@@ -246,7 +246,7 @@ Przeniesienie issue do ?Done" bez spe?nienia powy?szych zasad jest traktowane ja
 
 ---
 
-## 7. Podsumowanie
+## 10. Podsumowanie
 
 - Ta Definition of Done jest **minimalnym standardem** dla R1.0.  
 - Mo?emy wprowadza? doprecyzowania per modu?, ale nie powinni?my jej ?rozmi?kcza?".  
