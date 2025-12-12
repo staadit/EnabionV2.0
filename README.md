@@ -25,6 +25,12 @@ docker compose -f infra/docker-compose.dev.yml up -d
 - Epics should use clear sections (Goal/Scope/Constraints/AC/Telemetry) with Tasks as checklists (`[ ]`), ready for AI-assisted breakdown.
 - AI-generated code: require unit/integration/e2e sanity, log events (no PII), and PR checkbox “AI code reviewed + tests ran”.
 
+## Branching model
+- `main` – produkcyjny, stabilny; merge tylko przez PR + review.
+- `dev` – gałąź integracyjna; feature branche mergujemy przez PR do `dev`.
+- Release/gotowe inkrementy: PR z `dev` do `main`.
+- Backups: na push do `main` lub `dev` (branże `backup`, `backup-dev`, tagi `backup-main-*`, `backup-dev-*` z retencją 90 dni).
+
 ## Workflow
 - Default branch: `main` (work via PRs).
 - Project board columns: Backlog | In progress | For CEO | Done.
