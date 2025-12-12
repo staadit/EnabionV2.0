@@ -1,0 +1,37 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: enabion
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: enabion
+    volumes:
+      - ./dev-data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+  backend:
+    build: ../apps/backend
+    restart: unless-stopped
+    env_file:
+      - ../apps/backend/.env.example
+    depends_on:
+      - db
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build: ../apps/frontend
+    restart: unless-stopped
+    environment:
+      NEXT_PUBLIC_BACKEND_URL: http://localhost:4000
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+volumes:
+  postgres-data:

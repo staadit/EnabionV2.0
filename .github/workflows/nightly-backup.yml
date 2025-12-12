@@ -1,0 +1,71 @@
+name: branch-backups
+
+on:
+  push:
+    branches: [main, dev]
+  workflow_dispatch:
+
+jobs:
+  backup-main:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Sync main into backup branch
+        run: |
+          git fetch origin backup
+          git checkout backup
+          git merge origin/main --no-edit
+          git push origin backup
+
+      - name: Tag backup-main and prune older than 90 days
+        run: |
+          ts="backup-main-$(date -u +"%Y%m%d-%H%M%S")"
+          git tag "$ts"
+          git push origin "$ts"
+          cutoff=$(date -u -d '90 days ago' +%s)
+          for tag in $(git for-each-ref --format='%(refname:short) %(creatordate:unix)' refs/tags/backup-main-* | sort -k2 | awk -v c=$cutoff '$2 < c {print $1}'); do
+            git tag -d "$tag"
+            git push origin --delete "$tag"
+          done
+
+  backup-dev:
+    if: github.ref == 'refs/heads/dev'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Sync dev into backup-dev branch
+        run: |
+          git fetch origin backup-dev
+          git checkout backup-dev
+          git merge origin/dev --no-edit
+          git push origin backup-dev
+
+      - name: Tag backup-dev and prune older than 90 days
+        run: |
+          ts="backup-dev-$(date -u +"%Y%m%d-%H%M%S")"
+          git tag "$ts"
+          git push origin "$ts"
+          cutoff=$(date -u -d '90 days ago' +%s)
+          for tag in $(git for-each-ref --format='%(refname:short) %(creatordate:unix)' refs/tags/backup-dev-* | sort -k2 | awk -v c=$cutoff '$2 < c {print $1}'); do
+            git tag -d "$tag"
+            git push origin --delete "$tag"
+          done
