@@ -25,6 +25,9 @@ Thumbs.db
 .idea/
 .vscode/
 
+# Private infra notes (never commit)
+infra/priv.md
+
 # Logs
 *.log
 logs/
