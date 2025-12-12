@@ -1,0 +1,39 @@
+name: nightly-backup
+
+on:
+  schedule:
+    # 3:00 CET ≈ 02:00 UTC (zimą). W razie DST przesunąć na 01:00 UTC.
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Sync main into backup
+        run: |
+          git fetch origin backup
+          git checkout backup
+          git merge origin/main --no-edit
+          git push origin backup
+
+      - name: Tag backup and prune older than 10 tags
+        run: |
+          ts="backup-$(date -u +"%Y%m%d-%H%M%S")"
+          git tag "$ts"
+          git push origin "$ts"
+          cutoff=$(date -u -d '90 days ago' +%s)
+          for tag in $(git for-each-ref --format='%(refname:short) %(creatordate:unix)' refs/tags/backup-* | sort -k2 | awk -v c=$cutoff '$2 < c {print $1}'); do
+            git tag -d "$tag"
+            git push origin --delete "$tag"
+          done

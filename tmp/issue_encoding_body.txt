@@ -1,0 +1,11 @@
+﻿Cleanup of mojibake/encoding artifacts (â€“ â€” â€˜ â€™ â€œ â€ … � etc.) across R1.0 docs to ensure UTF-8 consistency.
+
+Scope:
+- Phase1_MVP-Spec, BCOS_Data_Event_Model_v1.md, AI_Gateway_Avatars_R1.0_Spec.md
+- Security_Privacy_* docs, NDA docs
+- Data_Models_1-3_*, TrustScore_*, other core docs per index
+
+Definition of Done:
+- find-in-files for artifacts returns zero occurrences
+- key docs render cleanly in GitHub preview
+- changes logged in log-YYYY-MM-DD.md

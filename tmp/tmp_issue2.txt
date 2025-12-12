@@ -1,0 +1,88 @@
+## Goal
+
+Define the initial BCOS Data & Event Model v1 for R1.0 so backend and AI work on one shared canonical model, fully aligned with the Enabion Playbook and the R1.0 Implementation Plan.
+
+## Scope / checklist
+
+- Define core entities for R1.0 (Model 1 - Standard):
+  - Org, User, **Contact**, Intent, Engagement (pre-sales), Event, NDA, TrustScoreSnapshot.
+  - Add a minimal **Outcome** skeleton as a future-use entity for Deliver/Expand (R2.0+), clearly marked as "not implemented in R1.0".
+- Specify fields and relationships for all entities (not only names), including:
+  - multi-tenant scoping (e.g. `orgId` / `tenantId` on all records),
+  - basic RBAC structure for R1.0 roles (Owner, BD/AM, Viewer/CEO) on Org/User level.
+- Define full list of R1.0 events:
+  - `INTENT_CREATED` / `INTENT_UPDATED`
+  - `AVATAR_SUGGESTION_ISSUED` / `AVATAR_SUGGESTION_ACCEPTED` / `AVATAR_SUGGESTION_REJECTED`
+  - `MATCH_LIST_CREATED`
+  - `NDA_ACCEPTED`
+  - `COMMIT_DECISION_TAKEN`
+- For each event, define the event payload schema:
+  - shared envelope fields (e.g. `eventId`, `type`, `occurredAt`, `actorUserId`, `orgId`, `entityType`, `entityId`),
+  - event-specific fields and minimal metadata needed for AI, audit and analytics.
+- Map each event to steps in the Enabion 5-Step Partnership Lifecycle:
+  - Clarify, Match & Align, Commit & Assure (implemented in R1.0),
+  - Deliver, Expand (placeholders only for R2.0+, no functional events yet).
+- Document ID strategy and versioning:
+  - how IDs are generated for entities and events,
+  - how we version schema changes without breaking R1.0 data.
+- Describe how we keep the model ready for R2.0+:
+  - Deliver & Expand flows,
+  - Issues/Disputes and Outcome log,
+  - TrustScore & Trust Graph integration, at least on the level of future fields and relations.
+- Add simple ERD / diagrams for the BCOS Core & Event Model:
+  - stored in the repo (e.g. `/docs/assets/bcos-data-model-v1.png`),
+  - referenced from the main spec document.
+- Ensure the whole R1.0 Data & Event Model lives as a dedicated section in the shared spec file:
+  - `docs/Phase1_MVP-Spec.md` -> section "BCOS Data & Event Model v1 (MVP)".
+
+## Tasks
+
+- [x] [Ewa] Create (or reuse if it already exists) the file `docs/Phase1_MVP-Spec.md` with a clear structure for R1.0 specs (Product, Data & Event Model, Architecture, AI Gateway, Security, etc.).
+- [x] [Ewa] Add a section **"BCOS Data & Event Model v1 (MVP)"** in `Phase1_MVP-Spec.md`:
+      - describe all core entities (Org, User, Contact, Intent, Engagement (pre-sales), Event, NDA, TrustScoreSnapshot, Outcome skeleton),
+      - list key fields and relationships, including multi-tenant scoping and basic RBAC assumptions.
+- [x] [Ewa] Define the full R1.0 event catalogue in the same section:
+      - include the event list from this issue,
+      - for each event, provide a JSON-like payload example and the mapping to affected entities.
+- [x] [Ewa] Add a mapping table **Event -> 5-Step Lifecycle step**:
+      - show which events belong to Clarify, Match & Align, Commit & Assure,
+      - mark Deliver/Expand as "future step - placeholders only".
+- [x] [Ewa] Document ID & versioning strategy:
+      - entity IDs (e.g. UUID/ULID) and event IDs,
+      - how we evolve schema between R1.0 and later releases.
+- [x] [Ewa] Prepare a simple ERD diagram for the R1.0 BCOS data model:
+      - export it as an image under `/docs/assets/bcos-data-model-v1.png`,
+      - embed it into `Phase1_MVP-Spec.md` under the Data & Event Model section.
+- [x] [Ewa] Cross-check consistency with:
+      - Issue #1 (MVP - Product Spec R1.0),
+      - Issue #3 (Architecture Overview - MVP),
+      - Issue #4 (AI Gateway & Avatars - Design & Guardrails),
+      - Issue #5 (Security & Privacy baseline - Model 1),
+      - Issue #11 (Definition of Done & dev standards),
+      and update names/terms if anything diverges.
+- [ ] [Ewa] Add a short comment to this issue with:
+      - links to the relevant sections in `Phase1_MVP-Spec.md`,
+      - link or path to the ERD image.
+
+## Relationships
+- Related to #1 [M0] MVP - Product Spec R1.0
+- Related to #3 [M0] Architecture Overview - MVP (R1.0)
+- Related to #4 [M0] AI Gateway & Avatars - Design & Guardrails (R1.0)
+- Related to #5 [M0] Security & Privacy baseline - Model 1 (MVP)
+- Related to #11 [M1] Definition of Done & dev standards (R1.0)
+
+## Definition of Done
+
+- [x] `docs/Phase1_MVP-Spec.md` exists in the repo and contains a section titled **"BCOS Data & Event Model v1 (MVP)"**.
+- [x] The section fully describes all core R1.0 entities (Org, User, Contact, Intent, Engagement (pre-sales), Event, NDA, TrustScoreSnapshot) including:
+      - key fields and relationships,
+      - multi-tenant scoping and basic RBAC assumptions.
+- [x] A minimal **Outcome** entity skeleton and future Issue/Dispute hooks are defined for R2.0+, clearly marked as "not implemented in R1.0".
+- [x] The R1.0 event catalogue is defined with:
+      - event list,
+      - payload schemas,
+      - mapping to 5-Step Lifecycle and to entities.
+- [x] ID and versioning rules for entities and events are documented in the spec.
+- [x] A simple ERD diagram of the BCOS data model is committed to the repo and referenced from the spec.
+- [ ] This issue has links (in comments) to the relevant spec section(s) and ERD, so other issues (#1, #3, #4, #5, #8, #10) can reference it as the canonical model.
+- [x] Relationships to the key dependent epics (#1, #3, #4, #5, #11) are set in GitHub so the board view shows this as a core M0 dependency.
