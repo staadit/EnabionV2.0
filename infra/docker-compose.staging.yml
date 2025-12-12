@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - ../apps/backend/.env.example # replace with /opt/enabion/staging/env/db.env on server
+    volumes:
+      - ../data/postgres:/var/lib/postgresql/data
+    ports:
+      - "5432:5432" # expose only if needed; prefer internal use
+
+  backend:
+    build: ../apps/backend
+    restart: unless-stopped
+    env_file:
+      - ../env/backend.env
+    depends_on:
+      - db
+    ports:
+      - "4000:4000"
+
+  frontend:
+    build: ../apps/frontend
+    restart: unless-stopped
+    env_file:
+      - ../env/frontend.env
+    depends_on:
+      - backend
+    ports:
+      - "3000:3000"
+
+# Usage on Vimexx staging:
+# 1) Place env files in /opt/enabion/staging/env (db.env, backend.env, frontend.env).
+# 2) Run: docker compose -f infra/docker-compose.staging.yml up -d --build
+# 3) Reverse proxy (Traefik/Nginx) should route:
+#    - staging.<domain> -> frontend:3000
+#    - api.staging.<domain> -> backend:4000
