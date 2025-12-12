@@ -24,6 +24,7 @@ docker compose -f infra/docker-compose.dev.yml up -d
 - Source of truth for DoD/dev standards: `docs/engineering/Definition_of_Done_R1.0.md`.
 - Epics should use clear sections (Goal/Scope/Constraints/AC/Telemetry) with Tasks as checklists (`[ ]`), ready for AI-assisted breakdown.
 - AI-generated code: require unit/integration/e2e sanity, log events (no PII), and PR checkbox “AI code reviewed + tests ran”.
+- `infra/priv.md` is private (local-only, read-only) and must never be committed/pushed.
 
 ## Branching model
 - `main` – produkcyjny, stabilny; merge tylko przez PR + review.
