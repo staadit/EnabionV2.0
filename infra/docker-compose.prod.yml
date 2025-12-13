@@ -21,6 +21,19 @@ services:
     networks:
       - internal
       - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.backend.rule=Host(`api.dev.enabion.com`)"
+      - "traefik.http.routers.backend.entrypoints=websecure"
+      - "traefik.http.routers.backend.tls.certresolver=le"
+      - "traefik.http.routers.backend.service=backend-svc"
+      - "traefik.http.services.backend-svc.loadbalancer.server.port=4000"
+      - "traefik.http.routers.backend-web.rule=Host(`api.dev.enabion.com`)"
+      - "traefik.http.routers.backend-web.entrypoints=web"
+      - "traefik.http.routers.backend-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.backend-web.service=backend-svc"
 
   frontend:
     build:
@@ -32,6 +45,19 @@ services:
       - backend
     networks:
       - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.frontend.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend.entrypoints=websecure"
+      - "traefik.http.routers.frontend.tls.certresolver=le"
+      - "traefik.http.routers.frontend.service=frontend-svc"
+      - "traefik.http.services.frontend-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend-web.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend-web.entrypoints=web"
+      - "traefik.http.routers.frontend-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.frontend-web.service=frontend-svc"
 
 networks:
   internal:
