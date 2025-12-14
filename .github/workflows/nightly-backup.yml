@@ -46,17 +46,29 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: dev
 
       - name: Configure git
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
 
-      - name: Sync dev into backup-dev branch
+      - name: Create zip from dev HEAD
         run: |
-          git fetch origin backup-dev
-          git checkout backup-dev
-          git merge origin/dev --no-edit
+          ts="$(date -u +"%Y%m%d-%H%M%S")"
+          git archive --format=zip -o "/tmp/dev-backup-${ts}.zip" HEAD
+          echo "ZIP_PATH=/tmp/dev-backup-${ts}.zip" >> $GITHUB_ENV
+          echo "TS=${ts}" >> $GITHUB_ENV
+
+      - name: Sync dev into backup-dev branch and store zip
+        run: |
+          git fetch origin backup-dev || true
+          git checkout backup-dev || git checkout --orphan backup-dev
+          mkdir -p backup-dev
+          rm -rf backup-dev/*
+          cp "${ZIP_PATH}" "backup-dev/dev-backup-${TS}.zip"
+          git add backup-dev/
+          git commit -m "backup(dev): dev-backup-${TS}" || echo "Nothing to commit"
           git push origin backup-dev
 
       - name: Tag backup-dev and prune older than 90 days
