@@ -6,9 +6,18 @@ type HomeProps = {
   backendError: string | null;
   apiHealth: string | null;
   apiError: string | null;
+  vpsHealth: string | null;
+  vpsError: string | null;
 };
 
-export default function Home({ backendHealth, backendError, apiHealth, apiError }: HomeProps) {
+export default function Home({
+  backendHealth,
+  backendError,
+  apiHealth,
+  apiError,
+  vpsHealth,
+  vpsError,
+}: HomeProps) {
   const boxStyle = {
     background: '#f5f5f5',
     padding: '1rem',
@@ -31,6 +40,9 @@ export default function Home({ backendHealth, backendError, apiHealth, apiError 
 
         <p style={{ marginTop: '1.5rem' }}>API health (frontend route /api/health):</p>
         <pre style={boxStyle}>{apiError ? `Error: ${apiError}` : apiHealth ?? 'No response'}</pre>
+
+        <p style={{ marginTop: '1.5rem' }}>VPS health (frontend route /api/vps-health):</p>
+        <pre style={boxStyle}>{vpsError ? `Error: ${vpsError}` : vpsHealth ?? 'No response'}</pre>
       </main>
     </>
   );
@@ -49,6 +61,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
 
   const backend = await fetchText('http://backend:4000/health');
   const api = await fetchText('http://localhost:3000/api/health');
+  const vps = await fetchText('http://localhost:3000/api/vps-health');
 
   return {
     props: {
@@ -56,6 +69,8 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
       backendError: backend.error,
       apiHealth: api.text,
       apiError: api.error,
+      vpsHealth: vps.text,
+      vpsError: vps.error,
     },
   };
 };
