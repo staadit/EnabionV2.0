@@ -1,4 +1,5 @@
 import Head from 'next/head';
+import { useEffect, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 
 type HomeProps = {
@@ -10,6 +11,15 @@ type HomeProps = {
   vpsError: string | null;
 };
 
+type VpsLoad = {
+  status: string;
+  timestamp: string;
+  uptimeSeconds: number;
+  loadAvg: number[];
+  mem: { total: number; free: number };
+  hostname: string;
+};
+
 export default function Home({
   backendHealth,
   backendError,
@@ -18,6 +28,25 @@ export default function Home({
   vpsHealth,
   vpsError,
 }: HomeProps) {
+  const [vpsLoad, setVpsLoad] = useState<VpsLoad | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchLoad = async () => {
+      try {
+        const res = await fetch('/api/vps-load');
+        const data = (await res.json()) as VpsLoad;
+        setVpsLoad(data);
+        setLoadError(null);
+      } catch (err: any) {
+        setLoadError(err?.message ?? 'Unknown error');
+      }
+    };
+    fetchLoad();
+    const id = setInterval(fetchLoad, 30 * 60 * 1000); // every 30 minutes
+    return () => clearInterval(id);
+  }, []);
+
   const boxStyle = {
     background: '#f5f5f5',
     padding: '1rem',
@@ -43,6 +72,19 @@ export default function Home({
 
         <p style={{ marginTop: '1.5rem' }}>VPS health (frontend route /api/vps-health):</p>
         <pre style={boxStyle}>{vpsError ? `Error: ${vpsError}` : vpsHealth ?? 'No response'}</pre>
+
+        <p style={{ marginTop: '1.5rem' }}>VPS load (auto-refresh co 30 min):</p>
+        <pre style={boxStyle}>
+          {loadError
+            ? `Error: ${loadError}`
+            : vpsLoad
+            ? `Last update: ${vpsLoad.timestamp}
+Host: ${vpsLoad.hostname}
+Uptime (s): ${vpsLoad.uptimeSeconds}
+Load avg (1/5/15): ${vpsLoad.loadAvg.map((n) => n.toFixed(2)).join(', ')}
+Mem free/total (MB): ${(vpsLoad.mem.free / 1024 / 1024).toFixed(0)} / ${(vpsLoad.mem.total / 1024 / 1024).toFixed(0)}`
+            : 'Loading...'}
+        </pre>
       </main>
     </>
   );
