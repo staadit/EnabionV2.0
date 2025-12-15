@@ -49,7 +49,7 @@ export class EventService {
         pipelineStage: validated.pipelineStage,
         channel: validated.channel,
         correlationId: validated.correlationId,
-        payload: validated.payload as Prisma.InputJsonValue,
+        payload: validated.payload as any,
       },
     });
 
