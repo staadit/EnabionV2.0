@@ -234,7 +234,8 @@ const envelopeSchema = z
 
 export type EventEnvelope = z.infer<typeof envelopeSchema>;
 
-export type EventEnvelopeInput = Omit<EventEnvelope, 'recordedAt'> & {
+export type EventEnvelopeInput = Omit<EventEnvelope, 'recordedAt' | 'schemaVersion'> & {
+  schemaVersion?: 1;
   recordedAt?: Date | string;
 };
 
@@ -244,9 +245,9 @@ export type ValidatedEvent = EventEnvelope & {
 
 export function validateEvent(input: EventEnvelopeInput): ValidatedEvent {
   const parsedEnvelope = envelopeSchema.parse({
-    schemaVersion: 1,
-    recordedAt: input.recordedAt ?? new Date(),
     ...input,
+    schemaVersion: input.schemaVersion ?? 1,
+    recordedAt: input.recordedAt ?? new Date(),
   });
 
   const payloadSchema = payloadSchemas[parsedEnvelope.type];
