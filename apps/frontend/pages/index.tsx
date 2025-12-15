@@ -78,16 +78,39 @@ export default function Home({
           {loadError
             ? `Error: ${loadError}`
             : vpsLoad
-            ? `Last update: ${vpsLoad.timestamp}
-Host: ${vpsLoad.hostname}
-Uptime (s): ${vpsLoad.uptimeSeconds}
-Load avg (1/5/15): ${vpsLoad.loadAvg.map((n) => n.toFixed(2)).join(', ')}
-Mem free/total (MB): ${(vpsLoad.mem.free / 1024 / 1024).toFixed(0)} / ${(vpsLoad.mem.total / 1024 / 1024).toFixed(0)}`
+            ? formatLoadSummary(vpsLoad)
             : 'Loading...'}
         </pre>
       </main>
     </>
   );
+}
+
+function formatLoadSummary(load: VpsLoad) {
+  const totalMb = load.mem.total / 1024 / 1024;
+  const freeMb = load.mem.free / 1024 / 1024;
+  const usedMb = totalMb - freeMb;
+  const [l1, l5, l15] = load.loadAvg.map((n) => n.toFixed(2));
+  const uptime = formatUptime(load.uptimeSeconds);
+  return [
+    `Last update: ${load.timestamp}`,
+    `Host: ${load.hostname}`,
+    `Uptime: ${uptime}`,
+    `Load avg (1/5/15): ${l1}/${l5}/${l15}`,
+    `RAM: ${usedMb.toFixed(1)} GiB used, ${freeMb.toFixed(1)} GiB free (total ${totalMb.toFixed(1)} GiB)`,
+  ].join('\n');
+}
+
+function formatUptime(seconds: number) {
+  const days = Math.floor(seconds / 86400);
+  const hours = Math.floor((seconds % 86400) / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const parts = [];
+  if (days) parts.push(`${days}d`);
+  if (hours) parts.push(`${hours}h`);
+  if (minutes) parts.push(`${minutes}m`);
+  if (!parts.length) parts.push(`${seconds}s`);
+  return parts.join(' ');
 }
 
 export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
