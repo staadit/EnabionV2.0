@@ -11,6 +11,7 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   users     User[]
+  events    Event[]
   createdAt DateTime @default(now())
 }
 
@@ -21,4 +22,26 @@ model User {
   role      String
   org       Organization @relation(fields: [orgId], references: [id])
   createdAt DateTime @default(now())
+}
+
+model Event {
+  id             String   @id
+  schemaVersion  Int
+  type           String
+  occurredAt     DateTime
+  recordedAt     DateTime @default(now())
+  orgId          String
+  actorUserId    String?
+  actorOrgId     String?
+  subjectType    String
+  subjectId      String
+  lifecycleStep  String?
+  pipelineStage  String?
+  channel        String
+  correlationId  String
+  payload        Json
+
+  org Organization @relation(fields: [orgId], references: [id])
+
+  @@index([orgId, subjectId, type, occurredAt])
 }
