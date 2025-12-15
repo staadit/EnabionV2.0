@@ -1,6 +1,10 @@
 FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
+# Build-time deps for Prisma engine detection
+RUN apt-get update && apt-get install -y --no-install-recommends openssl \
+  && rm -rf /var/lib/apt/lists/*
+
 # Install deps
 COPY package*.json ./
 RUN npm install
