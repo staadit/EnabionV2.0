@@ -9,6 +9,10 @@ type HomeProps = {
   apiError: string | null;
   vpsHealth: string | null;
   vpsError: string | null;
+  prodFrontendHealth: string | null;
+  prodFrontendError: string | null;
+  prodBackendHealth: string | null;
+  prodBackendError: string | null;
 };
 
 type VpsLoad = {
@@ -27,6 +31,10 @@ export default function Home({
   apiError,
   vpsHealth,
   vpsError,
+  prodFrontendHealth,
+  prodFrontendError,
+  prodBackendHealth,
+  prodBackendError,
 }: HomeProps) {
   const [vpsLoad, setVpsLoad] = useState<VpsLoad | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -81,9 +89,62 @@ export default function Home({
             ? formatLoadSummary(vpsLoad)
             : 'Loading...'}
         </pre>
+
+        <section style={{ marginTop: '2rem' }}>
+          <h2>Prod pilot controls (manual)</h2>
+          <p>
+            Start/stop pilota prod via GitHub Actions (workflow{' '}
+            <code>Deploy Prod Pilot (manual)</code>). Links otworzą stronę akcji do ręcznego uruchomienia.
+          </p>
+          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
+            <a
+              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+              target="_blank"
+              rel="noreferrer"
+              style={buttonStyle('#0b5ed7')}
+            >
+              Start Prod (GH Actions)
+            </a>
+            <a
+              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+              target="_blank"
+              rel="noreferrer"
+              style={buttonStyle('#dc3545')}
+            >
+              Stop Prod (GH Actions)
+            </a>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+            <div>
+              <p>Prod backend health (`https://api.enabion.com/health`):</p>
+              <pre style={boxStyle}>
+                {prodBackendError ? `Error: ${prodBackendError}` : prodBackendHealth ?? 'No response'}
+              </pre>
+            </div>
+            <div>
+              <p>Prod frontend health (`https://enabion.com/api/health`):</p>
+              <pre style={boxStyle}>
+                {prodFrontendError ? `Error: ${prodFrontendError}` : prodFrontendHealth ?? 'No response'}
+              </pre>
+            </div>
+          </div>
+        </section>
       </main>
     </>
   );
+}
+
+function buttonStyle(bg: string) {
+  return {
+    display: 'inline-block',
+    padding: '0.75rem 1.25rem',
+    color: '#fff',
+    background: bg,
+    borderRadius: '6px',
+    textDecoration: 'none',
+    fontWeight: 600,
+  } as const;
 }
 
 function formatLoadSummary(load: VpsLoad) {
@@ -127,6 +188,8 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
   const backend = await fetchText('http://backend:4000/health');
   const api = await fetchText('http://localhost:3000/api/health');
   const vps = await fetchText('http://localhost:3000/api/vps-health');
+  const prodFrontend = await fetchText('https://enabion.com/api/health');
+  const prodBackend = await fetchText('https://api.enabion.com/health');
 
   return {
     props: {
@@ -136,6 +199,10 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
       apiError: api.error,
       vpsHealth: vps.text,
       vpsError: vps.error,
+      prodFrontendHealth: prodFrontend.text,
+      prodFrontendError: prodFrontend.error,
+      prodBackendHealth: prodBackend.text,
+      prodBackendError: prodBackend.error,
     },
   };
 };
