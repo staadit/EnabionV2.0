@@ -1,0 +1,84 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    env_file:
+      - /srv/enabion/prod/env/db.env
+    volumes:
+      - /srv/enabion/_volumes/prod/postgres:/var/lib/postgresql/data
+    networks:
+      - internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  backend:
+    build:
+      context: ../apps/backend
+    restart: unless-stopped
+    env_file:
+      - /srv/enabion/prod/env/backend.env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - internal
+      - edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.backend-prod.rule=Host(`api.enabion.com`)"
+      - "traefik.http.routers.backend-prod.entrypoints=websecure"
+      - "traefik.http.routers.backend-prod.tls.certresolver=le"
+      - "traefik.http.routers.backend-prod.service=backend-prod-svc"
+      - "traefik.http.services.backend-prod-svc.loadbalancer.server.port=4000"
+      - "traefik.http.routers.backend-prod-web.rule=Host(`api.enabion.com`)"
+      - "traefik.http.routers.backend-prod-web.entrypoints=web"
+      - "traefik.http.routers.backend-prod-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.backend-prod-web.service=backend-prod-svc"
+
+  frontend:
+    build:
+      context: ../apps/frontend
+    restart: unless-stopped
+    env_file:
+      - /srv/enabion/prod/env/frontend.env
+    depends_on:
+      backend:
+        condition: service_healthy
+    networks:
+      - edge
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.frontend-prod.rule=Host(`enabion.com`)"
+      - "traefik.http.routers.frontend-prod.entrypoints=websecure"
+      - "traefik.http.routers.frontend-prod.tls.certresolver=le"
+      - "traefik.http.routers.frontend-prod.service=frontend-prod-svc"
+      - "traefik.http.services.frontend-prod-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend-prod-web.rule=Host(`enabion.com`)"
+      - "traefik.http.routers.frontend-prod-web.entrypoints=web"
+      - "traefik.http.routers.frontend-prod-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.frontend-prod-web.service=frontend-prod-svc"
+
+networks:
+  internal:
+  edge:
+    external: true
+    name: enabion_edge
