@@ -1,5 +1,8 @@
 name: branch-backups
 
+permissions:
+  contents: write
+
 on:
   schedule:
     - cron: '0 3 * * *'
@@ -19,6 +22,11 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+
+      - name: Use GITHUB_TOKEN for push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
 
       - name: Sync main into backup branch
         run: |
@@ -52,6 +60,11 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
+
+      - name: Use GITHUB_TOKEN for push
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
 
       - name: Create zip from dev HEAD
         run: |
