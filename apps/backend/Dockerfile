@@ -1,4 +1,4 @@
-FROM node:20-alpine AS builder
+FROM node:20-bookworm-slim AS builder
 WORKDIR /app
 
 # Install deps
@@ -9,11 +9,13 @@ RUN npm install
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine
+FROM node:20-bookworm-slim
 WORKDIR /app
 ENV NODE_ENV=production
 
-RUN apk add --no-cache curl
+# Runtime deps: curl for healthcheck, openssl for Prisma engines
+RUN apt-get update && apt-get install -y --no-install-recommends curl openssl \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /app /app
 
