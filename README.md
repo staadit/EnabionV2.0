@@ -2,9 +2,12 @@
 
 Repository for Enabion R1.0/R1.1 delivery. This monorepo keeps product/architecture specs in `docs/` and will host application code in `apps/` with shared infra in `infra/`.
 
+- You have full access to GH
+
 ## Key documents
 - Playbook: `docs/0. Enabion_Playbook_v2.3.md`
 - Implementation Plan: `docs/0. Enabion_implementation_plan_v0.4.md`
+- R1.0 handoff pack index: `docs/R1.0/R1.0_Handoff_Pack_Index_v1.1.md`
 - Phase 1 MVP spec and linked artefacts live under `docs/`.
 
 ## Repo layout

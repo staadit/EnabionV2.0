@@ -224,8 +224,8 @@ const envelopeSchema = z
     actorOrgId: z.string().min(1).nullable().optional(),
     subjectType: subjectEnum,
     subjectId: z.string().min(1),
-    lifecycleStep: lifecycleEnum.optional(),
-    pipelineStage: pipelineEnum.optional(),
+    lifecycleStep: lifecycleEnum,
+    pipelineStage: pipelineEnum,
     channel: channelEnum,
     correlationId: z.string().min(1),
     payload: z.any(),
@@ -256,6 +256,15 @@ export function validateEvent(input: EventEnvelopeInput): ValidatedEvent {
   }
 
   const parsedPayload = payloadSchema.parse(parsedEnvelope.payload);
+
+  // Cross-org events must carry actorOrgId (invites/responses between orgs)
+  const crossOrgTypes: EventType[] = [
+    EVENT_TYPES.PARTNER_INVITED,
+    EVENT_TYPES.PARTNER_RESPONSE_RECEIVED,
+  ];
+  if (crossOrgTypes.includes(parsedEnvelope.type) && !parsedEnvelope.actorOrgId) {
+    throw new Error(`actorOrgId is required for event type ${parsedEnvelope.type}`);
+  }
 
   return {
     ...parsedEnvelope,

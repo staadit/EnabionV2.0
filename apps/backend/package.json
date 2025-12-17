@@ -8,8 +8,13 @@
     "start:dev": "nest start --watch",
     "build": "nest build",
     "lint": "eslint . --ext .ts",
-    "test": "npm run test:contracts",
-    "test:contracts": "ts-node --project tsconfig.json scripts/event-contract.test.ts"
+    "test": "npm run test:blobstore && npm run test:attachments && npm run test:contracts && npm run test:tenant && npm run test:nda-leak && npm run test:api",
+    "test:blobstore": "ts-node --project tsconfig.json scripts/blobstore.test.ts",
+    "test:attachments": "ts-node --project tsconfig.json scripts/attachment-integration.test.ts",
+    "test:contracts": "ts-node --project tsconfig.json scripts/event-contract.test.ts",
+    "test:tenant": "ts-node --project tsconfig.json scripts/tenant-isolation.test.ts",
+    "test:nda-leak": "ts-node --project tsconfig.json scripts/nda-leak.test.ts",
+    "test:api": "ts-node --project tsconfig.json scripts/event-api.test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

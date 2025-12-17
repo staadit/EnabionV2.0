@@ -13,6 +13,8 @@ model Organization {
   name      String
   users     User[]
   events    Event[]
+  blobs     Blob[]
+  attachments Attachment[]
   createdAt DateTime @default(now())
 }
 
@@ -23,6 +25,23 @@ model User {
   role      String
   org       Organization @relation(fields: [orgId], references: [id])
   createdAt DateTime @default(now())
+}
+
+enum ConfidentialityLevel {
+  L1
+  L2
+  L3
+}
+
+enum BlobStorageDriver {
+  local
+  s3
+}
+
+enum AttachmentSource {
+  email_ingest
+  manual_upload
+  export
 }
 
 model Event {
@@ -36,8 +55,8 @@ model Event {
   actorOrgId     String?
   subjectType    String
   subjectId      String
-  lifecycleStep  String?
-  pipelineStage  String?
+  lifecycleStep  String   @default("CLARIFY")
+  pipelineStage  String   @default("NEW")
   channel        String
   correlationId  String
   payload        Json
@@ -45,4 +64,44 @@ model Event {
   org Organization @relation(fields: [orgId], references: [id])
 
   @@index([orgId, subjectId, type, occurredAt])
+  @@index([correlationId])
+  @@index([occurredAt])
+}
+
+model Blob {
+  id               String                @id @default(uuid())
+  orgId            String
+  storageDriver    BlobStorageDriver     @default(local)
+  objectKey        String
+  sizeBytes        Int
+  sha256           String                @db.Char(64)
+  contentType      String
+  confidentiality  ConfidentialityLevel  @default(L1)
+  encrypted        Boolean               @default(false)
+  encryptionAlg    String?
+  encryptionKeyId  String?
+  encryptionIvB64  String?
+  encryptionTagB64 String?
+  createdAt        DateTime              @default(now())
+  attachments      Attachment[]
+  org              Organization          @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([orgId, objectKey])
+}
+
+model Attachment {
+  id              String             @id @default(uuid())
+  orgId           String
+  intentId        String?
+  source          AttachmentSource   @default(manual_upload)
+  filename        String
+  blobId          String
+  createdByUserId String?
+  createdAt       DateTime           @default(now())
+  blob            Blob               @relation(fields: [blobId], references: [id])
+  org             Organization       @relation(fields: [orgId], references: [id])
+
+  @@index([orgId])
+  @@index([intentId])
 }
