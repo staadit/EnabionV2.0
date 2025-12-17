@@ -63,6 +63,5 @@
 - [x] Tests: integration (docker-style) upload/download + tenant isolation via `scripts/attachment-integration.test.ts`; unit tests cover local driver, AES-GCM, L2 without NDA -> 403.
 - [x] Docs: `docs/R1.0/R1_0_infra_blobstore.md` env/paths/notes updated.
 - [ ] Mark issue For CEO after implementation/tests; apply DB migrations in environments (`npx prisma migrate deploy`). Optional: S3 smoke with `@aws-sdk/client-s3`.
-- [ ] Apply DB migrations in environments: `cd apps/backend && npx prisma migrate deploy`.
+- [x] Apply DB migrations in environments: `cd apps/backend && npx prisma migrate deploy`.
 - [ ] Optional: S3 smoke test with `@aws-sdk/client-s3` installed and env set; mark issue For CEO after deploy/tests.
-
