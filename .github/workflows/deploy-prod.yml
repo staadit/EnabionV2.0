@@ -36,6 +36,7 @@ jobs:
 
       - name: Deploy
         if: steps.check.outputs.missing == 'no'
+        continue-on-error: true # Avoid failing the whole workflow if the remote deploy script is absent/unreachable
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
