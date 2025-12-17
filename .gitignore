@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+.next/
+out/
+dist/
+build/
+coverage/
+
+# Env/config
+.env
+.env.*
+!.env.example
+apps/**/.env
+apps/**/.env.*
+
+# OS/Editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# Private infra notes (never commit)
+infra/priv.md
+
+# Logs
+*.log
+logs/
+
+# Prisma
+prisma/*.db
+
+# Docker volumes (local)
+infra/dev-data/

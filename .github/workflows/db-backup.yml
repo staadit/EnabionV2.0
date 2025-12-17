@@ -1,0 +1,98 @@
+permissions:
+  contents: write
+
+name: db backup
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+
+jobs:
+  backup-db:
+    runs-on: ubuntu-latest
+    env:
+      HOST: ${{ secrets.VPS_HOST }}
+      USER: ${{ secrets.VPS_USER }}
+      PORT: ${{ secrets.VPS_PORT || '22' }}
+    steps:
+      - name: Checkout repo (dev)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: dev
+
+      - name: Detect changes on dev in last 24h
+        id: detect_changes
+        run: |
+          git fetch origin dev
+          if git log origin/dev --since='1 day ago' --oneline | grep -q .; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Skip backup (no changes)
+        if: steps.detect_changes.outputs.changed == 'false'
+        run: echo "No changes on dev in last 24h; skipping DB backup."
+
+      - name: Configure git
+        if: steps.detect_changes.outputs.changed == 'true'
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      - name: Prepare backup-dev branch
+        if: steps.detect_changes.outputs.changed == 'true'
+        run: |
+          git fetch origin backup-dev || true
+          if git show-ref --quiet refs/remotes/origin/backup-dev; then
+            git checkout backup-dev
+            git merge origin/dev --no-edit
+          else
+            git checkout -b backup-dev
+          fi
+
+      - name: Setup SSH agent
+        if: steps.detect_changes.outputs.changed == 'true'
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
+
+      - name: Trust host key
+        if: steps.detect_changes.outputs.changed == 'true'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.VPS_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      - name: Dump DB from VPS (prod stack)
+        if: steps.detect_changes.outputs.changed == 'true'
+        run: |
+          ts=$(date -u +"%Y%m%d-%H%M%S")
+          ssh -p "$PORT" "${USER}@${HOST}" \
+            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db pg_dump -U enabion enabion_prod" \
+            > "db-backup-${ts}.sql"
+          gzip "db-backup-${ts}.sql"
+          echo "TS=$ts" >> $GITHUB_ENV
+          echo "BACKUP_FILE=db-backup-${ts}.sql.gz" >> $GITHUB_ENV
+
+      - name: Commit backup into backup-dev branch
+        if: steps.detect_changes.outputs.changed == 'true'
+        run: |
+          mkdir -p db-backups
+          mv "$BACKUP_FILE" db-backups/
+          find db-backups -maxdepth 1 -type f -name 'db-backup-*.sql.gz' | sort > /tmp/db-backups.txt
+          count=$(wc -l < /tmp/db-backups.txt | tr -d ' ')
+          if [ "$count" -gt 30 ]; then
+            head -n $(($count - 30)) /tmp/db-backups.txt | xargs -r rm --
+          fi
+          git add db-backups/
+          git commit -m "db-backup: dev $TS" || echo "Nothing to commit"
+
+      - name: Push backup-dev
+        if: steps.detect_changes.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          git remote set-url origin https://x-access-token:${GH_TOKEN}@github.com/${{ github.repository }}.git
+          git push origin backup-dev
