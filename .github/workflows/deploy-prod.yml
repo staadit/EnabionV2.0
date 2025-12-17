@@ -6,47 +6,45 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  check-secrets:
     runs-on: ubuntu-latest
+    outputs:
+      can_deploy: ${{ steps.check.outputs.can_deploy }}
     steps:
       - name: Check required secrets
         id: check
         shell: bash
         run: |
-          missing=""
-          [ -z "${{ secrets.VPS_HOST }}" ] && missing="yes"
-          [ -z "${{ secrets.VPS_USER }}" ] && missing="yes"
-          [ -z "${{ secrets.VPS_SSH_KEY }}" ] && missing="yes"
-          echo "missing=${missing:-no}" >> "$GITHUB_OUTPUT"
+          if [ -n "${{ secrets.VPS_HOST }}" ] && [ -n "${{ secrets.VPS_USER }}" ] && [ -n "${{ secrets.VPS_SSH_KEY }}" ]; then
+            echo "can_deploy=yes" >> "$GITHUB_OUTPUT"
+            echo "Ready to deploy."
+          else
+            echo "can_deploy=no" >> "$GITHUB_OUTPUT"
+            echo "Skipping deploy: VPS_HOST/VPS_USER/VPS_SSH_KEY secrets not configured."
+          fi
 
+  deploy:
+    needs: check-secrets
+    if: needs.check-secrets.outputs.can_deploy == 'yes'
+    runs-on: ubuntu-latest
+    steps:
       - name: Checkout
-        if: steps.check.outputs.missing == 'no'
         uses: actions/checkout@v4
 
       - name: Setup SSH agent
-        if: steps.check.outputs.missing == 'no'
-        continue-on-error: true
         uses: webfactory/ssh-agent@v0.9.0
         with:
           ssh-private-key: ${{ secrets.VPS_SSH_KEY }}
 
       - name: Trust host key
-        if: steps.check.outputs.missing == 'no'
-        continue-on-error: true
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.VPS_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
 
       - name: Deploy
-        if: steps.check.outputs.missing == 'no'
-        continue-on-error: true # Avoid failing the whole workflow if the remote deploy script is absent/unreachable
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
           PORT: ${{ secrets.VPS_PORT }}
         run: |
           ssh -p "${PORT:-22}" "${USER}@${HOST}" "/usr/local/bin/enabion-deploy-prod.sh"
-
-      - name: Skip deploy (missing VPS secrets)
-        if: steps.check.outputs.missing != 'no'
-        run: echo "Skipping deploy: VPS_HOST/VPS_USER/VPS_SSH_KEY secrets not configured."
