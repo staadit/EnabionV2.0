@@ -43,9 +43,9 @@ jobs:
         env:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
-          PORT: ${{ secrets.VPS_PORT || '22' }}
+          PORT: ${{ secrets.VPS_PORT }}
         run: |
-          ssh -p "$PORT" "${USER}@${HOST}" "/usr/local/bin/enabion-deploy-prod.sh"
+          ssh -p "${PORT:-22}" "${USER}@${HOST}" "/usr/local/bin/enabion-deploy-prod.sh"
 
       - name: Skip deploy (missing VPS secrets)
         if: steps.check.outputs.missing != 'no'
