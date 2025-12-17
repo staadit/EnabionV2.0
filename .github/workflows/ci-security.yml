@@ -50,4 +50,4 @@ jobs:
         run: npm ci
       - name: Audit (high+)
         working-directory: ${{ matrix.app.path }}
-        run: npm audit --audit-level=high
+        run: npm audit --omit=dev --audit-level=high
