@@ -46,5 +46,6 @@ jobs:
           HOST: ${{ secrets.VPS_HOST }}
           USER: ${{ secrets.VPS_USER }}
           PORT: ${{ secrets.VPS_PORT }}
+        continue-on-error: true
         run: |
           ssh -p "${PORT:-22}" "${USER}@${HOST}" "/usr/local/bin/enabion-deploy-prod.sh"
