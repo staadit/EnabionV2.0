@@ -39,21 +39,4 @@ jobs:
           REF: ${{ github.event.inputs.ref }}
           MODE: ${{ github.event.inputs.mode }}
         run: |
-          ssh -p "$PORT" "${USER}@${HOST}" bash -s <<'EOF'
-          set -euo pipefail
-          REF="${REF}"
-          MODE="${MODE}"
-          COMPOSE="infra/docker-compose.prod.pilot.yml"
-          cd /srv/enabion/prod/repo
-          git fetch --all --tags
-          git checkout "$REF"
-          git reset --hard "$REF"
-          if [ "$MODE" = "stop" ]; then
-            docker compose -f "$COMPOSE" down
-            exit 0
-          fi
-          if [ "$MODE" = "restart" ]; then
-            docker compose -f "$COMPOSE" down || true
-          fi
-          docker compose -f "$COMPOSE" up -d --build
-          EOF
+          ssh -p "$PORT" "${USER}@${HOST}" "/usr/local/bin/enabion-deploy-prod.sh \"$REF\" \"$MODE\""
