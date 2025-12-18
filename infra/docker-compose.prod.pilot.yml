@@ -1,4 +1,4 @@
-version: "3.9"
+name: enabion_pilot
 
 services:
   db:
@@ -7,7 +7,7 @@ services:
     env_file:
       - /srv/enabion/prod/env/db.env
     volumes:
-      - /srv/enabion/_volumes/prod/postgres:/var/lib/postgresql/data
+      - /srv/enabion/_volumes/pilot/postgres:/var/lib/postgresql/data
     networks:
       - internal
     healthcheck:
@@ -25,11 +25,13 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      - /srv/enabion/_volumes/pilot/blobstore:/app/tmp/blobstore
     networks:
       - internal
       - edge
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:4000/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1));\""]
       interval: 15s
       timeout: 5s
       retries: 5
@@ -59,7 +61,7 @@ services:
     networks:
       - edge
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:3000/api/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1));\""]
       interval: 15s
       timeout: 5s
       retries: 5
