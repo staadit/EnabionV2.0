@@ -68,13 +68,41 @@ jobs:
       - name: Dump DB from VPS (prod stack)
         if: steps.detect_changes.outputs.changed == 'true'
         run: |
+          set -euo pipefail
           ts=$(date -u +"%Y%m%d-%H%M%S")
+          psql_db=${POSTGRES_LIST_DB:-postgres}
+          db_candidates="${POSTGRES_DB:-enabion_prod} enabion enabion_staging"
+          db_list=$(ssh -p "$PORT" "${USER}@${HOST}" \
+            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db psql -U enabion -d \"$psql_db\" -tAc \"SELECT datname FROM pg_database WHERE datistemplate = false;\"")
+          echo "Databases found on server: $db_list"
+          db_name=""
+          for candidate in $db_candidates; do
+            if echo "$db_list" | tr -s '[:space:]' '\n' | grep -Fx "$candidate" >/dev/null 2>&1; then
+              db_name="$candidate"
+              break
+            fi
+          done
+          if [ -z "$db_name" ]; then
+            db_first=$(echo "$db_list" | tr -s '[:space:]' '\n' | grep -E -v '^(template0|template1|postgres)$' | head -n1)
+            if [ -z "$db_first" ]; then
+              db_first=$(echo "$db_list" | tr -s '[:space:]' '\n' | grep -E -v '^(template0|template1)$' | head -n1)
+            fi
+            if [ -n "$db_first" ]; then
+              db_name="$db_first"
+              echo "No candidate match; falling back to first available DB: $db_name"
+            else
+              echo "No candidate DB found (looked for: $db_candidates). Existing DBs: $db_list" >&2
+              exit 1
+            fi
+          fi
+          echo "Using DB: $db_name"
           ssh -p "$PORT" "${USER}@${HOST}" \
-            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db pg_dump -U enabion enabion_prod" \
+            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db pg_dump -U enabion \"$db_name\"" \
             > "db-backup-${ts}.sql"
           gzip "db-backup-${ts}.sql"
           echo "TS=$ts" >> $GITHUB_ENV
           echo "BACKUP_FILE=db-backup-${ts}.sql.gz" >> $GITHUB_ENV
+          echo "DB_NAME=$db_name" >> $GITHUB_ENV
 
       - name: Commit backup into backup-dev branch
         if: steps.detect_changes.outputs.changed == 'true'

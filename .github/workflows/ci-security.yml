@@ -1,0 +1,54 @@
+name: security CI (secrets + deps)
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  gitleaks:
+    name: secrets scan (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+        with:
+          args: detect --redact --report-path=gitleaks-report.sarif --report-format=sarif
+      - name: Upload SARIF
+        if: always()
+        continue-on-error: true # Skip failing the workflow when code scanning upload is not permitted
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: gitleaks-report.sarif
+
+  npm-audit:
+    name: dependency scan (npm)
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        app:
+          - name: backend
+            path: apps/backend
+          - name: frontend
+            path: apps/frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: ${{ matrix.app.path }}/package-lock.json
+      - name: Install
+        working-directory: ${{ matrix.app.path }}
+        run: npm ci
+      - name: Audit (high+)
+        working-directory: ${{ matrix.app.path }}
+        run: npm audit --omit=dev --audit-level=high

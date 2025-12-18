@@ -4,13 +4,13 @@ import { EVENT_TYPES, validateEvent } from '../src/events/event-registry';
 const baseEnvelope = {
   orgId: 'org_test',
   actorUserId: 'user_test',
-  subjectType: 'INTENT',
+  subjectType: 'INTENT' as const,
   subjectId: 'intent_test',
-  lifecycleStep: 'CLARIFY',
-  pipelineStage: 'NEW',
-  channel: 'ui',
+  lifecycleStep: 'CLARIFY' as const,
+  pipelineStage: 'NEW' as const,
+  channel: 'ui' as const,
   correlationId: 'corr_test',
-  occurredAt: new Date().toISOString(),
+  occurredAt: new Date(),
 };
 
 const cases = [
@@ -54,6 +54,42 @@ const cases = [
       viewContext: 'owner',
     },
   },
+  {
+    type: EVENT_TYPES.INTENT_SHARED_LINK_VIEWED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      shareTokenId: 'token1',
+    },
+  },
+  {
+    type: EVENT_TYPES.EXPORT_GENERATED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      exportId: 'exp1',
+      format: 'markdown',
+    },
+  },
+  {
+    type: EVENT_TYPES.ATTACHMENT_UPLOADED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      attachmentId: 'att1',
+      filename: 'file.txt',
+      sizeBytes: 123,
+    },
+  },
+  {
+    type: EVENT_TYPES.ATTACHMENT_DOWNLOADED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      attachmentId: 'att1',
+      via: 'owner',
+    },
+  },
 ];
 
 function expectValid(type: string, payload: Record<string, unknown>) {
@@ -80,6 +116,52 @@ function expectInvalid() {
 
   if (!threw) {
     throw new Error('Contract test failed: missing payloadVersion did not throw');
+  }
+
+  // Missing lifecycleStep / pipelineStage should fail
+  threw = false;
+  try {
+    validateEvent({
+      ...baseEnvelope,
+      lifecycleStep: undefined as any,
+      type: EVENT_TYPES.INTENT_CREATED,
+      eventId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        intentId: 'intent_test',
+        title: 'Title',
+        language: 'EN',
+        confidentialityLevel: 'L1',
+        source: 'manual',
+      },
+    });
+  } catch {
+    threw = true;
+  }
+  if (!threw) {
+    throw new Error('Contract test failed: missing lifecycleStep did not throw');
+  }
+
+  // Cross-org event without actorOrgId should fail
+  threw = false;
+  try {
+    validateEvent({
+      ...baseEnvelope,
+      type: EVENT_TYPES.PARTNER_INVITED,
+      eventId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        intentId: 'intent_test',
+        partnerOrgId: 'orgY',
+        inviteId: 'invite1',
+        accessLevel: 'L1',
+      },
+    });
+  } catch {
+    threw = true;
+  }
+  if (!threw) {
+    throw new Error('Contract test failed: PARTNER_INVITED without actorOrgId did not throw');
   }
 }
 
