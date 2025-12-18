@@ -70,9 +70,10 @@ jobs:
         run: |
           set -euo pipefail
           ts=$(date -u +"%Y%m%d-%H%M%S")
+          psql_db=${POSTGRES_LIST_DB:-postgres}
           db_candidates="${POSTGRES_DB:-enabion_prod} enabion"
           db_list=$(ssh -p "$PORT" "${USER}@${HOST}" \
-            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db psql -U enabion -tAc \"SELECT datname FROM pg_database WHERE datistemplate = false;\"")
+            "cd /srv/enabion/prod/repo && docker compose -f infra/docker-compose.prod.yml exec -T db psql -U enabion -d \"$psql_db\" -tAc \"SELECT datname FROM pg_database WHERE datistemplate = false;\"")
           echo "Databases found on server: $db_list"
           db_name=""
           for candidate in $db_candidates; do
