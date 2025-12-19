@@ -1,7 +1,8 @@
 import {
   ConflictException,
+  HttpException,
+  HttpStatus,
   Injectable,
-  TooManyRequestsException,
   UnauthorizedException,
 } from '@nestjs/common';
 import type { CookieOptions } from 'express';
@@ -268,7 +269,7 @@ export class AuthService {
     }
 
     if (entry.count >= this.loginMaxAttempts) {
-      throw new TooManyRequestsException('Too many login attempts, try again later');
+      throw new HttpException('Too many login attempts, try again later', HttpStatus.TOO_MANY_REQUESTS);
     }
   }
 

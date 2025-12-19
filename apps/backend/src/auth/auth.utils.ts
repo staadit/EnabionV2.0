@@ -1,7 +1,4 @@
-import { createHash, randomBytes, scrypt as _scrypt, timingSafeEqual } from 'crypto';
-import { promisify } from 'util';
-
-const scrypt = promisify(_scrypt);
+import { createHash, randomBytes, scryptSync, timingSafeEqual } from 'crypto';
 
 type ScryptParams = {
   N: number;
@@ -19,11 +16,11 @@ const DEFAULT_SCRYPT: ScryptParams = {
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = randomBytes(16).toString('hex');
-  const derived = (await scrypt(password, salt, DEFAULT_SCRYPT.keyLen, {
+  const derived = scryptSync(password, salt, DEFAULT_SCRYPT.keyLen, {
     N: DEFAULT_SCRYPT.N,
     r: DEFAULT_SCRYPT.r,
     p: DEFAULT_SCRYPT.p,
-  })) as Buffer;
+  }) as Buffer;
   return [
     'scrypt',
     DEFAULT_SCRYPT.N,
@@ -53,11 +50,11 @@ export async function verifyPassword(password: string, stored: string): Promise<
     return false;
   }
 
-  const derived = (await scrypt(password, salt, hashBuffer.length, {
+  const derived = scryptSync(password, salt, hashBuffer.length, {
     N,
     r,
     p,
-  })) as Buffer;
+  }) as Buffer;
 
   return timingSafeEqual(hashBuffer, derived);
 }
