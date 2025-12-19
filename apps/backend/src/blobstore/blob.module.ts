@@ -8,8 +8,10 @@ import { BlobService, BLOBCONFIG_TOKEN, BLOBSTORE_TOKEN } from './blob.service';
 import { LocalBlobStore } from './local-blobstore';
 import { S3BlobStore } from './s3-blobstore';
 import { NdaPolicy } from './nda.policy';
+import { EventModule } from '../events/event.module';
 
 @Module({
+  imports: [EventModule],
   controllers: [AttachmentController],
   providers: [
     PrismaService,
