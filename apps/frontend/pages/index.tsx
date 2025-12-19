@@ -1,4 +1,4 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 
@@ -51,7 +51,7 @@ export default function Home({
       }
     };
     fetchLoad();
-    const id = setInterval(fetchLoad, 30 * 60 * 1000); // every 30 minutes
+    const id = setInterval(fetchLoad, 30 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -83,36 +83,104 @@ export default function Home({
 
         <p style={{ marginTop: '1.5rem' }}>VPS load (auto-refresh co 30 min):</p>
         <pre style={boxStyle}>
-          {loadError
-            ? `Error: ${loadError}`
-            : vpsLoad
-            ? formatLoadSummary(vpsLoad)
-            : 'Loading...'}
+          {loadError ? `Error: ${loadError}` : vpsLoad ? formatLoadSummary(vpsLoad) : 'Loading...'}
         </pre>
 
         <section style={{ marginTop: '2rem' }}>
-          <h2>Prod pilot controls (manual)</h2>
+          <h2>Dev &lt;-&gt; Pilot controls and status</h2>
           <p>
-            Start/stop pilota prod via GitHub Actions (workflow{' '}
-            <code>Deploy Prod Pilot (manual)</code>). Links otworzą stronę akcji do ręcznego uruchomienia.
+            Szybkie wejscia do operacji. Pilot uruchamiamy/przerywamy z GH Actions, dev dziala stale. Status pokazuje health oraz sciezki volume (ktory katalog jest podpiety w kontenerze).
           </p>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-            <a
-              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-              target="_blank"
-              rel="noreferrer"
-              style={buttonStyle('#0b5ed7')}
-            >
-              Start Prod (GH Actions)
-            </a>
-            <a
-              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-              target="_blank"
-              rel="noreferrer"
-              style={buttonStyle('#dc3545')}
-            >
-              Stop Prod (GH Actions)
-            </a>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <div style={boxStyle}>
+              <h3 style={{ marginTop: 0 }}>Pilot (prod)</h3>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Workflow <code>Deploy Prod Pilot (manual)</code> z parametrami <code>ref</code> (tag/branch) + <code>mode=start|stop|restart</code>.
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#198754')}
+                >
+                  Start pilot (GH Actions)
+                </a>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#0d6efd')}
+                >
+                  Restart pilot (GH Actions)
+                </a>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#dc3545')}
+                >
+                  Stop pilot (GH Actions)
+                </a>
+              </div>
+              <p style={{ marginBottom: '0.25rem' }}>Volumes (pilot):</p>
+              <code style={{ display: 'block', marginBottom: '0.5rem' }}>
+                {'/srv/enabion/_volumes/pilot/{postgres,blobstore}'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Sprawdz aktywny mount w kontenerze:</p>
+              <code style={{ display: 'block' }}>
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker inspect enabion_pilot-backend-1 --format "{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}"'}
+              </code>
+            </div>
+
+            <div style={boxStyle}>
+              <h3 style={{ marginTop: 0 }}>Dev</h3>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Dev jest zawsze-on. W razie potrzeby reczny restart przez docker compose (patrz runbook).
+              </p>
+              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#198754')}
+                >
+                  Start dev (manual)
+                </a>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#0d6efd')}
+                >
+                  Restart dev (manual)
+                </a>
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
+                  target="_blank"
+                  rel="noreferrer"
+                  style={buttonStyle('#dc3545')}
+                >
+                  Stop dev (manual)
+                </a>
+              </div>
+              <p style={{ marginBottom: '0.25rem' }}>Volumes (dev):</p>
+              <code style={{ display: 'block', marginBottom: '0.5rem' }}>
+                {'/srv/enabion/_volumes/prod/{postgres,blobstore}'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Sprawdz aktywny mount w kontenerze:</p>
+              <code style={{ display: 'block' }}>
+                {'docker inspect infra-backend-1 --format "{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}"'}
+              </code>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -166,7 +234,7 @@ function formatUptime(seconds: number) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  const parts = [];
+  const parts: string[] = [];
   if (days) parts.push(`${days}d`);
   if (hours) parts.push(`${hours}h`);
   if (minutes) parts.push(`${minutes}m`);

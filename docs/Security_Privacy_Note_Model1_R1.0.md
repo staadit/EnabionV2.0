@@ -33,11 +33,13 @@ We keep a minimal, structured audit log (who/when/what) for:
 - NDA acceptance,
 - AI suggestions issued/accepted/rejected,
 - Commit decisions and Intent sharing with partners.
+- Attachment upload/download events (with NDA gate for L2) for auditability.
 Audit logs are stored separately, encrypted, and kept for at least 12 months in production. Logs avoid full sensitive text; where needed we pseudonymise.
 
 ## 5. Encryption and data protection
 - **In transit:** all access via HTTPS (TLS 1.2+); internal services also use TLS/VPC isolation.
-- **At rest:** database, object storage and backups are encrypted (cloud-managed encryption).
+- **At rest:** database, object storage and backups are encrypted (cloud-managed encryption). L2 attachments are envelope-encrypted and only streamed after NDA/RBAC checks; S3 downloads use signed URLs with expiry, local driver streams via backend.
+- **Content policy:** upload limits and MIME allowlist enforced for attachments to reduce risk from executable/oversize payloads.
 - **Secrets:** API keys and credentials are stored in secret management, not in code.
 
 ## 6. Data retention and deletion
@@ -54,4 +56,3 @@ Audit logs are stored separately, encrypted, and kept for at least 12 months in 
 - Share when describing Enabion security posture for R1.0 pre-sales.
 - Pair with the Mutual NDA (Layer 1) for L2 work.
 - Emphasise that deep-confidential (L3) scenarios will use Shielded/Sovereign models in future releases.
-
