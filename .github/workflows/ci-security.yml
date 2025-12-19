@@ -6,11 +6,13 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
   security-events: write
 
 jobs:
   gitleaks:
     name: secrets scan (gitleaks)
+    if: ${{ github.event_name != 'push' || github.event.forced != true }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,15 +21,14 @@ jobs:
       - name: Run gitleaks
         uses: gitleaks/gitleaks-action@v2
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
-        with:
-          args: detect --redact --report-path=gitleaks-report.sarif --report-format=sarif
       - name: Upload SARIF
         if: always()
         continue-on-error: true # Skip failing the workflow when code scanning upload is not permitted
         uses: github/codeql-action/upload-sarif@v3
         with:
-          sarif_file: gitleaks-report.sarif
+          sarif_file: results.sarif
 
   npm-audit:
     name: dependency scan (npm)
