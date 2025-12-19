@@ -139,34 +139,8 @@ export default function Home({
             <div style={boxStyle}>
               <h3 style={{ marginTop: 0 }}>Dev</h3>
               <p style={{ marginBottom: '0.75rem' }}>
-                Dev jest zawsze-on. W razie potrzeby reczny restart przez docker compose (patrz runbook).
+                Dev jest zawsze-on.
               </p>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
-                <a
-                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonStyle('#198754')}
-                >
-                  Start dev (manual)
-                </a>
-                <a
-                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonStyle('#0d6efd')}
-                >
-                  Restart dev (manual)
-                </a>
-                <a
-                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md#dev-stack-always-on"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonStyle('#dc3545')}
-                >
-                  Stop dev (manual)
-                </a>
-              </div>
               <p style={{ marginBottom: '0.25rem' }}>Volumes (dev):</p>
               <code style={{ display: 'block', marginBottom: '0.5rem' }}>
                 {'/srv/enabion/_volumes/prod/{postgres,blobstore}'}
