@@ -3,6 +3,12 @@ import { useEffect, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 
 type HomeProps = {
+  user: {
+    id: string;
+    email: string;
+    orgId: string;
+    role: string;
+  };
   backendHealth: string | null;
   backendError: string | null;
   apiHealth: string | null;
@@ -25,6 +31,7 @@ type VpsLoad = {
 };
 
 export default function Home({
+  user,
   backendHealth,
   backendError,
   apiHealth,
@@ -67,8 +74,25 @@ export default function Home({
       <Head>
         <title>Enabion R1.0 - Skeleton</title>
       </Head>
-      <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-        <h1>Enabion R1.0 - Intent & Pre-Sales OS (skeleton)</h1>
+      <main style={{ padding: '2rem', fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1>Enabion R1.0 - Intent & Pre-Sales OS (skeleton)</h1>
+            <p style={{ marginTop: '0.5rem', color: '#52565c' }}>
+              Signed in as {user.email} • {user.role}
+            </p>
+          </div>
+          <button
+            type="button"
+            style={{ ...buttonStyle('#0f3a4b'), border: 'none', cursor: 'pointer' }}
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login';
+            }}
+          >
+            Sign out
+          </button>
+        </div>
 
         <p>Backend health (proxying <code>http://localhost:4000/health</code>):</p>
         <pre style={boxStyle}>
@@ -211,7 +235,43 @@ function formatUptime(seconds: number) {
   return parts.join(' ');
 }
 
-export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
+export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req }) => {
+  const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
+  let user: HomeProps['user'] | null = null;
+  try {
+    const authRes = await fetch(`${backendBase}/auth/me`, {
+      headers: { cookie: req.headers.cookie ?? '' },
+    });
+
+    if (!authRes.ok) {
+      return {
+        redirect: {
+          destination: '/login',
+          permanent: false,
+        },
+      };
+    }
+
+    const authData = await authRes.json();
+    user = authData?.user || null;
+  } catch {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+
   const fetchText = async (url: string) => {
     try {
       const res = await fetch(url);
@@ -230,6 +290,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
 
   return {
     props: {
+      user,
       backendHealth: backend.text,
       backendError: backend.error,
       apiHealth: api.text,

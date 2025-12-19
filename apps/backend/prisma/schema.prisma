@@ -23,8 +23,25 @@ model User {
   orgId     String
   email     String   @unique
   role      String
+  passwordHash     String?
+  passwordUpdatedAt DateTime?
+  lastLoginAt      DateTime?
   org       Organization @relation(fields: [orgId], references: [id])
+  sessions  Session[]
   createdAt DateTime @default(now())
+}
+
+model Session {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
 }
 
 enum ConfidentialityLevel {
