@@ -4,7 +4,7 @@ services:
     image: postgres:16
     restart: unless-stopped
     env_file:
-      - /srv/enabion/prod/env/db.env
+      - /srv/enabion/dev/env/db.env
     volumes:
       - /srv/enabion/_volumes/prod/postgres:/var/lib/postgresql/data
     healthcheck:
@@ -20,7 +20,7 @@ services:
       context: ../apps/backend
     restart: unless-stopped
     env_file:
-      - /srv/enabion/prod/env/backend.env
+      - /srv/enabion/dev/env/backend.env
     depends_on:
       db:
         condition: service_healthy
@@ -53,7 +53,7 @@ services:
       context: ../apps/frontend
     restart: unless-stopped
     env_file:
-      - /srv/enabion/prod/env/frontend.env
+      - /srv/enabion/dev/env/frontend.env
     depends_on:
       backend:
         condition: service_healthy
