@@ -1,5 +1,5 @@
 import { HttpRequest } from '@smithy/protocol-http';
-import { Sha256 } from '@smithy/hash-node';
+import { Hash } from '@smithy/hash-node';
 import { SignatureV4MultiRegion } from '@aws-sdk/signature-v4-multi-region';
 import {
   BlobStore,
@@ -23,6 +23,12 @@ export class S3BlobStore implements BlobStore {
 
   constructor(private readonly config: S3Config) {}
 
+  private static readonly Sha256 = class Sha256 extends Hash {
+    constructor(secret?: any) {
+      super('sha256', secret);
+    }
+  };
+
   private buildEndpoint() {
     const endpoint =
       this.config.endpoint ||
@@ -37,7 +43,13 @@ export class S3BlobStore implements BlobStore {
       .join('/');
   }
 
-  private formatUrl(request: HttpRequest): string {
+  private formatUrl(request: {
+    protocol?: string;
+    hostname?: string;
+    port?: number;
+    path?: string;
+    query?: Record<string, string | number | string[] | undefined>;
+  }): string {
     const protocol = request.protocol || 'https:';
     const port = request.port ? `:${request.port}` : '';
     const path = request.path || '/';
@@ -82,7 +94,7 @@ export class S3BlobStore implements BlobStore {
       service: 's3',
       region,
       credentials,
-      sha256: Sha256,
+      sha256: S3BlobStore.Sha256,
     });
 
     const signed = await signer.presign(request, { expiresIn: expiresInSeconds });
