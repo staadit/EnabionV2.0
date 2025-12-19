@@ -48,7 +48,7 @@ export class S3BlobStore implements BlobStore {
     hostname?: string;
     port?: number;
     path?: string;
-    query?: Record<string, string | number | string[] | undefined>;
+    query?: Record<string, string | number | string[] | null | undefined>;
   }): string {
     const protocol = request.protocol || 'https:';
     const port = request.port ? `:${request.port}` : '';
@@ -58,7 +58,7 @@ export class S3BlobStore implements BlobStore {
     Object.entries(query).forEach(([key, value]) => {
       if (Array.isArray(value)) {
         value.forEach((v) => searchParams.append(key, String(v)));
-      } else if (value !== undefined) {
+      } else if (value !== undefined && value !== null) {
         searchParams.append(key, String(value));
       }
     });
