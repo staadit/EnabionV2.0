@@ -89,7 +89,7 @@ export default function Home({
         <section style={{ marginTop: '2rem' }}>
           <h2>Dev &lt;-&gt; Pilot controls and status</h2>
           <p>
-            Szybkie wejscia do operacji. Pilot uruchamiamy/przerywamy z GH Actions, dev dziala stale. Status pokazuje health oraz sciezki volume (ktory katalog jest podpiety w kontenerze).
+            Szybkie wejscia do operacji. Pilot uruchamiamy manualnie na VPS (tag/branch), dev dziala stale. Status pokazuje health oraz sciezki volume (ktory katalog jest podpiety w kontenerze).
           </p>
 
           <div
@@ -103,34 +103,29 @@ export default function Home({
             <div style={boxStyle}>
               <h3 style={{ marginTop: 0 }}>Pilot (prod)</h3>
               <p style={{ marginBottom: '0.75rem' }}>
-                Workflow <code>Deploy Prod Pilot (manual)</code> z parametrami <code>ref</code> (tag/branch) + <code>mode=start|stop|restart</code>.
+                Pilot uruchamiamy manualnie na VPS (tag/branch). Szczegoly w runbooku.
               </p>
-              <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', marginBottom: '0.75rem' }}>
+              <p style={{ marginBottom: '0.25rem' }}>Start pilot (manual):</p>
+              <code style={{ display: 'block', marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>
+                {'cd /srv/enabion/prod/repo\n'}
+                {'git fetch --all --tags\n'}
+                {'git checkout r1.0-rc.<n>\n'}
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker compose -f infra/docker-compose.prod.pilot.yml up -d --build'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Stop pilot (manual):</p>
+              <code style={{ display: 'block', marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker compose -f infra/docker-compose.prod.pilot.yml down'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>
+                Runbook:{' '}
                 <a
-                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
+                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md"
                   target="_blank"
                   rel="noreferrer"
-                  style={buttonStyle('#198754')}
                 >
-                  Start pilot (GH Actions)
+                  R1.0 Pilot Operations Runbook
                 </a>
-                <a
-                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonStyle('#0d6efd')}
-                >
-                  Restart pilot (GH Actions)
-                </a>
-                <a
-                  href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-                  target="_blank"
-                  rel="noreferrer"
-                  style={buttonStyle('#dc3545')}
-                >
-                  Stop pilot (GH Actions)
-                </a>
-              </div>
+              </p>
               <p style={{ marginBottom: '0.25rem' }}>Volumes (pilot):</p>
               <code style={{ display: 'block', marginBottom: '0.5rem' }}>
                 {'/srv/enabion/_volumes/pilot/{postgres,blobstore}'}
