@@ -1,10 +1,10 @@
-# Vimexx VPS Runbook (R1.0, Model 1 - Standard)
+﻿# Vimexx VPS Runbook (R1.0, Model 1 - Standard)
 ## Dev always-on + Prod pilot-mode (start/stop)
 
-Status: draft internal (must be kept in sync with infra + GH Actions)  
+Status: draft internal (must be kept in sync with infra + manual ops)  
 Timezone: CET  
 Owner: Dev Lead (Ewa) / CTO (Mieszko2.0)  
-Last updated: 2025-12-15
+Last updated: 2025-12-19
 
 This runbook describes the **minimum operational baseline** for the Enabion R1.0 pilot on a single VPS:
 - **Remote Dev** runs continuously (`dev.enabion.com`, `api.dev.enabion.com`) from branch `dev`.
@@ -50,7 +50,7 @@ docker compose version
 
 ## 3) Directory layout (recommended) [Ewa]
 
-Create the following structure (names can vary, but must be consistent with scripts/workflows):
+Create the following structure (names can vary, but must be consistent with runbooks):
 
 ```
 /srv/enabion/
@@ -76,7 +76,7 @@ Permissions:
 
 ---
 
-## 4) Edge proxy (Traefik) – always-on [Ewa]
+## 4) Edge proxy (Traefik) â€“ always-on [Ewa]
 
 - Compose: `infra/docker-compose.edge.yml`
 - Network: external `enabion_edge` must exist (`docker network create enabion_edge || true`)
@@ -92,7 +92,7 @@ docker compose -f infra/docker-compose.edge.yml up -d
 
 ---
 
-## 5) Remote Dev stack – always-on [Ewa]
+## 5) Remote Dev stack â€“ always-on [Ewa]
 
 - Domains: `dev.enabion.com` (frontend), `api.dev.enabion.com` (backend)
 - Branch: `dev`
@@ -106,11 +106,10 @@ git reset --hard origin/dev
 docker compose -f infra/docker-compose.prod.yml up -d --build
 ```
 - Health: `https://dev.enabion.com/api/health`, `https://api.dev.enabion.com/health`
-- GH Actions: workflow **Deploy to VPS (prod)** (`.github/workflows/deploy-prod.yml`) triggers on push to `dev` and calls `/usr/local/bin/enabion-deploy-prod.sh` on the VPS (deploys this dev stack).
 
 ---
 
-## 6) Remote Prod stack – pilot mode (keep OFF by default) [Ewa]
+## 6) Remote Prod stack â€“ pilot mode (keep OFF by default) [Ewa]
 
 - Domains: `enabion.com` (frontend), `api.enabion.com` (backend)
 - Ref: `main` or release/tag
@@ -124,16 +123,13 @@ git checkout <tag-or-main>
 git reset --hard <tag-or-main>
 docker compose -f infra/docker-compose.prod.pilot.yml up -d --build
 ```
-- Start/stop via GH Actions: workflow **Deploy Prod Pilot (manual)** (`.github/workflows/deploy-prod-pilot.yml`) → inputs `ref` and `mode` (`start|stop|restart`).
 - Smoke tests after start: `https://enabion.com/api/health`, `https://api.enabion.com/health`
 - After pilot: `docker compose -f infra/docker-compose.prod.pilot.yml down`; optionally `pg_dump` the prod DB and log the pilot session in `docs/log/log-YYYY-MM-DD.md`.
 
 ---
 
-## 7) GitHub Actions hooks [Ewa]
+## 7) Automation (backups only) [Ewa]
 
-- `deploy-prod.yml` (dev deploy): trigger push to `dev`; runs `/usr/local/bin/enabion-deploy-prod.sh` on VPS, which uses `infra/docker-compose.prod.yml`.
-- `deploy-prod-pilot.yml`: manual `workflow_dispatch`; inputs `ref`, `mode`; runs `infra/docker-compose.prod.pilot.yml` on VPS.
 - `nightly-backup.yml`: cron `0 3 * * *` CET; zips `dev` HEAD into `backup-dev` branch, tags `backup-dev-YYYYMMDD-HHMMSS`, prunes >90 days.
 - `db-backup.yml`: cron `0 4 * * *` CET; `pg_dump` via `docker compose -f infra/docker-compose.prod.yml exec db ...`; stores gzip under `backup-dev/db-backups` and pushes with `GITHUB_TOKEN` (requires dev DB running).
 
@@ -157,3 +153,5 @@ Minimum steps:
 2) rotate affected credentials
 3) write incident note in log (no secrets)
 4) create GH issue `type:security-privacy` + `priority:P0`
+
+

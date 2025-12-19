@@ -1,10 +1,10 @@
 # Vimexx VPS Runbook (R1.0, Model 1 — Standard)
 ## Dev always-on + Prod pilot-mode (start/stop)
 
-Status: draft internal (must be kept in sync with infra + GH Actions)  
+Status: draft internal (must be kept in sync with infra + manual ops)  
 Timezone: CET  
 Owner: Dev Lead (Ewa) / CTO (Mieszko2.0)  
-Last updated: 2025-12-15
+Last updated: 2025-12-19
 
 This runbook describes the **minimum operational baseline** for the Enabion R1.0 pilot on a single VPS:
 - **Remote Dev** runs continuously (`dev.enabion.com`, `api.dev.enabion.com`) from branch `dev`.
@@ -165,20 +165,9 @@ Log pilot stop + incidents/feedback in daily log.
 
 ---
 
-## 7) GitHub Actions hooks (recommended) [Ewa]
+## 7) Manual operations only [Ewa]
 
-### Deploy Dev
-- workflow: `deploy-dev.yml`
-- trigger: push to `dev`
-- remote command: call a VPS script (e.g. `/usr/local/bin/enabion-deploy-dev.sh`)
-
-### Deploy Prod (pilot-mode)
-- workflow: `deploy-prod.yml`
-- trigger: manual `workflow_dispatch`
-- inputs:
-  - `ref` (tag/branch, default latest RC tag)
-  - `mode` (`start`|`stop`|`restart`)
-- remote command: `/usr/local/bin/enabion-deploy-prod.sh <ref> <mode>`
+Automation via GH Actions/scripts is not used; start/stop/deploy are run manually on the VPS.
 
 ---
 
@@ -209,4 +198,3 @@ Minimum steps:
 2) rotate affected credentials
 3) write incident note in log (no secrets)
 4) create GH issue `type:security-privacy` + `priority:P0`
-
