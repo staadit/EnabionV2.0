@@ -1,97 +1,89 @@
 import Head from 'next/head';
 import { useState, type FormEvent, type CSSProperties } from 'react';
-import { useRouter } from 'next/router';
-import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 
-export default function Login() {
-  const router = useRouter();
+export default function ResetRequest() {
   const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'sent'>('idle');
   const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const nextPath = typeof router.query.next === 'string' ? router.query.next : '/';
+  const [debugToken, setDebugToken] = useState<string | null>(null);
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setLoading(true);
+    setStatus('loading');
     setError(null);
+    setDebugToken(null);
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('/api/auth/password-reset/request', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       });
 
+      const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        const data = await res.json();
         const message = Array.isArray(data?.message) ? data.message.join('; ') : data?.message;
-        throw new Error(message || data?.error || 'Login failed');
+        throw new Error(message || data?.error || 'Reset request failed');
       }
 
-      await router.push(nextPath);
+      if (data?.resetToken) {
+        setDebugToken(data.resetToken);
+      }
+      setStatus('sent');
     } catch (err: any) {
-      setError(err?.message ?? 'Login failed');
-    } finally {
-      setLoading(false);
+      setError(err?.message ?? 'Reset request failed');
+      setStatus('idle');
     }
   };
 
   return (
     <div style={shellStyle}>
       <Head>
-        <title>Enabion Login</title>
+        <title>Reset Password</title>
       </Head>
 
       <main style={{ ...cardStyle, animation: 'panelIn 480ms ease' }}>
         <div style={badgeStyle}>Enabion R1.0</div>
-        <h1 style={titleStyle}>Welcome back</h1>
-        <p style={subtitleStyle}>Sign in with your org email to continue.</p>
+        <h1 style={titleStyle}>Reset password</h1>
+        <p style={subtitleStyle}>We will send a reset link to your email address.</p>
 
-        <form onSubmit={onSubmit} style={{ marginTop: '2rem' }}>
-          <label style={labelStyle}>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="you@company.com"
-              required
-              style={inputStyle}
-            />
-          </label>
+        {status === 'sent' ? (
+          <div style={successStyle}>
+            <p>Check your inbox for the reset link.</p>
+            {debugToken ? (
+              <div style={debugStyle}>
+                <p style={{ margin: 0 }}>Debug token:</p>
+                <code style={codeStyle}>{debugToken}</code>
+              </div>
+            ) : null}
+            <Link style={linkStyle} href="/login">
+              Back to login
+            </Link>
+          </div>
+        ) : (
+          <form onSubmit={onSubmit} style={{ marginTop: '2rem' }}>
+            <label style={labelStyle}>
+              Email
+              <input
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="you@company.com"
+                required
+                style={inputStyle}
+              />
+            </label>
 
-          <label style={{ ...labelStyle, marginTop: '1rem' }}>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="Minimum 12 characters"
-              required
-              minLength={12}
-              style={inputStyle}
-            />
-          </label>
+            {error ? <p style={errorStyle}>{error}</p> : null}
 
-          {error ? <p style={errorStyle}>{error}</p> : null}
-
-          <button type="submit" style={buttonStyle} disabled={loading}>
-            {loading ? 'Signing in...' : 'Sign in'}
-          </button>
-        </form>
-
-        <p style={footerStyle}>
-          <a style={{ ...linkStyle, marginRight: '1rem' }} href="/reset">
-            Forgot password?
-          </a>
-          New here?{' '}
-          <a style={linkStyle} href="/signup">
-            Create an account
-          </a>
-        </p>
+            <button type="submit" style={buttonStyle} disabled={status === 'loading'}>
+              {status === 'loading' ? 'Sending...' : 'Send reset link'}
+            </button>
+          </form>
+        )}
       </main>
+
       <style jsx global>{`
         @keyframes panelIn {
           from {
@@ -186,35 +178,29 @@ const errorStyle: CSSProperties = {
   color: '#b42318',
 };
 
-const footerStyle: CSSProperties = {
-  marginTop: '1.5rem',
-  color: '#4b4f54',
-  fontSize: '0.95rem',
+const successStyle: CSSProperties = {
+  marginTop: '2rem',
+  display: 'flex',
+  flexDirection: 'column',
+  gap: '1rem',
+  color: '#1c1c1a',
+};
+
+const debugStyle: CSSProperties = {
+  background: '#f5f5f5',
+  padding: '0.75rem',
+  borderRadius: '12px',
+  fontSize: '0.9rem',
+};
+
+const codeStyle: CSSProperties = {
+  display: 'block',
+  marginTop: '0.5rem',
+  wordBreak: 'break-all',
 };
 
 const linkStyle: CSSProperties = {
   color: '#0f3a4b',
   fontWeight: 600,
   textDecoration: 'none',
-};
-
-export const getServerSideProps: GetServerSideProps = async ({ req }) => {
-  const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
-  try {
-    const res = await fetch(`${backendBase}/auth/me`, {
-      headers: { cookie: req.headers.cookie ?? '' },
-    });
-    if (res.status === 200) {
-      return {
-        redirect: {
-          destination: '/',
-          permanent: false,
-        },
-      };
-    }
-  } catch {
-    // Ignore backend errors and render login form.
-  }
-
-  return { props: {} };
 };

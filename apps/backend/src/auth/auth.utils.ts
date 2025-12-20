@@ -63,6 +63,18 @@ export function generateSessionToken(): string {
   return randomBytes(32).toString('hex');
 }
 
-export function hashSessionToken(token: string): string {
+export function generateResetToken(): string {
+  return randomBytes(32).toString('hex');
+}
+
+export function hashToken(token: string): string {
   return createHash('sha256').update(token).digest('hex');
+}
+
+export function hashSessionToken(token: string): string {
+  return hashToken(token);
+}
+
+export function hashResetToken(token: string): string {
+  return hashToken(token);
 }

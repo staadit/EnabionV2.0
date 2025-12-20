@@ -44,6 +44,19 @@ model Session {
   @@index([expiresAt])
 }
 
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
 enum ConfidentialityLevel {
   L1
   L2

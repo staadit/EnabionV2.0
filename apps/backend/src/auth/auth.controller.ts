@@ -26,6 +26,15 @@ const loginSchema = z.object({
   password: z.string().min(12),
 });
 
+const resetRequestSchema = z.object({
+  email: z.string().email(),
+});
+
+const resetConfirmSchema = z.object({
+  token: z.string().min(16),
+  password: z.string().min(12),
+});
+
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -82,6 +91,18 @@ export class AuthController {
       user: req.user,
       sessionId: req.sessionId,
     };
+  }
+
+  @Post('password-reset/request')
+  async requestPasswordReset(@Body() body: unknown) {
+    const parsed = this.parseBody(resetRequestSchema, body);
+    return this.authService.requestPasswordReset(parsed.email);
+  }
+
+  @Post('password-reset/confirm')
+  async confirmPasswordReset(@Body() body: unknown) {
+    const parsed = this.parseBody(resetConfirmSchema, body);
+    return this.authService.confirmPasswordReset(parsed.token, parsed.password);
   }
 
   private parseBody<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {

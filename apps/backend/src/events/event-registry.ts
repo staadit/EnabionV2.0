@@ -64,6 +64,8 @@ export const EVENT_TYPES = {
   USER_SIGNED_UP: 'USER_SIGNED_UP',
   USER_LOGGED_IN: 'USER_LOGGED_IN',
   USER_LOGGED_OUT: 'USER_LOGGED_OUT',
+  USER_PASSWORD_RESET_REQUESTED: 'USER_PASSWORD_RESET_REQUESTED',
+  USER_PASSWORD_RESET_COMPLETED: 'USER_PASSWORD_RESET_COMPLETED',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -229,6 +231,16 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     userId: z.string().min(1),
     orgId: z.string().min(1),
     sessionId: z.string().min(1),
+  }),
+  [EVENT_TYPES.USER_PASSWORD_RESET_REQUESTED]: basePayload.extend({
+    userId: z.string().min(1),
+    orgId: z.string().min(1),
+    resetTokenId: z.string().min(1),
+  }),
+  [EVENT_TYPES.USER_PASSWORD_RESET_COMPLETED]: basePayload.extend({
+    userId: z.string().min(1),
+    orgId: z.string().min(1),
+    resetTokenId: z.string().min(1),
   }),
 };
 
