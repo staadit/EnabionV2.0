@@ -28,6 +28,7 @@ model User {
   lastLoginAt      DateTime?
   org       Organization @relation(fields: [orgId], references: [id])
   sessions  Session[]
+  passwordResetTokens PasswordResetToken[]
   createdAt DateTime @default(now())
 }
 
