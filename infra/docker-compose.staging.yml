@@ -1,15 +1,20 @@
-version: "3.9"
-
 services:
   db:
     image: postgres:16
     restart: unless-stopped
     env_file:
       - ../apps/backend/.env.example # replace with /opt/enabion/staging/env/db.env on server
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     volumes:
       - ../data/postgres:/var/lib/postgresql/data
     ports:
       - "5432:5432" # expose only if needed; prefer internal use
+    networks:
+      - internal
 
   backend:
     build: ../apps/backend
@@ -17,9 +22,31 @@ services:
     env_file:
       - ../env/backend.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:4000/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     ports:
       - "4000:4000"
+    networks:
+      - internal
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.backend-staging.rule=Host(`api.dev.enabion.com`)"
+      - "traefik.http.routers.backend-staging.entrypoints=websecure"
+      - "traefik.http.routers.backend-staging.tls.certresolver=le"
+      - "traefik.http.routers.backend-staging.service=backend-staging-svc"
+      - "traefik.http.services.backend-staging-svc.loadbalancer.server.port=4000"
+      - "traefik.http.routers.backend-staging-web.rule=Host(`api.dev.enabion.com`)"
+      - "traefik.http.routers.backend-staging-web.entrypoints=web"
+      - "traefik.http.routers.backend-staging-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.backend-staging-web.service=backend-staging-svc"
 
   frontend:
     build: ../apps/frontend
@@ -27,9 +54,30 @@ services:
     env_file:
       - ../env/frontend.env
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
     ports:
       - "3000:3000"
+    networks:
+      - edge
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.frontend-staging.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend-staging.entrypoints=websecure"
+      - "traefik.http.routers.frontend-staging.tls.certresolver=le"
+      - "traefik.http.routers.frontend-staging.service=frontend-staging-svc"
+      - "traefik.http.services.frontend-staging-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend-staging-web.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend-staging-web.entrypoints=web"
+      - "traefik.http.routers.frontend-staging-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.frontend-staging-web.service=frontend-staging-svc"
 
 # Usage on Vimexx staging:
 # 1) Place env files in /opt/enabion/staging/env (db.env, backend.env, frontend.env).
@@ -37,3 +85,9 @@ services:
 # 3) Reverse proxy (Traefik/Nginx) should route:
 #    - staging.<domain> -> frontend:3000
 #    - api.staging.<domain> -> backend:4000
+
+networks:
+  internal:
+  edge:
+    external: true
+    name: enabion_edge

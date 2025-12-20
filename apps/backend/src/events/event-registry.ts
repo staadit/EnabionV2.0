@@ -61,6 +61,9 @@ export const EVENT_TYPES = {
   EXPORT_GENERATED: 'EXPORT_GENERATED',
   ATTACHMENT_UPLOADED: 'ATTACHMENT_UPLOADED',
   ATTACHMENT_DOWNLOADED: 'ATTACHMENT_DOWNLOADED',
+  USER_SIGNED_UP: 'USER_SIGNED_UP',
+  USER_LOGGED_IN: 'USER_LOGGED_IN',
+  USER_LOGGED_OUT: 'USER_LOGGED_OUT',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -209,6 +212,23 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     attachmentId: z.string().min(1),
     via: z.enum(['owner', 'share_link', 'system']),
+  }),
+  [EVENT_TYPES.USER_SIGNED_UP]: basePayload.extend({
+    userId: z.string().min(1),
+    email: z.string().min(1),
+    orgId: z.string().min(1),
+    role: z.string().min(1),
+    sessionId: z.string().min(1),
+  }),
+  [EVENT_TYPES.USER_LOGGED_IN]: basePayload.extend({
+    userId: z.string().min(1),
+    orgId: z.string().min(1),
+    sessionId: z.string().min(1),
+  }),
+  [EVENT_TYPES.USER_LOGGED_OUT]: basePayload.extend({
+    userId: z.string().min(1),
+    orgId: z.string().min(1),
+    sessionId: z.string().min(1),
   }),
 };
 

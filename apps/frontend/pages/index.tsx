@@ -1,8 +1,14 @@
-import Head from 'next/head';
+﻿import Head from 'next/head';
 import { useEffect, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 
 type HomeProps = {
+  user: {
+    id: string;
+    email: string;
+    orgId: string;
+    role: string;
+  };
   backendHealth: string | null;
   backendError: string | null;
   apiHealth: string | null;
@@ -25,6 +31,7 @@ type VpsLoad = {
 };
 
 export default function Home({
+  user,
   backendHealth,
   backendError,
   apiHealth,
@@ -51,7 +58,7 @@ export default function Home({
       }
     };
     fetchLoad();
-    const id = setInterval(fetchLoad, 30 * 60 * 1000); // every 30 minutes
+    const id = setInterval(fetchLoad, 30 * 60 * 1000);
     return () => clearInterval(id);
   }, []);
 
@@ -67,8 +74,25 @@ export default function Home({
       <Head>
         <title>Enabion R1.0 - Skeleton</title>
       </Head>
-      <main style={{ padding: '2rem', fontFamily: 'sans-serif' }}>
-        <h1>Enabion R1.0 - Intent & Pre-Sales OS (skeleton)</h1>
+      <main style={{ padding: '2rem', fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif' }}>
+        <div style={{ display: 'flex', gap: '1.5rem', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div>
+            <h1>Enabion R1.0 - Intent & Pre-Sales OS (skeleton)</h1>
+            <p style={{ marginTop: '0.5rem', color: '#52565c' }}>
+              Signed in as {user.email} • {user.role}
+            </p>
+          </div>
+          <button
+            type="button"
+            style={{ ...buttonStyle('#0f3a4b'), border: 'none', cursor: 'pointer' }}
+            onClick={async () => {
+              await fetch('/api/auth/logout', { method: 'POST' });
+              window.location.href = '/login';
+            }}
+          >
+            Sign out
+          </button>
+        </div>
 
         <p>Backend health (proxying <code>http://localhost:4000/health</code>):</p>
         <pre style={boxStyle}>
@@ -83,36 +107,73 @@ export default function Home({
 
         <p style={{ marginTop: '1.5rem' }}>VPS load (auto-refresh co 30 min):</p>
         <pre style={boxStyle}>
-          {loadError
-            ? `Error: ${loadError}`
-            : vpsLoad
-            ? formatLoadSummary(vpsLoad)
-            : 'Loading...'}
+          {loadError ? `Error: ${loadError}` : vpsLoad ? formatLoadSummary(vpsLoad) : 'Loading...'}
         </pre>
 
         <section style={{ marginTop: '2rem' }}>
-          <h2>Prod pilot controls (manual)</h2>
+          <h2>Dev &lt;-&gt; Pilot controls and status</h2>
           <p>
-            Start/stop pilota prod via GitHub Actions (workflow{' '}
-            <code>Deploy Prod Pilot (manual)</code>). Links otworzą stronę akcji do ręcznego uruchomienia.
+            Szybkie wejscia do operacji. Pilot uruchamiamy manualnie na VPS (tag/branch), dev dziala stale. Status pokazuje health oraz sciezki volume (ktory katalog jest podpiety w kontenerze).
           </p>
-          <div style={{ display: 'flex', gap: '1rem', marginBottom: '1rem' }}>
-            <a
-              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-              target="_blank"
-              rel="noreferrer"
-              style={buttonStyle('#0b5ed7')}
-            >
-              Start Prod (GH Actions)
-            </a>
-            <a
-              href="https://github.com/staadit/EnabionV2.0/actions/workflows/deploy-prod-pilot.yml"
-              target="_blank"
-              rel="noreferrer"
-              style={buttonStyle('#dc3545')}
-            >
-              Stop Prod (GH Actions)
-            </a>
+
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+              gap: '1rem',
+              marginBottom: '1.5rem',
+            }}
+          >
+            <div style={boxStyle}>
+              <h3 style={{ marginTop: 0 }}>Pilot (prod)</h3>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Pilot uruchamiamy manualnie na VPS (tag/branch). Szczegoly w runbooku.
+              </p>
+              <p style={{ marginBottom: '0.25rem' }}>Start pilot (manual):</p>
+              <code style={{ display: 'block', marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>
+                {'cd /srv/enabion/prod/repo\n'}
+                {'git fetch --all --tags\n'}
+                {'git checkout r1.0-rc.<n>\n'}
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker compose -f infra/docker-compose.prod.pilot.yml up -d --build'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Stop pilot (manual):</p>
+              <code style={{ display: 'block', marginBottom: '0.75rem', whiteSpace: 'pre-wrap' }}>
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker compose -f infra/docker-compose.prod.pilot.yml down'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>
+                Runbook:{' '}
+                <a
+                  href="https://github.com/staadit/EnabionV2.0/blob/dev/docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  R1.0 Pilot Operations Runbook
+                </a>
+              </p>
+              <p style={{ marginBottom: '0.25rem' }}>Volumes (pilot):</p>
+              <code style={{ display: 'block', marginBottom: '0.5rem' }}>
+                {'/srv/enabion/_volumes/pilot/{postgres,blobstore}'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Sprawdz aktywny mount w kontenerze:</p>
+              <code style={{ display: 'block' }}>
+                {'COMPOSE_PROJECT_NAME=enabion_pilot docker inspect enabion_pilot-backend-1 --format "{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}"'}
+              </code>
+            </div>
+
+            <div style={boxStyle}>
+              <h3 style={{ marginTop: 0 }}>Dev</h3>
+              <p style={{ marginBottom: '0.75rem' }}>
+                Dev jest zawsze-on.
+              </p>
+              <p style={{ marginBottom: '0.25rem' }}>Volumes (dev):</p>
+              <code style={{ display: 'block', marginBottom: '0.5rem' }}>
+                {'/srv/enabion/_volumes/prod/{postgres,blobstore}'}
+              </code>
+              <p style={{ marginBottom: '0.25rem' }}>Sprawdz aktywny mount w kontenerze:</p>
+              <code style={{ display: 'block' }}>
+                {'docker inspect infra-backend-1 --format "{{range .Mounts}}{{.Source}} -> {{.Destination}}{{println}}{{end}}"'}
+              </code>
+            </div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
@@ -166,7 +227,7 @@ function formatUptime(seconds: number) {
   const days = Math.floor(seconds / 86400);
   const hours = Math.floor((seconds % 86400) / 3600);
   const minutes = Math.floor((seconds % 3600) / 60);
-  const parts = [];
+  const parts: string[] = [];
   if (days) parts.push(`${days}d`);
   if (hours) parts.push(`${hours}h`);
   if (minutes) parts.push(`${minutes}m`);
@@ -174,7 +235,43 @@ function formatUptime(seconds: number) {
   return parts.join(' ');
 }
 
-export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
+export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req }) => {
+  const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
+  let user: HomeProps['user'] | null = null;
+  try {
+    const authRes = await fetch(`${backendBase}/auth/me`, {
+      headers: { cookie: req.headers.cookie ?? '' },
+    });
+
+    if (!authRes.ok) {
+      return {
+        redirect: {
+          destination: '/login',
+          permanent: false,
+        },
+      };
+    }
+
+    const authData = await authRes.json();
+    user = authData?.user || null;
+  } catch {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+
+  if (!user) {
+    return {
+      redirect: {
+        destination: '/login',
+        permanent: false,
+      },
+    };
+  }
+
   const fetchText = async (url: string) => {
     try {
       const res = await fetch(url);
@@ -193,6 +290,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async () => {
 
   return {
     props: {
+      user,
       backendHealth: backend.text,
       backendError: backend.error,
       apiHealth: api.text,

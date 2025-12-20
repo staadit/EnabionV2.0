@@ -9,6 +9,8 @@ import { BlobService } from '../src/blobstore/blob.service';
 import { LocalBlobStore } from '../src/blobstore/local-blobstore';
 import { NdaPolicy } from '../src/blobstore/nda.policy';
 import { ConfidentialityLevel } from '../src/blobstore/types';
+import { EventService } from '../src/events/event.service';
+import { EVENT_TYPES } from '../src/events/event-registry';
 
 type BlobRecord = {
   id: string;
@@ -72,6 +74,24 @@ class MockPrismaService {
   };
 }
 
+class MockEventService extends EventService {
+  public emitted: any[] = [];
+  constructor() {
+    // @ts-expect-error - EventService expects prisma, we bypass for tests
+    super({});
+  }
+  async emitEvent(event: any): Promise<any> {
+    this.emitted.push(event);
+    return {
+      ...event,
+      eventId: event.eventId || 'evt_test',
+      schemaVersion: 1,
+      recordedAt: new Date(),
+      payload: event.payload,
+    };
+  }
+}
+
 function assert(cond: any, msg: string) {
   if (!cond) {
     throw new Error(msg);
@@ -91,13 +111,14 @@ async function run() {
   const tmpRoot = path.resolve(process.cwd(), 'tmp', 'blobstore-int');
   await fs.promises.rm(tmpRoot, { recursive: true, force: true });
   const prisma = new MockPrismaService();
+  const eventService = new MockEventService();
   const blobService = new BlobService(prisma as any, new LocalBlobStore(tmpRoot), {
     driver: 'local',
     localRoot: tmpRoot,
     masterKeyB64: Buffer.alloc(32, 1).toString('base64'),
     encryptionKeyId: 'master-v1',
   });
-  const attachmentService = new AttachmentService(prisma as any, blobService);
+  const attachmentService = new AttachmentService(prisma as any, blobService, eventService as any);
   const policy = new AttachmentAccessPolicy();
   const ndaPolicy = new NdaPolicy();
   const controller = new AttachmentController(attachmentService, policy, blobService, ndaPolicy);
@@ -116,6 +137,16 @@ async function run() {
     undefined,
   );
   assert(uploadRes.attachmentId, 'attachmentId missing');
+  const uploadEvent = eventService.emitted.find((e) => e.type === EVENT_TYPES.ATTACHMENT_UPLOADED);
+  assert(
+    uploadEvent && uploadEvent.payload?.filename === 'test.txt',
+    'upload event should be emitted',
+  );
+
+  assert(
+    eventService.emitted.some((e) => e.type === EVENT_TYPES.ATTACHMENT_UPLOADED),
+    'upload event should be emitted',
+  );
 
   // Download L1 from same org succeeds
   const downloadRes: any = await controller.downloadAttachment(
@@ -167,6 +198,11 @@ async function run() {
   );
   const l2Buffer = await streamToBuffer(okDownload.getStream());
   assert(l2Buffer.toString() === 'top-secret', 'L2 decrypt mismatch');
+  const downloadEvents = eventService.emitted.filter(
+    (e) => e.type === EVENT_TYPES.ATTACHMENT_DOWNLOADED,
+  );
+  assert(downloadEvents.length >= 2, 'download events should be emitted');
+  assert(downloadEvents.every((e) => e.payload?.via === 'owner'), 'via should be owner');
 
   // eslint-disable-next-line no-console
   console.log('Attachment integration tests passed.');

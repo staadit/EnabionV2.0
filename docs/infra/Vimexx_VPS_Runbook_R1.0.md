@@ -75,10 +75,16 @@ curl -H "Host: dev.enabion.com" http://127.0.0.1/api/health
 curl -H "Host: api.dev.enabion.com" http://127.0.0.1/health
 ```
 
-## 9) Deploy pipeline (GitHub Actions)
+## 9) Deploy pipeline (manual)
 - Default branch: `dev`.
-- Workflow: `.github/workflows/deploy-prod.yml` on push to `dev`, SSH → `/usr/local/bin/enabion-deploy-prod.sh` (git reset --hard origin/dev, compose up).
-- Secrets: `VPS_HOST=37.97.223.106`, `VPS_USER=deploy`, `VPS_SSH_KEY` (deploy key), `VPS_KNOWN_HOSTS`, optional `VPS_PORT`.
+- Manual update on VPS:
+```bash
+cd /srv/enabion/prod/repo
+git fetch --all --tags
+git checkout dev
+git reset --hard origin/dev
+docker compose -f infra/docker-compose.prod.yml up -d --build
+```
 
 ## 10) Backups
 - Code backups: `.github/workflows/nightly-backup.yml` (03:00 UTC) → branch `backup-dev` (zip of `dev`, tags 90d retention).

@@ -4,7 +4,7 @@
 
 **Owner:** Engineering
 
-**Primary implementation tracker:** GitHub issue `R1.0-BLOBSTORE-001 (#42)`
+**Primary implementation tracker:** GitHub issue `R1.0-BLOBSTORE-001 (#42)` / `R1.0-BLOBSTORE-SEC-001 (#87)`
 
 ---
 
@@ -26,7 +26,7 @@ Key objectives:
 
 Non-goals for v1:
 
-- signed URLs / direct-to-S3 upload (future: `#87`)
+- direct-to-S3 **upload** (download signed URLs are implemented for S3)
 - full BYOK/KMS key management (future enhancement)
 
 ---
@@ -132,15 +132,15 @@ Recommended columns (R1.0):
 
 `GET /v1/attachments/:attachmentId`
 
-- response: streamed bytes
+- response:
+  - **S3 driver + L1**: signed URL with expiry (default 5 minutes) to a private bucket (no public objects)
+  - **Encrypted blobs (L2+) or local driver**: authenticated streaming from backend
 - behavior:
   - policy check **before** accessing blob:
     - tenant isolation
     - RBAC
     - NDA gating for L2
-  - decrypt on-the-fly if encrypted
-
-> R1.0 baseline uses backend streaming rather than signed URLs.
+  - decrypt on-the-fly if encrypted (L2+ cannot be served via signed URL directly)
 
 ### 4.3 Email ingest integration (R1.0)
 
@@ -190,8 +190,10 @@ Download/upload routes must enforce role-based permissions:
 
 Blobstore v1 should implement baseline safeguards:
 
-- max upload size (configurable; enforce at API)
-- allowed content types (configurable; soft-enforce initially)
+- max upload size (configurable; enforced at API; default 25MB)
+- allowed content types (enforced allowlist; default `application/octet-stream, application/pdf, text/plain, text/markdown, image/png, image/jpeg`)
+- S3 downloads use signed URLs with TTL (default 300s); no public buckets
+- Encrypted blobs (L2+) are streamed and decrypted server-side (not exposed via signed URL)
 
 Signed URLs and more advanced policies are tracked in `R1.0-BLOBSTORE-SEC-001 (#87)`.
 
@@ -211,10 +213,13 @@ Signed URLs and more advanced policies are tracked in `R1.0-BLOBSTORE-SEC-001 (#
   Identifier for the active key (for metadata; default `master-v1`).
 
 - `BLOBSTORE_MAX_UPLOAD_MB`  
-  Optional per-request guard (API-level) to reject oversize uploads.
+  Per-request guard (API-level) to reject oversize uploads. Default: `25`.
 
 - `BLOBSTORE_ALLOWED_CONTENT_TYPES`  
-  Optional comma-separated allowlist (soft-enforced in R1.0).
+  Comma-separated allowlist. Default: `application/octet-stream,application/pdf,text/plain,text/markdown,image/png,image/jpeg`.
+
+- `BLOBSTORE_SIGNED_URL_TTL_SECONDS`  
+  TTL for signed download URLs (S3) and download expiry metadata. Default: `300` seconds.
 
 ### 6.2 Local driver
 
@@ -249,12 +254,15 @@ R1.0 expectation:
 - Local driver roundtrip: `put` -> `get` bytes equality
 - AES-GCM roundtrip: encrypt -> decrypt equals input
 - Policy: L2 attachment without NDA acceptance returns 403
+- Upload guards: reject disallowed content types / oversize uploads
+- Download path: S3 (unencrypted) returns signed URL with TTL; encrypted blobs force streaming/decrypt
 - Script coverage: `apps/backend/scripts/blobstore.test.ts`
 
 ### 7.2 Integration tests (docker)
 
 - upload attachment -> DB rows created -> download returns identical bytes
 - tenant isolation: cannot download attachment from another tenant
+- audit events emitted on upload/download (link: `#84`)
 - Script: `apps/backend/scripts/attachment-integration.test.ts` (local driver, NDA gate paths)
 
 ---
@@ -277,8 +285,8 @@ Recommendation:
 
 ## 9. Operational considerations
 
-- **Streaming:** downloads should stream (avoid buffering large blobs in memory)
-- **Observability:** create product events for upload/download outcomes (align with `#24` and event protocol)
+- **Streaming/Signed URLs:** S3 L1 uses signed URLs (TTL), encrypted blobs + local driver stream via backend (with NDA/RBAC checks)
+- **Observability:** emit product events for upload/download outcomes (align with `#24` / `#84` event protocol)
 - **Retention:** future work will integrate soft-delete/anonymization policies (`#81/#82`)
 
 ---

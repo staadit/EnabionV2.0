@@ -11,9 +11,15 @@ export interface BlobStoreGetOutput {
   contentType?: string;
 }
 
+export interface BlobStoreSignedUrlOutput {
+  url: string;
+  expiresAt: Date;
+}
+
 export interface BlobStore {
   driver: StorageDriverKind;
   put(input: BlobStorePutInput): Promise<void>;
   get(objectKey: string): Promise<BlobStoreGetOutput>;
   delete(objectKey: string): Promise<void>;
+  getSignedUrl?(objectKey: string, expiresInSeconds: number): Promise<BlobStoreSignedUrlOutput>;
 }

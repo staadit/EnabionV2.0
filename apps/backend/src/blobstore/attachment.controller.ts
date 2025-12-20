@@ -104,12 +104,25 @@ export class AttachmentController {
       ndaAccepted: ndaOk,
     });
 
-    const { blob, stream } = await this.blobService.getBlobStream(attachment.blobId, orgId);
-    const dispositionType = this.parseBool(asInline) ? 'inline' : 'attachment';
+    const download = await this.blobService.getBlobStream(attachment.blobId, orgId);
+    await this.attachmentService.emitDownloadedEvent({
+      attachment,
+      actorUserId: userId,
+      via: 'owner',
+    });
 
-    return new StreamableFile(stream as any, {
+    if (download.signedUrl) {
+      return {
+        signedUrl: download.signedUrl,
+        expiresAt: download.expiresAt?.toISOString(),
+        contentType: attachment.blob?.contentType,
+      };
+    }
+
+    const dispositionType = this.parseBool(asInline) ? 'inline' : 'attachment';
+    return new StreamableFile(download.stream as any, {
       disposition: `${dispositionType}; filename="${attachment.filename}"`,
-      type: blob.contentType,
+      type: attachment.blob?.contentType,
     });
   }
 

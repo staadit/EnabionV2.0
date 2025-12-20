@@ -1,7 +1,10 @@
+import * as crypto from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { AttachmentSource, ConfidentialityLevel } from './types';
 import { PrismaService } from '../prisma.service';
 import { BlobService } from './blob.service';
+import { EventService } from '../events/event.service';
+import { EVENT_TYPES } from '../events/event-registry';
+import { AttachmentSource, ConfidentialityLevel } from './types';
 
 export interface UploadAttachmentInput {
   orgId: string;
@@ -19,6 +22,7 @@ export class AttachmentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly blobService: BlobService,
+    private readonly events: EventService,
   ) {}
 
   async uploadAttachment(input: UploadAttachmentInput) {
@@ -41,6 +45,11 @@ export class AttachmentService {
       },
       include: { blob: true },
     });
+
+    await this.emitUploadedEvent({
+      attachment,
+      actorUserId: input.createdByUserId,
+    });
     return attachment;
   }
 
@@ -53,5 +62,56 @@ export class AttachmentService {
       throw new NotFoundException('Attachment not found');
     }
     return attachment;
+  }
+
+  async emitDownloadedEvent(input: {
+    attachment: any;
+    actorUserId?: string;
+    via?: 'owner' | 'share_link' | 'system';
+  }) {
+    const intentId = input.attachment.intentId || 'unknown';
+    await this.events.emitEvent({
+      orgId: input.attachment.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.attachment.orgId,
+      subjectType: 'ATTACHMENT',
+      subjectId: input.attachment.id,
+      lifecycleStep: 'CLARIFY',
+      pipelineStage: 'NEW',
+      channel: 'api',
+      correlationId: crypto.randomUUID(),
+      occurredAt: new Date(),
+      type: EVENT_TYPES.ATTACHMENT_DOWNLOADED,
+      payload: {
+        payloadVersion: 1,
+        intentId,
+        attachmentId: input.attachment.id,
+        via: input.via || 'owner',
+      },
+    });
+  }
+
+  private async emitUploadedEvent(input: { attachment: any; actorUserId?: string }) {
+    const intentId = input.attachment.intentId || 'unknown';
+    await this.events.emitEvent({
+      orgId: input.attachment.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.attachment.orgId,
+      subjectType: 'ATTACHMENT',
+      subjectId: input.attachment.id,
+      lifecycleStep: 'CLARIFY',
+      pipelineStage: 'NEW',
+      channel: 'api',
+      correlationId: crypto.randomUUID(),
+      occurredAt: new Date(),
+      type: EVENT_TYPES.ATTACHMENT_UPLOADED,
+      payload: {
+        payloadVersion: 1,
+        intentId,
+        attachmentId: input.attachment.id,
+        filename: input.attachment.filename,
+        sizeBytes: input.attachment.blob?.sizeBytes,
+      },
+    });
   }
 }

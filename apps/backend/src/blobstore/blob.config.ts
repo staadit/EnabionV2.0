@@ -17,10 +17,22 @@ export interface BlobConfig {
   encryptionKeyId?: string;
   maxUploadBytes?: number;
   allowedContentTypes?: string[];
+  downloadUrlTtlSeconds?: number;
   s3?: S3Config;
 }
 
 export function loadBlobConfig(): BlobConfig {
+  const DEFAULT_ALLOWED_TYPES = [
+    'application/octet-stream',
+    'application/pdf',
+    'text/plain',
+    'text/markdown',
+    'image/png',
+    'image/jpeg',
+  ];
+  const DEFAULT_MAX_UPLOAD_MB = 25;
+  const DEFAULT_SIGNED_URL_TTL_SECONDS = 300;
+
   const driverEnv = (process.env.BLOBSTORE_DRIVER || 'local').toLowerCase();
   const driver: BlobStorageDriverType = driverEnv === 's3' ? 's3' : 'local';
   const localRoot =
@@ -28,9 +40,16 @@ export function loadBlobConfig(): BlobConfig {
   const masterKeyB64 = process.env.BLOB_ENC_MASTER_KEY;
   const encryptionKeyId = process.env.BLOB_ENC_KEY_ID || 'master-v1';
 
-  const maxUploadMb = process.env.BLOBSTORE_MAX_UPLOAD_MB
+  const parsedMaxUpload = process.env.BLOBSTORE_MAX_UPLOAD_MB
     ? Number(process.env.BLOBSTORE_MAX_UPLOAD_MB)
-    : undefined;
+    : DEFAULT_MAX_UPLOAD_MB;
+  const maxUploadMb = Number.isNaN(parsedMaxUpload) ? DEFAULT_MAX_UPLOAD_MB : parsedMaxUpload;
+  const parsedTtl = process.env.BLOBSTORE_SIGNED_URL_TTL_SECONDS
+    ? Number(process.env.BLOBSTORE_SIGNED_URL_TTL_SECONDS)
+    : DEFAULT_SIGNED_URL_TTL_SECONDS;
+  const downloadUrlTtlSeconds = Number.isNaN(parsedTtl)
+    ? DEFAULT_SIGNED_URL_TTL_SECONDS
+    : parsedTtl;
 
   const cfg: BlobConfig = {
     driver,
@@ -44,19 +63,20 @@ export function loadBlobConfig(): BlobConfig {
       accessKey: process.env.S3_ACCESS_KEY,
       secretKey: process.env.S3_SECRET_KEY,
     },
+    downloadUrlTtlSeconds,
   };
 
-  if (maxUploadMb && !Number.isNaN(maxUploadMb) && maxUploadMb > 0) {
+  if (!Number.isNaN(maxUploadMb) && maxUploadMb > 0) {
     cfg.maxUploadBytes = maxUploadMb * 1024 * 1024;
   }
 
   const allowList = process.env.BLOBSTORE_ALLOWED_CONTENT_TYPES;
-  if (allowList) {
-    cfg.allowedContentTypes = allowList
-      .split(',')
-      .map((v) => v.trim())
-      .filter(Boolean);
-  }
+  cfg.allowedContentTypes = allowList
+    ? allowList
+        .split(',')
+        .map((v) => v.trim().toLowerCase())
+        .filter(Boolean)
+    : DEFAULT_ALLOWED_TYPES;
 
   return cfg;
 }
