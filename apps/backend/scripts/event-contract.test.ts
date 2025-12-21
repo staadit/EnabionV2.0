@@ -92,9 +92,14 @@ const cases = [
   },
 ];
 
-function expectValid(type: string, payload: Record<string, unknown>) {
+function expectValid(
+  type: string,
+  payload: Record<string, unknown>,
+  overrides: Partial<typeof baseEnvelope> = {},
+) {
   validateEvent({
     ...baseEnvelope,
+    ...overrides,
     type: type as any,
     eventId: ulid(),
     payload,
@@ -166,6 +171,48 @@ function expectInvalid() {
 }
 
 cases.forEach((c) => expectValid(c.type, c.payload));
+expectValid(
+  EVENT_TYPES.USER_SIGNED_UP,
+  {
+    payloadVersion: 1,
+    userId: 'user_test',
+    email: 'user@example.com',
+    orgId: 'org_test',
+    role: 'Owner',
+    sessionId: 'session_test',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.USER_LOGGED_IN,
+  {
+    payloadVersion: 1,
+    userId: 'user_test',
+    orgId: 'org_test',
+    sessionId: 'session_test',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.USER_PASSWORD_RESET_REQUESTED,
+  {
+    payloadVersion: 1,
+    userId: 'user_test',
+    orgId: 'org_test',
+    resetTokenId: 'reset_token_1',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.USER_PASSWORD_RESET_COMPLETED,
+  {
+    payloadVersion: 1,
+    userId: 'user_test',
+    orgId: 'org_test',
+    resetTokenId: 'reset_token_1',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
 expectInvalid();
 // eslint-disable-next-line no-console
 console.log('Event contract schemas validated.');

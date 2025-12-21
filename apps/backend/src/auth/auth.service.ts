@@ -12,7 +12,14 @@ import { PrismaService } from '../prisma.service';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { AuthUser } from './auth.types';
-import { generateSessionToken, hashPassword, hashSessionToken, verifyPassword } from './auth.utils';
+import {
+  generateResetToken,
+  generateSessionToken,
+  hashPassword,
+  hashResetToken,
+  hashSessionToken,
+  verifyPassword,
+} from './auth.utils';
 
 type SignupInput = {
   email: string;
@@ -41,6 +48,8 @@ export class AuthService {
   private readonly sessionTtlHours = this.parseNumber(process.env.AUTH_SESSION_TTL_HOURS, 12);
   private readonly loginWindowMinutes = this.parseNumber(process.env.AUTH_LOGIN_WINDOW_MINUTES, 10);
   private readonly loginMaxAttempts = this.parseNumber(process.env.AUTH_LOGIN_MAX_ATTEMPTS, 5);
+  private readonly resetTtlMinutes = this.parseNumber(process.env.AUTH_RESET_TTL_MINUTES, 30);
+  private readonly resetDebug = this.parseBool(process.env.AUTH_RESET_DEBUG);
   private readonly loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
   constructor(
@@ -192,6 +201,91 @@ export class AuthService {
     };
   }
 
+  async requestPasswordReset(email: string) {
+    const normalizedEmail = this.normalizeEmail(email);
+    const user = await this.prisma.user.findUnique({ where: { email: normalizedEmail } });
+
+    if (!user) {
+      return { status: 'ok' };
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + this.resetTtlMinutes * 60 * 1000);
+    const token = generateResetToken();
+    const tokenHash = hashResetToken(token);
+
+    const tokenRecord = await this.prisma.$transaction(async (tx) => {
+      await tx.passwordResetToken.updateMany({
+        where: { userId: user.id, usedAt: null, expiresAt: { gt: now } },
+        data: { usedAt: now },
+      });
+
+      return tx.passwordResetToken.create({
+        data: {
+          userId: user.id,
+          tokenHash,
+          expiresAt,
+        },
+      });
+    });
+
+    await this.emitPasswordResetEvent(EVENT_TYPES.USER_PASSWORD_RESET_REQUESTED, user, tokenRecord.id);
+
+    if (this.resetDebug) {
+      return {
+        status: 'ok',
+        resetToken: token,
+        expiresAt: expiresAt.toISOString(),
+      };
+    }
+
+    return { status: 'ok' };
+  }
+
+  async confirmPasswordReset(token: string, newPassword: string) {
+    const tokenHash = hashResetToken(token);
+    const now = new Date();
+
+    const tokenRecord = await this.prisma.passwordResetToken.findUnique({
+      where: { tokenHash },
+      include: { user: true },
+    });
+
+    if (!tokenRecord || tokenRecord.usedAt || tokenRecord.expiresAt <= now) {
+      throw new HttpException('Invalid or expired reset token', HttpStatus.BAD_REQUEST);
+    }
+
+    const passwordHash = await hashPassword(newPassword);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: tokenRecord.userId },
+        data: {
+          passwordHash,
+          passwordUpdatedAt: now,
+        },
+      });
+
+      await tx.passwordResetToken.update({
+        where: { id: tokenRecord.id },
+        data: { usedAt: now },
+      });
+
+      await tx.session.updateMany({
+        where: { userId: tokenRecord.userId, revokedAt: null },
+        data: { revokedAt: now },
+      });
+    });
+
+    await this.emitPasswordResetEvent(
+      EVENT_TYPES.USER_PASSWORD_RESET_COMPLETED,
+      tokenRecord.user,
+      tokenRecord.id,
+    );
+
+    return { status: 'ok' };
+  }
+
   private async createSession(tx: Prisma.TransactionClient, userId: string, now: Date): Promise<SessionOutput> {
     const token = generateSessionToken();
     const tokenHash = hashSessionToken(token);
@@ -236,6 +330,27 @@ export class AuthService {
       channel: 'api',
       correlationId: ulid(),
       payload,
+    });
+  }
+
+  private async emitPasswordResetEvent(type: string, user: User, resetTokenId: string) {
+    await this.events.emitEvent({
+      type: type as any,
+      occurredAt: new Date(),
+      orgId: user.orgId,
+      actorUserId: user.id,
+      subjectType: 'USER',
+      subjectId: user.id,
+      lifecycleStep: 'CLARIFY',
+      pipelineStage: 'NEW',
+      channel: 'api',
+      correlationId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        userId: user.id,
+        orgId: user.orgId,
+        resetTokenId,
+      },
     });
   }
 

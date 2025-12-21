@@ -28,6 +28,7 @@ model User {
   lastLoginAt      DateTime?
   org       Organization @relation(fields: [orgId], references: [id])
   sessions  Session[]
+  passwordResetTokens PasswordResetToken[]
   createdAt DateTime @default(now())
 }
 
@@ -38,6 +39,19 @@ model Session {
   createdAt DateTime @default(now())
   expiresAt DateTime
   revokedAt DateTime?
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+  usedAt    DateTime?
   user      User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
