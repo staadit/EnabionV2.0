@@ -93,6 +93,51 @@ docker compose -f infra/docker-compose.edge.yml up -d
 
 ---
 
+## 4.1) Outbound SMTP relay (Docker, smarthost)
+
+Outbound-only mail relay runs as a container (no Postfix on host). No inbound SMTP, no MX, no public ports.
+
+Compose:
+- `infra/docker-compose.prod.yml` and `infra/docker-compose.prod.pilot.yml` include `smtp-relay`.
+- The relay is reachable only on the internal Docker network `smtp_internal` (no `ports:`).
+
+Env (NOT in git; placeholders only):
+```
+# /srv/enabion/dev/env/smtp-relay.env
+RELAYHOST=smtp.example.com
+RELAYHOST_PORT=587
+RELAYHOST_USERNAME=__SMTP_USER__
+RELAYHOST_PASSWORD=__SMTP_PASS__
+```
+
+Backend env (NOT in git; use placeholders):
+```
+SMTP_HOST=smtp-relay
+SMTP_PORT=25
+SMTP_SECURE=false
+SMTP_FROM=no-reply@example.com
+APP_PUBLIC_URL=https://dev.example.com
+```
+
+Notes:
+- Backend -> relay uses port 25 on `smtp-relay`; relay -> smarthost uses 587.
+- Keep AUTH_RESET_DEBUG=true for debug token mode; set to false to send emails.
+
+---
+
+## 4.2) Smoke test - password reset email
+
+Checklist:
+- [ ] Relay container is up and reachable on `smtp_internal` (no public SMTP ports).
+- [ ] Backend env has SMTP_* + APP_PUBLIC_URL set (placeholders in repo only).
+- [ ] AUTH_RESET_DEBUG=false on backend for this test.
+- [ ] Request reset via UI (`/reset`) for a test inbox; request returns 200.
+- [ ] Email arrives with reset link pointing to APP_PUBLIC_URL.
+- [ ] Open reset link, set a new password; confirm success.
+- [ ] Verify logs/events do not include email address or reset token.
+
+---
+
 ## 5) Remote Dev stack — always-on [Ewa]
 
 **Domains**

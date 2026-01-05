@@ -56,7 +56,6 @@ function testPolicyNdaGate() {
     policy.assertCanDownload({
       requestOrgId: 'org-1',
       resourceOrgId: 'org-1',
-      role: 'Viewer',
       confidentiality: 'L2',
       ndaAccepted: false,
     });

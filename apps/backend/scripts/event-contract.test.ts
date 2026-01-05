@@ -1,14 +1,16 @@
 import { ulid } from 'ulid';
-import { EVENT_TYPES, validateEvent } from '../src/events/event-registry';
+import { EVENT_TYPES, EventEnvelopeInput, validateEvent } from '../src/events/event-registry';
 
-const baseEnvelope = {
+type EnvelopeOverrides = Partial<Omit<EventEnvelopeInput, 'eventId' | 'type' | 'payload'>>;
+
+const baseEnvelope: Omit<EventEnvelopeInput, 'eventId' | 'type' | 'payload'> = {
   orgId: 'org_test',
   actorUserId: 'user_test',
-  subjectType: 'INTENT' as const,
+  subjectType: 'INTENT',
   subjectId: 'intent_test',
-  lifecycleStep: 'CLARIFY' as const,
-  pipelineStage: 'NEW' as const,
-  channel: 'ui' as const,
+  lifecycleStep: 'CLARIFY',
+  pipelineStage: 'NEW',
+  channel: 'ui',
   correlationId: 'corr_test',
   occurredAt: new Date(),
 };
@@ -95,7 +97,7 @@ const cases = [
 function expectValid(
   type: string,
   payload: Record<string, unknown>,
-  overrides: Partial<typeof baseEnvelope> = {},
+  overrides: EnvelopeOverrides = {},
 ) {
   validateEvent({
     ...baseEnvelope,
@@ -210,6 +212,28 @@ expectValid(
     userId: 'user_test',
     orgId: 'org_test',
     resetTokenId: 'reset_token_1',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.EMAIL_SENT,
+  {
+    payloadVersion: 1,
+    messageType: 'password_reset',
+    transport: 'smtp',
+    resetTokenId: 'reset_token_1',
+    messageId: 'msg1',
+  },
+  { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.EMAIL_FAILED,
+  {
+    payloadVersion: 1,
+    messageType: 'password_reset',
+    transport: 'smtp',
+    resetTokenId: 'reset_token_1',
+    errorCode: 'smtp_not_configured',
   },
   { subjectType: 'USER', subjectId: 'user_test' },
 );

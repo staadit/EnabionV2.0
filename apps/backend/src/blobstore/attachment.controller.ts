@@ -15,6 +15,8 @@ import {
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { AuthenticatedRequest } from '../auth/auth.types';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { AttachmentService } from './attachment.service';
 import { AttachmentAccessPolicy } from './attachment.policy';
 import { BlobService } from './blob.service';
@@ -28,7 +30,7 @@ type UploadedFileType = {
   stream?: NodeJS.ReadableStream;
 };
 
-@UseGuards(AuthGuard)
+@UseGuards(AuthGuard, RolesGuard)
 @Controller('v1')
 export class AttachmentController {
   constructor(
@@ -39,6 +41,7 @@ export class AttachmentController {
   ) {}
 
   @Post('intents/:intentId/attachments')
+  @Roles('Owner', 'BD-AM')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAttachment(
     @Req() req: AuthenticatedRequest,
@@ -54,7 +57,6 @@ export class AttachmentController {
     this.policy.assertCanUpload({
       requestOrgId: orgId,
       resourceOrgId: orgId,
-      role: user.role,
     });
 
     const buffer = await this.toBuffer(file);
@@ -78,6 +80,7 @@ export class AttachmentController {
   }
 
   @Get('attachments/:id')
+  @Roles('Owner', 'BD-AM', 'Viewer')
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
@@ -98,7 +101,6 @@ export class AttachmentController {
     this.policy.assertCanDownload({
       requestOrgId: orgId,
       resourceOrgId: attachment.orgId,
-      role: user.role,
       confidentiality: attachment.blob.confidentiality as ConfidentialityLevel,
       ndaAccepted: ndaOk,
     });
