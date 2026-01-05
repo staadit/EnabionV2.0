@@ -5,7 +5,7 @@ const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 function buildBackendUrl(id: string, req: NextApiRequest) {
   const params = new URLSearchParams();
-  ['orgId', 'role', 'ndaAccepted', 'userId', 'asInline'].forEach((key) => {
+  ['ndaAccepted', 'asInline'].forEach((key) => {
     const value = req.query[key];
     if (typeof value === 'string') {
       params.append(key, value);
@@ -29,7 +29,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const backendUrl = buildBackendUrl(id, req);
-  const backendRes = await fetch(backendUrl);
+  const headers: Record<string, string> = {};
+  if (req.headers.cookie) {
+    headers.cookie = req.headers.cookie;
+  }
+  const backendRes = await fetch(backendUrl, { headers });
   const contentType = backendRes.headers.get('content-type') || '';
 
   // JSON path (signed URL / metadata)

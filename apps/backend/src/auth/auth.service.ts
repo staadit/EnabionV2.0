@@ -11,7 +11,8 @@ import { ulid } from 'ulid';
 import { PrismaService } from '../prisma.service';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
-import { AuthUser } from './auth.types';
+import { EmailService } from '../email/email.service';
+import { AuthUser, UserRole } from './auth.types';
 import {
   generateResetToken,
   generateSessionToken,
@@ -50,11 +51,13 @@ export class AuthService {
   private readonly loginMaxAttempts = this.parseNumber(process.env.AUTH_LOGIN_MAX_ATTEMPTS, 5);
   private readonly resetTtlMinutes = this.parseNumber(process.env.AUTH_RESET_TTL_MINUTES, 30);
   private readonly resetDebug = this.parseBool(process.env.AUTH_RESET_DEBUG);
+  private readonly appPublicUrl = (process.env.APP_PUBLIC_URL || '').trim();
   private readonly loginAttempts = new Map<string, { count: number; resetAt: number }>();
 
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
+    private readonly emailService: EmailService,
   ) {}
 
   getCookieName(): string {
@@ -213,6 +216,7 @@ export class AuthService {
     const expiresAt = new Date(now.getTime() + this.resetTtlMinutes * 60 * 1000);
     const token = generateResetToken();
     const tokenHash = hashResetToken(token);
+    const correlationId = ulid();
 
     const tokenRecord = await this.prisma.$transaction(async (tx) => {
       await tx.passwordResetToken.updateMany({
@@ -229,7 +233,12 @@ export class AuthService {
       });
     });
 
-    await this.emitPasswordResetEvent(EVENT_TYPES.USER_PASSWORD_RESET_REQUESTED, user, tokenRecord.id);
+    await this.emitPasswordResetEvent(
+      EVENT_TYPES.USER_PASSWORD_RESET_REQUESTED,
+      user,
+      tokenRecord.id,
+      correlationId,
+    );
 
     if (this.resetDebug) {
       return {
@@ -237,6 +246,30 @@ export class AuthService {
         resetToken: token,
         expiresAt: expiresAt.toISOString(),
       };
+    }
+
+    try {
+      const resetUrl = this.buildResetUrl(token);
+      const result = await this.emailService.sendPasswordResetEmail({
+        to: user.email,
+        resetUrl,
+        ttlMinutes: this.resetTtlMinutes,
+      });
+      await this.emitEmailEvent({
+        type: EVENT_TYPES.EMAIL_SENT,
+        user,
+        resetTokenId: tokenRecord.id,
+        correlationId,
+        messageId: result.messageId,
+      });
+    } catch (err) {
+      await this.emitEmailEvent({
+        type: EVENT_TYPES.EMAIL_FAILED,
+        user,
+        resetTokenId: tokenRecord.id,
+        correlationId,
+        errorCode: this.getEmailErrorCode(err),
+      });
     }
 
     return { status: 'ok' };
@@ -333,7 +366,12 @@ export class AuthService {
     });
   }
 
-  private async emitPasswordResetEvent(type: string, user: User, resetTokenId: string) {
+  private async emitPasswordResetEvent(
+    type: string,
+    user: User,
+    resetTokenId: string,
+    correlationId?: string,
+  ) {
     await this.events.emitEvent({
       type: type as any,
       occurredAt: new Date(),
@@ -344,7 +382,7 @@ export class AuthService {
       lifecycleStep: 'CLARIFY',
       pipelineStage: 'NEW',
       channel: 'api',
-      correlationId: ulid(),
+      correlationId: correlationId ?? ulid(),
       payload: {
         payloadVersion: 1,
         userId: user.id,
@@ -354,12 +392,80 @@ export class AuthService {
     });
   }
 
+  private async emitEmailEvent(input: {
+    type: string;
+    user: User;
+    resetTokenId: string;
+    correlationId: string;
+    messageId?: string;
+    errorCode?: string;
+  }) {
+    const payloadBase = {
+      payloadVersion: 1,
+      messageType: 'password_reset',
+      transport: 'smtp',
+      resetTokenId: input.resetTokenId,
+    };
+    const payload =
+      input.type === EVENT_TYPES.EMAIL_SENT
+        ? { ...payloadBase, messageId: input.messageId }
+        : { ...payloadBase, errorCode: input.errorCode || 'unknown' };
+
+    await this.events.emitEvent({
+      type: input.type as any,
+      occurredAt: new Date(),
+      orgId: input.user.orgId,
+      actorUserId: input.user.id,
+      subjectType: 'USER',
+      subjectId: input.user.id,
+      lifecycleStep: 'CLARIFY',
+      pipelineStage: 'NEW',
+      channel: 'api',
+      correlationId: input.correlationId,
+      payload,
+    });
+  }
+
+  private buildResetUrl(token: string): string {
+    if (!this.appPublicUrl) {
+      throw new Error('APP_PUBLIC_URL_NOT_CONFIGURED');
+    }
+
+    const baseUrl = this.appPublicUrl.endsWith('/')
+      ? this.appPublicUrl.slice(0, -1)
+      : this.appPublicUrl;
+
+    return `${baseUrl}/reset/confirm?token=${token}`;
+  }
+
+  private getEmailErrorCode(err: unknown): string {
+    if (err instanceof Error) {
+      if (err.message === 'SMTP_NOT_CONFIGURED') {
+        return 'smtp_not_configured';
+      }
+      if (err.message === 'APP_PUBLIC_URL_NOT_CONFIGURED') {
+        return 'app_public_url_not_configured';
+      }
+    }
+    if (err && typeof err === 'object') {
+      const code = (err as { code?: string }).code;
+      if (code) {
+        return String(code).toLowerCase();
+      }
+      const name = (err as { name?: string }).name;
+      if (name) {
+        return String(name).toLowerCase();
+      }
+    }
+    return 'unknown';
+  }
+
   private toAuthUser(user: User): AuthUser {
     return {
       id: user.id,
       email: user.email,
       orgId: user.orgId,
-      role: user.role,
+      role: user.role as UserRole,
     };
   }
 

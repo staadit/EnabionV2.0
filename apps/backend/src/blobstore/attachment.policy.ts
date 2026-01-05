@@ -1,7 +1,6 @@
 import { ForbiddenException, Injectable } from '@nestjs/common';
+import { UserRole } from '../auth/auth.types';
 import { ConfidentialityLevel } from './types';
-
-export type UserRole = 'Owner' | 'BD-AM' | 'Viewer';
 
 export interface AccessContext {
   requestOrgId: string;

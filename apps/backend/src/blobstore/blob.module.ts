@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { AttachmentAccessPolicy } from './attachment.policy';
 import { AttachmentController } from './attachment.controller';
@@ -9,9 +9,10 @@ import { LocalBlobStore } from './local-blobstore';
 import { S3BlobStore } from './s3-blobstore';
 import { NdaPolicy } from './nda.policy';
 import { EventModule } from '../events/event.module';
+import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [EventModule],
+  imports: [EventModule, forwardRef(() => AuthModule)],
   controllers: [AttachmentController],
   providers: [
     PrismaService,
