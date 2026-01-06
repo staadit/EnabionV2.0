@@ -54,6 +54,8 @@ export const EVENT_TYPES = {
   EMAIL_RECEIVED: 'EMAIL_RECEIVED',
   EMAIL_THREAD_MAPPED_TO_INTENT: 'EMAIL_THREAD_MAPPED_TO_INTENT',
   EMAIL_APPLIED_AS_INTENT_UPDATE: 'EMAIL_APPLIED_AS_INTENT_UPDATE',
+  EMAIL_SENT: 'EMAIL_SENT',
+  EMAIL_FAILED: 'EMAIL_FAILED',
   TRUSTSCORE_SNAPSHOT_CREATED: 'TRUSTSCORE_SNAPSHOT_CREATED',
   // Audit-critical coverage
   INTENT_VIEWED: 'INTENT_VIEWED',
@@ -183,6 +185,18 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     messageId: z.string().min(1),
     updatedFields: z.array(z.string().min(1)),
+  }),
+  [EVENT_TYPES.EMAIL_SENT]: basePayload.extend({
+    messageType: z.enum(['password_reset']),
+    transport: z.enum(['smtp']),
+    resetTokenId: z.string().min(1),
+    messageId: z.string().min(1).optional(),
+  }),
+  [EVENT_TYPES.EMAIL_FAILED]: basePayload.extend({
+    messageType: z.enum(['password_reset']),
+    transport: z.enum(['smtp']),
+    resetTokenId: z.string().min(1),
+    errorCode: z.string().min(1),
   }),
   [EVENT_TYPES.TRUSTSCORE_SNAPSHOT_CREATED]: basePayload.extend({
     orgId: z.string().min(1),

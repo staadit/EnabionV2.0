@@ -122,18 +122,40 @@ async function run() {
   const policy = new AttachmentAccessPolicy();
   const ndaPolicy = new NdaPolicy();
   const controller = new AttachmentController(attachmentService, policy, blobService, ndaPolicy);
+  const ownerReq = {
+    user: {
+      id: 'user-1',
+      email: 'owner@example.com',
+      orgId: 'org-1',
+      role: 'Owner',
+    },
+  } as any;
+  const viewerReq = {
+    user: {
+      id: 'user-2',
+      email: 'viewer@example.com',
+      orgId: 'org-1',
+      role: 'Viewer',
+    },
+  } as any;
+  const otherOrgReq = {
+    user: {
+      id: 'user-3',
+      email: 'other@example.com',
+      orgId: 'other-org',
+      role: 'Viewer',
+    },
+  } as any;
 
   // Upload L1
   const uploadRes: any = await controller.uploadAttachment(
+    ownerReq,
     'intent-1',
     {
       originalname: 'test.txt',
       mimetype: 'text/plain',
       buffer: Buffer.from('hello-world'),
     } as any,
-    'org-1',
-    'Owner',
-    'user-1',
     undefined,
   );
   assert(uploadRes.attachmentId, 'attachmentId missing');
@@ -150,9 +172,8 @@ async function run() {
 
   // Download L1 from same org succeeds
   const downloadRes: any = await controller.downloadAttachment(
+    viewerReq,
     uploadRes.attachmentId,
-    'org-1',
-    'Viewer',
     undefined,
     undefined,
   );
@@ -162,7 +183,12 @@ async function run() {
   // Cross-tenant forbidden
   let threw = false;
   try {
-    await controller.downloadAttachment(uploadRes.attachmentId, 'other-org', 'Viewer', undefined, undefined);
+    await controller.downloadAttachment(
+      otherOrgReq,
+      uploadRes.attachmentId,
+      undefined,
+      undefined,
+    );
   } catch (err) {
     if (err instanceof ForbiddenException) threw = true;
   }
@@ -170,29 +196,26 @@ async function run() {
 
   // L2 requires NDA
   const uploadL2: any = await controller.uploadAttachment(
+    ownerReq,
     'intent-2',
     {
       originalname: 'secret.txt',
       mimetype: 'text/plain',
       buffer: Buffer.from('top-secret'),
     } as any,
-    'org-1',
-    'Owner',
-    'user-1',
     'L2',
   );
   threw = false;
   try {
-    await controller.downloadAttachment(uploadL2.attachmentId, 'org-1', 'Viewer', undefined, undefined);
+    await controller.downloadAttachment(viewerReq, uploadL2.attachmentId, undefined, undefined);
   } catch (err) {
     if (err instanceof ForbiddenException) threw = true;
   }
   assert(threw, 'L2 without NDA should be forbidden');
 
   const okDownload: any = await controller.downloadAttachment(
+    viewerReq,
     uploadL2.attachmentId,
-    'org-1',
-    'Viewer',
     'true',
     undefined,
   );

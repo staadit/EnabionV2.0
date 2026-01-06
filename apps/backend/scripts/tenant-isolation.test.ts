@@ -31,28 +31,38 @@ async function run() {
   const svc = new EventService(prisma as any);
   const controller = new EventController(svc);
 
-  // Controller must enforce orgId on list
+  // Controller must enforce session context on list
   let threw = false;
   try {
-    await controller.list(undefined);
+    await controller.list({} as any);
   } catch (err) {
     if (err instanceof BadRequestException) {
       threw = true;
     }
   }
-  assert(threw, 'list() without orgId should throw BadRequestException');
+  assert(threw, 'list() without req.user should throw BadRequestException');
 
-  // Service must scope queries by orgId
-  await svc.findMany({ orgId: 'org-123', limit: 10 });
+  const req = {
+    user: {
+      id: 'user-1',
+      email: 'owner@example.com',
+      orgId: 'org-123',
+      role: 'Owner',
+    },
+  } as any;
+
+  // Controller must scope queries by req.user.orgId
+  await controller.list(req);
   assert(
     prisma.lastFindManyArgs?.where?.orgId === 'org-123',
-    'findMany() must scope by orgId',
+    'list() must scope by req.user.orgId',
   );
 
-  // Emit should preserve orgId into create payload
-  await svc.emitEvent({
-    orgId: 'org-abc',
-    actorUserId: 'user-1',
+  // Controller must override orgId/actorUserId from req.user
+  await controller.create(req, {
+    orgId: 'org-evil',
+    actorUserId: 'user-evil',
+    actorOrgId: 'org-evil',
     subjectType: 'INTENT',
     subjectId: 'intent-1',
     lifecycleStep: 'CLARIFY',
@@ -71,8 +81,16 @@ async function run() {
     },
   });
   assert(
-    prisma.lastCreateArgs?.data?.orgId === 'org-abc',
-    'emitEvent must persist orgId',
+    prisma.lastCreateArgs?.data?.orgId === 'org-123',
+    'create() must override orgId from req.user',
+  );
+  assert(
+    prisma.lastCreateArgs?.data?.actorUserId === 'user-1',
+    'create() must override actorUserId from req.user',
+  );
+  assert(
+    prisma.lastCreateArgs?.data?.actorOrgId === 'org-123',
+    'create() must override actorOrgId from req.user',
   );
 
   // eslint-disable-next-line no-console

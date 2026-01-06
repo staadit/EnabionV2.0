@@ -27,22 +27,28 @@ async function run() {
   const prisma = new MockPrismaService();
   const svc = new EventService(prisma as any);
   const controller = new EventController(svc);
+  const req = {
+    user: {
+      id: 'user-1',
+      email: 'owner@example.com',
+      orgId: 'org-1',
+      role: 'Owner',
+    },
+  } as any;
 
-  // GET without orgId should throw 400
+  // GET without req.user should throw 400
   let threw = false;
   try {
-    await controller.list(undefined);
+    await controller.list({} as any);
   } catch (err) {
     if (err instanceof BadRequestException) threw = true;
   }
-  assert(threw, 'GET /events without orgId should be 400');
+  assert(threw, 'GET /events without req.user should be 400');
 
   // POST with invalid payload should throw (missing payloadVersion)
   threw = false;
   try {
-    await controller.create({
-      orgId: 'org-1',
-      actorUserId: 'user-1',
+    await controller.create(req, {
       subjectType: 'INTENT',
       subjectId: 'intent-1',
       lifecycleStep: 'CLARIFY',
@@ -59,9 +65,7 @@ async function run() {
   assert(threw, 'POST /events with bad payload should fail');
 
   // Happy path POST then GET scoped by orgId
-  await controller.create({
-    orgId: 'org-1',
-    actorUserId: 'user-1',
+  await controller.create(req, {
     subjectType: 'INTENT',
     subjectId: 'intent-1',
     lifecycleStep: 'CLARIFY',
@@ -80,10 +84,14 @@ async function run() {
     },
   });
   assert(prisma.created?.data?.orgId === 'org-1', 'orgId must persist on create');
+  assert(
+    prisma.created?.data?.actorUserId === 'user-1',
+    'actorUserId must persist on create',
+  );
   assert(prisma.created?.data?.lifecycleStep, 'lifecycleStep must persist');
   assert(prisma.created?.data?.pipelineStage, 'pipelineStage must persist');
 
-  await controller.list('org-1');
+  await controller.list(req);
   assert(prisma.queried?.where?.orgId === 'org-1', 'GET must scope by orgId');
 
   // eslint-disable-next-line no-console

@@ -15,6 +15,16 @@ services:
     networks:
       - internal
 
+  smtp-relay:
+    image: boky/postfix:5.1.0-debian
+    restart: unless-stopped
+    env_file:
+      - /srv/enabion/dev/env/smtp-relay.env
+    volumes:
+      - /srv/enabion/_volumes/prod/smtp-relay:/var/spool/postfix
+    networks:
+      - smtp_internal
+
   backend:
     build:
       context: ../apps/backend
@@ -27,8 +37,11 @@ services:
     volumes:
       - /srv/enabion/_volumes/prod/blobstore:/app/tmp/blobstore
     networks:
-      - internal
-      - edge
+      internal:
+      smtp_internal:
+      edge:
+        aliases:
+          - backend-dev
     healthcheck:
       test: ["CMD-SHELL", "node -e \"require('http').get('http://localhost:4000/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1));\""]
       interval: 15s
@@ -80,6 +93,7 @@ services:
 
 networks:
   internal:
+  smtp_internal:
   edge:
     external: true
     name: enabion_edge

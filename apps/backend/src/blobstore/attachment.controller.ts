@@ -6,13 +6,19 @@ import {
   Param,
   Post,
   Query,
+  Req,
   UploadedFile,
+  UseGuards,
   UseInterceptors,
   StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { AuthGuard } from '../auth/auth.guard';
+import { AuthenticatedRequest } from '../auth/auth.types';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
 import { AttachmentService } from './attachment.service';
-import { AttachmentAccessPolicy, UserRole } from './attachment.policy';
+import { AttachmentAccessPolicy } from './attachment.policy';
 import { BlobService } from './blob.service';
 import { NdaPolicy } from './nda.policy';
 import { ConfidentialityLevel } from './types';
@@ -24,6 +30,7 @@ type UploadedFileType = {
   stream?: NodeJS.ReadableStream;
 };
 
+@UseGuards(AuthGuard, RolesGuard)
 @Controller('v1')
 export class AttachmentController {
   constructor(
@@ -34,25 +41,22 @@ export class AttachmentController {
   ) {}
 
   @Post('intents/:intentId/attachments')
+  @Roles('Owner', 'BD-AM')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAttachment(
+    @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
     @UploadedFile() file: UploadedFileType,
-    @Query('orgId') orgId?: string,
-    @Query('role') role?: UserRole,
-    @Query('userId') userId?: string,
     @Body('confidentiality') confidentiality?: ConfidentialityLevel,
   ) {
-    if (!orgId) {
-      throw new BadRequestException('orgId is required');
-    }
+    const user = this.requireUser(req);
+    const orgId = user.orgId;
     if (!file) {
       throw new BadRequestException('file is required');
     }
     this.policy.assertCanUpload({
       requestOrgId: orgId,
       resourceOrgId: orgId,
-      role,
     });
 
     const buffer = await this.toBuffer(file);
@@ -65,7 +69,7 @@ export class AttachmentController {
       contentType: file.mimetype || 'application/octet-stream',
       confidentiality: confidentialityLevel,
       buffer,
-      createdByUserId: userId,
+      createdByUserId: user.id,
     });
 
     return {
@@ -76,22 +80,20 @@ export class AttachmentController {
   }
 
   @Get('attachments/:id')
+  @Roles('Owner', 'BD-AM', 'Viewer')
   async downloadAttachment(
+    @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Query('orgId') orgId?: string,
-    @Query('role') role?: UserRole,
     @Query('ndaAccepted') ndaAccepted?: string,
-    @Query('userId') userId?: string,
     @Query('asInline') asInline?: string,
   ) {
-    if (!orgId) {
-      throw new BadRequestException('orgId is required');
-    }
+    const user = this.requireUser(req);
+    const orgId = user.orgId;
 
     const attachment = await this.attachmentService.findByIdWithBlob(id);
     const ndaOk = await this.ndaPolicy.canAccess({
       orgId,
-      userId,
+      userId: user.id,
       intentId: attachment.intentId || undefined,
       confidentiality: attachment.blob.confidentiality as ConfidentialityLevel,
       assumedAccepted: this.parseBool(ndaAccepted),
@@ -99,7 +101,6 @@ export class AttachmentController {
     this.policy.assertCanDownload({
       requestOrgId: orgId,
       resourceOrgId: attachment.orgId,
-      role,
       confidentiality: attachment.blob.confidentiality as ConfidentialityLevel,
       ndaAccepted: ndaOk,
     });
@@ -107,7 +108,7 @@ export class AttachmentController {
     const download = await this.blobService.getBlobStream(attachment.blobId, orgId);
     await this.attachmentService.emitDownloadedEvent({
       attachment,
-      actorUserId: userId,
+      actorUserId: user.id,
       via: 'owner',
     });
 
@@ -149,5 +150,12 @@ export class AttachmentController {
       stream.on('end', () => resolve(Buffer.concat(chunks)));
       stream.on('error', reject);
     });
+  }
+
+  private requireUser(req: AuthenticatedRequest) {
+    if (!req.user) {
+      throw new BadRequestException('Missing session');
+    }
+    return req.user;
   }
 }
