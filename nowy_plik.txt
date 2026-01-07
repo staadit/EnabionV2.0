@@ -1,1 +1,2 @@
 To jest nowy plik dla testu!
+to jest jakas nowa zmiana!
