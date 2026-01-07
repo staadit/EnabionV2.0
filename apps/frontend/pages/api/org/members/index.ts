@@ -11,14 +11,23 @@ function toJson(text: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
+  if (req.method !== 'GET' && req.method !== 'POST') {
+    res.setHeader('Allow', 'GET, POST');
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
+  const headers: Record<string, string> = { cookie: req.headers.cookie ?? '' };
+  const body =
+    req.method === 'POST' ? JSON.stringify(req.body ?? {}) : undefined;
+  if (req.method === 'POST') {
+    headers['content-type'] = 'application/json';
+  }
+
   const backendRes = await fetch(`${BACKEND_BASE}/v1/org/members`, {
-    headers: { cookie: req.headers.cookie ?? '' },
+    method: req.method,
+    headers,
+    body,
   });
 
   const text = await backendRes.text();

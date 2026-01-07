@@ -31,8 +31,15 @@ export default function MembersSettings({ user, org, members: initial }: Members
   const [members, setMembers] = useState<Member[]>(initial);
   const [error, setError] = useState<string | null>(null);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [showAdd, setShowAdd] = useState(false);
+  const [newEmail, setNewEmail] = useState('');
+  const [newRole, setNewRole] = useState('Viewer');
+  const [adding, setAdding] = useState(false);
+  const [addSuccess, setAddSuccess] = useState(false);
+  const [resetLink, setResetLink] = useState<string | null>(null);
 
   const labels = getAdminLabels(org.defaultLanguage);
+  const trimmedEmail = newEmail.trim().toLowerCase();
 
   const activeOwners = useMemo(
     () => members.filter((m) => m.role === 'Owner' && !m.deactivatedAt).length,
@@ -86,14 +93,131 @@ export default function MembersSettings({ user, org, members: initial }: Members
     }
   };
 
+  const onAddMember = async () => {
+    if (!trimmedEmail) {
+      return;
+    }
+    setAdding(true);
+    setError(null);
+    setAddSuccess(false);
+    setResetLink(null);
+    try {
+      const res = await fetch('/api/org/members', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ email: trimmedEmail, role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(parseError(data) || labels.commonRequestFailed);
+      }
+      if (data?.user) {
+        setMembers((prev) => [...prev, data.user]);
+      }
+      setNewEmail('');
+      setNewRole('Viewer');
+      setAddSuccess(true);
+      if (data?.resetToken && typeof window !== 'undefined') {
+        setResetLink(`${window.location.origin}/reset/confirm?token=${data.resetToken}`);
+      }
+    } catch (err: any) {
+      setError(err?.message ?? labels.commonRequestFailed);
+    } finally {
+      setAdding(false);
+    }
+  };
+
   return (
     <SettingsLayout user={user} org={org} active="members" labels={labels}>
       <Head>
         <title>{labels.settingsTitle} • {labels.navMembers}</title>
       </Head>
 
-      <h2 style={{ marginTop: 0 }}>{labels.membersTitle}</h2>
+      <div style={headerRowStyle}>
+        <h2 style={{ margin: 0 }}>{labels.membersTitle}</h2>
+        <button
+          type="button"
+          style={primaryButtonStyle}
+          onClick={() => {
+            setShowAdd(true);
+            setAddSuccess(false);
+            setResetLink(null);
+            setError(null);
+          }}
+        >
+          {labels.membersAdd}
+        </button>
+      </div>
       {error ? <p style={errorStyle}>{labels.commonErrorPrefix} {error}</p> : null}
+
+      {showAdd ? (
+        <div style={inviteCardStyle}>
+          <div style={formRowStyle}>
+            <label style={formLabelStyle}>
+              {labels.membersEmail}
+              <input
+                type="email"
+                value={newEmail}
+                onChange={(event) => {
+                  setNewEmail(event.target.value);
+                  setAddSuccess(false);
+                  setResetLink(null);
+                }}
+                style={inputStyle}
+              />
+            </label>
+
+            <label style={formLabelStyle}>
+              {labels.membersRole}
+              <select
+                value={newRole}
+                onChange={(event) => {
+                  setNewRole(event.target.value);
+                  setAddSuccess(false);
+                  setResetLink(null);
+                }}
+                style={selectStyle}
+              >
+                <option value="Owner">Owner</option>
+                <option value="BD_AM">BD/AM</option>
+                <option value="Viewer">Viewer</option>
+              </select>
+            </label>
+
+            <div style={formActionsStyle}>
+              <button
+                type="button"
+                style={{ ...primaryButtonStyle, opacity: trimmedEmail ? 1 : 0.6 }}
+                disabled={!trimmedEmail || adding}
+                onClick={onAddMember}
+              >
+                {adding ? labels.commonSaving : labels.membersAddSubmit}
+              </button>
+              <button
+                type="button"
+                style={ghostButtonStyle}
+                onClick={() => {
+                  setShowAdd(false);
+                  setNewEmail('');
+                  setNewRole('Viewer');
+                  setAddSuccess(false);
+                  setResetLink(null);
+                }}
+              >
+                {labels.membersAddCancel}
+              </button>
+            </div>
+          </div>
+
+          {addSuccess ? <p style={successStyle}>{labels.membersAddSuccess}</p> : null}
+          {resetLink ? (
+            <div style={noteStyle}>
+              <p style={noteLabelStyle}>{labels.membersResetLink}</p>
+              <code style={codeStyle}>{resetLink}</code>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
 
       <div style={{ overflowX: 'auto' }}>
         <table style={tableStyle}>
@@ -163,6 +287,44 @@ const tableStyle = {
   fontSize: '0.95rem',
 };
 
+const headerRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '1rem',
+  flexWrap: 'wrap' as const,
+  marginBottom: '1rem',
+};
+
+const inviteCardStyle = {
+  padding: '1rem',
+  borderRadius: '12px',
+  border: '1px solid rgba(15, 37, 54, 0.12)',
+  background: 'rgba(15, 37, 54, 0.03)',
+  marginBottom: '1.5rem',
+};
+
+const formRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.75rem',
+  alignItems: 'flex-end',
+};
+
+const formLabelStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '0.4rem',
+  fontWeight: 600,
+  flex: '1 1 220px',
+};
+
+const formActionsStyle = {
+  display: 'flex',
+  gap: '0.5rem',
+  flexWrap: 'wrap' as const,
+};
+
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
@@ -180,6 +342,22 @@ const selectStyle = {
   border: '1px solid rgba(15, 37, 54, 0.2)',
 };
 
+const inputStyle = {
+  padding: '0.5rem 0.65rem',
+  borderRadius: '8px',
+  border: '1px solid rgba(15, 37, 54, 0.2)',
+};
+
+const primaryButtonStyle = {
+  padding: '0.55rem 0.9rem',
+  borderRadius: '8px',
+  border: 'none',
+  background: '#1c6e5a',
+  color: '#fff',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
 const ghostButtonStyle = {
   padding: '0.4rem 0.75rem',
   borderRadius: '8px',
@@ -190,6 +368,33 @@ const ghostButtonStyle = {
 
 const errorStyle = {
   color: '#b42318',
+};
+
+const successStyle = {
+  color: '#157f3b',
+  marginTop: '0.75rem',
+  marginBottom: 0,
+};
+
+const noteStyle = {
+  marginTop: '0.75rem',
+  padding: '0.6rem 0.75rem',
+  borderRadius: '10px',
+  border: '1px dashed rgba(15, 37, 54, 0.2)',
+  background: '#fff',
+};
+
+const noteLabelStyle = {
+  margin: 0,
+  fontSize: '0.85rem',
+  color: '#4b4f54',
+};
+
+const codeStyle = {
+  display: 'block',
+  marginTop: '0.35rem',
+  fontSize: '0.85rem',
+  wordBreak: 'break-all' as const,
 };
 
 export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) => {

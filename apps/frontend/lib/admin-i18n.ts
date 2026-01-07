@@ -24,6 +24,11 @@ export type AdminLabels = {
   membersDeactivate: string;
   membersDeactivateConfirm: string;
   membersLastOwner: string;
+  membersAdd: string;
+  membersAddSubmit: string;
+  membersAddCancel: string;
+  membersAddSuccess: string;
+  membersResetLink: string;
   preferencesTitle: string;
   preferencesLanguageLabel: string;
   preferencesAiLabel: string;
@@ -60,6 +65,11 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     membersDeactivate: 'Deactivate',
     membersDeactivateConfirm: 'Deactivate this member?',
     membersLastOwner: 'Last Owner guardrail.',
+    membersAdd: 'Add member',
+    membersAddSubmit: 'Send invite',
+    membersAddCancel: 'Cancel',
+    membersAddSuccess: 'Member added.',
+    membersResetLink: 'Reset link',
     preferencesTitle: 'Org preferences',
     preferencesLanguageLabel: 'Default language',
     preferencesAiLabel: 'Enable AI features',
@@ -94,6 +104,11 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     membersDeactivate: 'Dezaktywuj',
     membersDeactivateConfirm: 'Dezaktywowac tego czlonka?',
     membersLastOwner: 'Zabezpieczenie ostatniego Ownera.',
+    membersAdd: 'Dodaj czlonka',
+    membersAddSubmit: 'Wyslij zaproszenie',
+    membersAddCancel: 'Anuluj',
+    membersAddSuccess: 'Czlonek dodany.',
+    membersResetLink: 'Link resetu',
     preferencesTitle: 'Preferencje organizacji',
     preferencesLanguageLabel: 'Domyslny jezyk',
     preferencesAiLabel: 'Wlacz funkcje AI',
@@ -128,6 +143,11 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     membersDeactivate: 'Deaktivieren',
     membersDeactivateConfirm: 'Mitglied deaktivieren?',
     membersLastOwner: 'Guardrail fuer letzten Owner.',
+    membersAdd: 'Mitglied hinzufuegen',
+    membersAddSubmit: 'Einladung senden',
+    membersAddCancel: 'Abbrechen',
+    membersAddSuccess: 'Mitglied hinzugefuegt.',
+    membersResetLink: 'Reset-Link',
     preferencesTitle: 'Org-Einstellungen',
     preferencesLanguageLabel: 'Standardsprache',
     preferencesAiLabel: 'AI-Funktionen aktivieren',
@@ -162,6 +182,11 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     membersDeactivate: 'Deactiveer',
     membersDeactivateConfirm: 'Dit lid deactiveren?',
     membersLastOwner: 'Laatste Owner guardrail.',
+    membersAdd: 'Lid toevoegen',
+    membersAddSubmit: 'Uitnodiging versturen',
+    membersAddCancel: 'Annuleren',
+    membersAddSuccess: 'Lid toegevoegd.',
+    membersResetLink: 'Reset link',
     preferencesTitle: 'Org-voorkeuren',
     preferencesLanguageLabel: 'Standaardtaal',
     preferencesAiLabel: 'AI-functies inschakelen',
