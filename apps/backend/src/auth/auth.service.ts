@@ -40,6 +40,8 @@ type SessionOutput = {
   expiresAt: Date;
 };
 
+type UserWithDeactivation = User & { deactivatedAt?: Date | null };
+
 @Injectable()
 export class AuthService {
   private readonly cookieName = process.env.AUTH_COOKIE_NAME || 'enabion_session';
@@ -93,9 +95,11 @@ export class AuthService {
 
     try {
       const result = await this.prisma.$transaction(async (tx) => {
+        const slug = await this.generateOrgSlug(tx, orgName);
         const org = await tx.organization.create({
           data: {
             name: orgName,
+            slug,
           },
         });
 
@@ -138,6 +142,10 @@ export class AuthService {
     if (!user || !user.passwordHash) {
       this.recordFailedLogin(attemptKey);
       throw new UnauthorizedException('Invalid credentials');
+    }
+    if ((user as UserWithDeactivation).deactivatedAt) {
+      this.recordFailedLogin(attemptKey);
+      throw new UnauthorizedException('Account deactivated');
     }
 
     const validPassword = await verifyPassword(input.password, user.passwordHash);
@@ -196,6 +204,9 @@ export class AuthService {
 
     if (!session || session.revokedAt || session.expiresAt <= new Date()) {
       throw new UnauthorizedException('Session expired');
+    }
+    if ((session.user as UserWithDeactivation).deactivatedAt) {
+      throw new UnauthorizedException('Account deactivated');
     }
 
     return {
@@ -348,7 +359,7 @@ export class AuthService {
     };
     const payload =
       type === EVENT_TYPES.USER_SIGNED_UP
-        ? { ...basePayload, email: user.email, role: user.role }
+        ? { ...basePayload, email: user.email, role: this.normalizeRole(user.role) }
         : basePayload;
 
     await this.events.emitEvent({
@@ -465,8 +476,52 @@ export class AuthService {
       id: user.id,
       email: user.email,
       orgId: user.orgId,
-      role: user.role as UserRole,
+      role: this.normalizeRole(user.role),
     };
+  }
+
+  private normalizeRole(role: string | null | undefined): UserRole {
+    if (role === 'BD-AM') {
+      return 'BD_AM';
+    }
+    return role as UserRole;
+  }
+
+  private slugifyOrgName(name: string): string {
+    const normalized = name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return normalized;
+  }
+
+  private buildSlugCandidate(base: string, suffix?: number): string {
+    if (!suffix) return base;
+    const suffixText = String(suffix);
+    const maxBaseLen = Math.max(3, 40 - suffixText.length - 1);
+    const trimmedBase = base.slice(0, maxBaseLen).replace(/-+$/g, '');
+    return `${trimmedBase}-${suffixText}`;
+  }
+
+  private async generateOrgSlug(tx: Prisma.TransactionClient, orgName: string): Promise<string> {
+    const base = this.slugifyOrgName(orgName);
+    const baseCandidate = base.length >= 3 ? base.slice(0, 40) : 'org';
+    let candidate =
+      base.length >= 3
+        ? baseCandidate
+        : `org-${ulid().toLowerCase().slice(0, 8)}`;
+    candidate = candidate.replace(/-+$/g, '');
+    if (candidate.length < 3) {
+      candidate = `org-${ulid().toLowerCase().slice(0, 8)}`.slice(0, 40);
+    }
+
+    let suffix = 2;
+    while (await tx.organization.findUnique({ where: { slug: candidate } })) {
+      candidate = this.buildSlugCandidate(baseCandidate, suffix);
+      suffix += 1;
+    }
+    return candidate;
   }
 
   private normalizeEmail(email: string): string {

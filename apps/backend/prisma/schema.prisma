@@ -11,6 +11,11 @@ datasource db {
 model Organization {
   id        String   @id @default(cuid())
   name      String
+  slug      String   @unique
+  defaultLanguage String @default("EN")
+  policyAiEnabled Boolean @default(true)
+  policyShareLinksEnabled Boolean @default(false)
+  policyEmailIngestEnabled Boolean @default(false)
   users     User[]
   events    Event[]
   blobs     Blob[]
@@ -23,6 +28,7 @@ model User {
   orgId     String
   email     String   @unique
   role      String
+  deactivatedAt DateTime?
   passwordHash     String?
   passwordUpdatedAt DateTime?
   lastLoginAt      DateTime?

@@ -5,7 +5,7 @@ import { Roles } from '../src/auth/roles.decorator';
 import { RolesGuard } from '../src/auth/roles.guard';
 
 class DummyController {
-  @Roles('Owner', 'BD-AM')
+  @Roles('Owner', 'BD_AM')
   upload() {
     return true;
   }

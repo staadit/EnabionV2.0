@@ -4,6 +4,8 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  Patch,
   Post,
   Req,
   UseGuards,
@@ -18,10 +20,46 @@ const createMemberSchema = z.object({
   role: z.enum(USER_ROLES).optional(),
 });
 
+const updateOrgSchema = z.object({
+  name: z.string().min(1).optional(),
+  slug: z.string().min(1).optional(),
+  defaultLanguage: z.enum(['EN', 'PL', 'DE', 'NL']).optional(),
+  policyAiEnabled: z.boolean().optional(),
+  policyShareLinksEnabled: z.boolean().optional(),
+  policyEmailIngestEnabled: z.boolean().optional(),
+});
+
+const updateRoleSchema = z.object({
+  role: z.enum(USER_ROLES),
+});
+
 @UseGuards(AuthGuard)
 @Controller('v1/org')
 export class OrgController {
   constructor(private readonly orgService: OrgService) {}
+
+  @Get('me')
+  async getOrg(@Req() req: AuthenticatedRequest) {
+    const user = this.requireUser(req);
+    this.assertOwner(user.role);
+
+    const org = await this.orgService.getOrg(user.orgId);
+    return { org: this.toOrgResponse(org) };
+  }
+
+  @Patch('me')
+  async updateOrg(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const user = this.requireUser(req);
+    this.assertOwner(user.role);
+
+    const parsed = this.parseBody(updateOrgSchema, body);
+    const updated = await this.orgService.updateOrg({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      ...parsed,
+    });
+    return { org: this.toOrgResponse(updated) };
+  }
 
   @Get('members')
   async listMembers(@Req() req: AuthenticatedRequest) {
@@ -48,6 +86,38 @@ export class OrgController {
     });
   }
 
+  @Patch('members/:userId/role')
+  async updateMemberRole(
+    @Req() req: AuthenticatedRequest,
+    @Param('userId') userId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    this.assertOwner(user.role);
+
+    const parsed = this.parseBody(updateRoleSchema, body);
+    const updated = await this.orgService.updateMemberRole({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      targetUserId: userId,
+      role: parsed.role,
+    });
+    return { member: updated };
+  }
+
+  @Post('members/:userId/deactivate')
+  async deactivateMember(@Req() req: AuthenticatedRequest, @Param('userId') userId: string) {
+    const user = this.requireUser(req);
+    this.assertOwner(user.role);
+
+    const updated = await this.orgService.deactivateMember({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      targetUserId: userId,
+    });
+    return { member: updated };
+  }
+
   private requireUser(req: AuthenticatedRequest) {
     if (!req.user) {
       throw new BadRequestException('Missing session');
@@ -69,5 +139,20 @@ export class OrgController {
 
     const message = result.error.issues.map((issue) => issue.message).join('; ');
     throw new BadRequestException(message || 'Invalid request');
+  }
+
+  private toOrgResponse(org: any) {
+    const domain = (process.env.INBOUND_EMAIL_DOMAIN || '').trim();
+    const inboundEmailAddress = domain ? `${org.slug}@${domain}` : undefined;
+    return {
+      id: org.id,
+      name: org.name,
+      slug: org.slug,
+      defaultLanguage: org.defaultLanguage,
+      policyAiEnabled: org.policyAiEnabled,
+      policyShareLinksEnabled: org.policyShareLinksEnabled,
+      policyEmailIngestEnabled: org.policyEmailIngestEnabled,
+      inboundEmailAddress,
+    };
   }
 }

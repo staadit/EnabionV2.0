@@ -3,5 +3,5 @@
   "compilerOptions": {
     "module": "commonjs"
   },
-  "include": ["scripts/**/*.ts", "pages/api/**/*.ts"]
+  "include": ["scripts/**/*.ts", "pages/api/**/*.ts", "lib/**/*.ts"]
 }
