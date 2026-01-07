@@ -477,6 +477,7 @@ export class AuthService {
       email: user.email,
       orgId: user.orgId,
       role: this.normalizeRole(user.role),
+      isPlatformAdmin: this.isPlatformAdminEmail(user.email),
     };
   }
 
@@ -485,6 +486,17 @@ export class AuthService {
       return 'BD_AM';
     }
     return role as UserRole;
+  }
+
+  private isPlatformAdminEmail(email: string): boolean {
+    const normalized = email.trim().toLowerCase();
+    if (!normalized) return false;
+    const raw = process.env.PLATFORM_ADMIN_EMAIL_ALLOWLIST || '';
+    const allowlist = raw
+      .split(',')
+      .map((entry) => entry.trim().toLowerCase())
+      .filter(Boolean);
+    return allowlist.includes(normalized);
   }
 
   private slugifyOrgName(name: string): string {

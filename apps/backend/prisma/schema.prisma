@@ -12,6 +12,7 @@ model Organization {
   id        String   @id @default(cuid())
   name      String
   slug      String   @unique
+  status    OrganizationStatus @default(ACTIVE)
   defaultLanguage String @default("EN")
   policyAiEnabled Boolean @default(true)
   policyShareLinksEnabled Boolean @default(false)
@@ -68,6 +69,11 @@ enum ConfidentialityLevel {
   L1
   L2
   L3
+}
+
+enum OrganizationStatus {
+  ACTIVE
+  SUSPENDED
 }
 
 enum BlobStorageDriver {

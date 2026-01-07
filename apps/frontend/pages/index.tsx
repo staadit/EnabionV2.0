@@ -9,6 +9,7 @@ type HomeProps = {
     email: string;
     orgId: string;
     role: string;
+    isPlatformAdmin: boolean;
   };
   backendHealth: string | null;
   backendError: string | null;
@@ -90,6 +91,14 @@ export default function Home({
                 style={{ ...buttonStyle('#1c6e5a'), border: 'none', cursor: 'pointer' }}
               >
                 Settings
+              </Link>
+            ) : null}
+            {user.isPlatformAdmin ? (
+              <Link
+                href="/platform-admin"
+                style={{ ...buttonStyle('#8b2a2a'), border: 'none', cursor: 'pointer' }}
+              >
+                Platform Admin
               </Link>
             ) : null}
             <button

@@ -8,6 +8,7 @@ export type AuthUser = {
   email: string;
   orgId: string;
   role: UserRole;
+  isPlatformAdmin: boolean;
 };
 
 export type AuthenticatedRequest = Request & {
