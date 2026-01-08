@@ -105,6 +105,12 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     kpi: z.string().min(1).optional(),
     risks: z.string().min(1).optional(),
     deadlineAt: z.string().min(1).optional(),
+    sourceText: z
+      .object({
+        sha256: z.string().length(64),
+        length: z.number().int().nonnegative(),
+      })
+      .optional(),
   }),
   [EVENT_TYPES.INTENT_UPDATED]: basePayload.extend({
     intentId: z.string().min(1),

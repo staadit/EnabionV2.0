@@ -38,9 +38,10 @@ export default function Pipeline({ user, org, newIntents, events }: PipelineProp
           <ul style={listStyle}>
             {newIntents.map((intent) => (
               <li key={intent.id} style={listItemStyle}>
-                <span style={{ fontWeight: 600 }}>{intent.goal}</span>
+                <span style={{ fontWeight: 600 }}>{intent.title || intent.goal}</span>
                 <span style={metaStyle}>
                   {intent.deadlineAt ? `Deadline ${intent.deadlineAt}` : 'No deadline'}
+                  {intent.source ? ` - ${intent.source}` : ''}
                 </span>
               </li>
             ))}

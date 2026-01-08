@@ -13,6 +13,8 @@ type NewIntentProps = {
 
 type IntentFormState = {
   goal: string;
+  title: string;
+  sourceTextRaw: string;
   context: string;
   scope: string;
   kpi: string;
@@ -20,10 +22,15 @@ type IntentFormState = {
   deadline: string;
 };
 
+type IntentMode = 'manual' | 'paste';
+
 export default function NewIntent({ user, org }: NewIntentProps) {
   const router = useRouter();
+  const [mode, setMode] = useState<IntentMode>('manual');
   const [form, setForm] = useState<IntentFormState>({
     goal: '',
+    title: '',
+    sourceTextRaw: '',
     context: '',
     scope: '',
     kpi: '',
@@ -48,8 +55,17 @@ export default function NewIntent({ user, org }: NewIntentProps) {
     event.preventDefault();
     if (isViewer || loading) return;
 
+    const isPaste = mode === 'paste';
     const goal = form.goal.trim();
-    if (goal.length < 3) {
+    const sourceTextRaw = form.sourceTextRaw;
+    const sourceTextTrimmed = sourceTextRaw.trim();
+
+    if (isPaste) {
+      if (!sourceTextTrimmed) {
+        setError('Paste text is required.');
+        return;
+      }
+    } else if (goal.length < 3) {
       setError('Goal must be at least 3 characters.');
       return;
     }
@@ -57,18 +73,25 @@ export default function NewIntent({ user, org }: NewIntentProps) {
     setLoading(true);
     setError(null);
 
-    const deadlineAt = form.deadline
-      ? new Date(form.deadline).toISOString()
-      : null;
-
-    const payload = {
-      goal,
-      context: normalizeOptional(form.context),
-      scope: normalizeOptional(form.scope),
-      kpi: normalizeOptional(form.kpi),
-      risks: normalizeOptional(form.risks),
-      deadlineAt,
-    };
+    let payload: Record<string, unknown>;
+    if (isPaste) {
+      payload = {
+        sourceTextRaw,
+        title: normalizeOptional(form.title),
+      };
+    } else {
+      const deadlineAt = form.deadline
+        ? new Date(form.deadline).toISOString()
+        : null;
+      payload = {
+        goal,
+        context: normalizeOptional(form.context),
+        scope: normalizeOptional(form.scope),
+        kpi: normalizeOptional(form.kpi),
+        risks: normalizeOptional(form.risks),
+        deadlineAt,
+      };
+    }
 
     try {
       const res = await fetch('/api/intents', {
@@ -85,7 +108,9 @@ export default function NewIntent({ user, org }: NewIntentProps) {
 
       const intentId = data?.intent?.id || data?.id;
       const destination = intentId
-        ? `/${org.slug}/intents/${intentId}`
+        ? isPaste
+          ? `/${org.slug}/intents/${intentId}/coach`
+          : `/${org.slug}/intents/${intentId}`
         : `/${org.slug}/pipeline`;
       await router.push(destination);
     } catch (err: any) {
@@ -100,7 +125,7 @@ export default function NewIntent({ user, org }: NewIntentProps) {
       user={user}
       org={org}
       title="Create Intent"
-      subtitle="Start from scratch without email or RFP."
+      subtitle="Start from scratch or paste an email/RFP."
       navItems={getXNavItems(org.slug, 'intents')}
     >
       <Head>
@@ -113,77 +138,128 @@ export default function NewIntent({ user, org }: NewIntentProps) {
           </div>
         ) : null}
 
-        <label style={labelStyle}>
-          Goal *
-          <textarea
-            value={form.goal}
-            onChange={updateField('goal')}
-            style={textAreaStyle}
-            rows={3}
-            placeholder="What is the core intent goal?"
-            disabled={isViewer || loading}
-            required
-          />
-        </label>
+        <div style={modeRowStyle}>
+          <button
+            type="button"
+            style={{ ...modeButtonStyle, ...(mode === 'manual' ? modeActiveStyle : {}) }}
+            onClick={() => setMode('manual')}
+          >
+            From scratch
+          </button>
+          <button
+            type="button"
+            style={{ ...modeButtonStyle, ...(mode === 'paste' ? modeActiveStyle : {}) }}
+            onClick={() => setMode('paste')}
+          >
+            Paste email/RFP
+          </button>
+        </div>
 
-        <label style={labelStyle}>
-          Context
-          <textarea
-            value={form.context}
-            onChange={updateField('context')}
-            style={textAreaStyle}
-            rows={3}
-            placeholder="Background, stakeholders, and constraints."
-            disabled={isViewer || loading}
-          />
-        </label>
+        {mode === 'paste' ? (
+          <>
+            <label style={labelStyle}>
+              Paste email/RFP text *
+              <textarea
+                value={form.sourceTextRaw}
+                onChange={updateField('sourceTextRaw')}
+                style={textAreaStyle}
+                rows={8}
+                placeholder="Paste the email or RFP text here."
+                disabled={isViewer || loading}
+                required
+              />
+            </label>
+            <label style={labelStyle}>
+              Title (optional)
+              <input
+                type="text"
+                value={form.title}
+                onChange={updateField('title')}
+                style={inputStyle}
+                placeholder="Intent title override"
+                disabled={isViewer || loading}
+              />
+            </label>
+            <p style={helperStyle}>
+              We store the raw text so Intent Coach can structure it. Raw text is not sent in
+              event payloads.
+            </p>
+          </>
+        ) : (
+          <>
+            <label style={labelStyle}>
+              Goal *
+              <textarea
+                value={form.goal}
+                onChange={updateField('goal')}
+                style={textAreaStyle}
+                rows={3}
+                placeholder="What is the core intent goal?"
+                disabled={isViewer || loading}
+                required
+              />
+            </label>
 
-        <label style={labelStyle}>
-          Scope
-          <textarea
-            value={form.scope}
-            onChange={updateField('scope')}
-            style={textAreaStyle}
-            rows={3}
-            placeholder="In/out of scope details."
-            disabled={isViewer || loading}
-          />
-        </label>
+            <label style={labelStyle}>
+              Context
+              <textarea
+                value={form.context}
+                onChange={updateField('context')}
+                style={textAreaStyle}
+                rows={3}
+                placeholder="Background, stakeholders, and constraints."
+                disabled={isViewer || loading}
+              />
+            </label>
 
-        <label style={labelStyle}>
-          KPI
-          <textarea
-            value={form.kpi}
-            onChange={updateField('kpi')}
-            style={textAreaStyle}
-            rows={2}
-            placeholder="Success metrics or KPIs."
-            disabled={isViewer || loading}
-          />
-        </label>
+            <label style={labelStyle}>
+              Scope
+              <textarea
+                value={form.scope}
+                onChange={updateField('scope')}
+                style={textAreaStyle}
+                rows={3}
+                placeholder="In/out of scope details."
+                disabled={isViewer || loading}
+              />
+            </label>
 
-        <label style={labelStyle}>
-          Risks
-          <textarea
-            value={form.risks}
-            onChange={updateField('risks')}
-            style={textAreaStyle}
-            rows={2}
-            placeholder="Delivery, budget, or timeline risks."
-            disabled={isViewer || loading}
-          />
-        </label>
+            <label style={labelStyle}>
+              KPI
+              <textarea
+                value={form.kpi}
+                onChange={updateField('kpi')}
+                style={textAreaStyle}
+                rows={2}
+                placeholder="Success metrics or KPIs."
+                disabled={isViewer || loading}
+              />
+            </label>
 
-        <label style={labelStyle}>
-          Deadline
-          <input
-            type="date"
-            value={form.deadline}
-            onChange={updateField('deadline')}
-            style={inputStyle}
-            disabled={isViewer || loading}
-          />
-        </label>
+            <label style={labelStyle}>
+              Risks
+              <textarea
+                value={form.risks}
+                onChange={updateField('risks')}
+                style={textAreaStyle}
+                rows={2}
+                placeholder="Delivery, budget, or timeline risks."
+                disabled={isViewer || loading}
+              />
+            </label>
+
+            <label style={labelStyle}>
+              Deadline
+              <input
+                type="date"
+                value={form.deadline}
+                onChange={updateField('deadline')}
+                style={inputStyle}
+                disabled={isViewer || loading}
+              />
+            </label>
+          </>
+        )}
 
         {error ? <p style={errorStyle}>{error}</p> : null}
 
@@ -207,6 +283,27 @@ export default function NewIntent({ user, org }: NewIntentProps) {
 const formStyle = {
   display: 'grid',
   gap: '1.2rem',
+};
+
+const modeRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.75rem',
+};
+
+const modeButtonStyle = {
+  padding: '0.5rem 1rem',
+  borderRadius: '999px',
+  border: '1px solid rgba(15, 37, 54, 0.2)',
+  background: 'rgba(255, 255, 255, 0.7)',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const modeActiveStyle = {
+  background: '#0f3a4b',
+  color: '#fff',
+  borderColor: '#0f3a4b',
 };
 
 const labelStyle = {
@@ -269,6 +366,12 @@ const noticeStyle = {
   background: 'rgba(15, 37, 54, 0.06)',
   border: '1px solid rgba(15, 37, 54, 0.18)',
   color: '#1f2933',
+};
+
+const helperStyle = {
+  margin: 0,
+  color: '#4b4f54',
+  fontSize: '0.9rem',
 };
 
 export const getServerSideProps: GetServerSideProps<NewIntentProps> = async (ctx) => {

@@ -171,6 +171,7 @@ model Intent {
   orgId                String
   createdByUserId      String
   goal                 String
+  title                String?
   context              String?
   scope                String?
   kpi                  String?
@@ -179,6 +180,9 @@ model Intent {
   stage                IntentStage          @default(NEW)
   confidentialityLevel ConfidentialityLevel @default(L1)
   source               IntentSource         @default(manual)
+  sourceTextRaw         String?
+  sourceTextSha256      String?              @db.Char(64)
+  sourceTextLength      Int?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
 

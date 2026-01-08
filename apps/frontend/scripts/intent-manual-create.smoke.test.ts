@@ -7,6 +7,7 @@ function assert(condition: any, message: string) {
 async function run() {
   process.env.BACKEND_URL = 'http://backend.test';
   const handler = (await import('../pages/api/intents/index')).default;
+  const coachHandler = (await import('../pages/api/intents/[id]/coach/run')).default;
 
   const originalFetch = globalThis.fetch;
   let capturedUrl = '';
@@ -60,6 +61,24 @@ async function run() {
     assert(
       capturedOptions?.headers?.['content-type'] === 'application/json',
       'Proxy must set content-type',
+    );
+
+    capturedUrl = '';
+    capturedOptions = null;
+    const reqCoach = {
+      method: 'POST',
+      query: { id: 'intent-1' },
+      headers: { cookie: 'enabion_session=tokenA' },
+    } as any;
+
+    await coachHandler(reqCoach, res);
+    assert(
+      capturedUrl.includes('/intents/intent-1/coach/run'),
+      'Coach proxy must call /intents/:id/coach/run',
+    );
+    assert(
+      capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
+      'Coach proxy must forward cookie',
     );
   } finally {
     if (originalFetch) {

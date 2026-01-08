@@ -1,7 +1,9 @@
 export type OrgIntent = {
   id: string;
   goal: string;
+  title?: string | null;
   stage: string;
+  source?: string | null;
   deadlineAt?: string | null;
   createdAt?: string | null;
 };
@@ -31,7 +33,9 @@ export async function fetchOrgIntents(
     return intents.map((row) => ({
       id: String(row.id ?? ''),
       goal: String(row.goal ?? ''),
+      title: row.title ?? null,
       stage: String(row.stage ?? ''),
+      source: row.source ?? null,
       deadlineAt: row.deadlineAt ?? null,
       createdAt: row.createdAt ?? null,
     }));

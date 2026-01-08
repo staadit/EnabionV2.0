@@ -3,6 +3,8 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
+  Param,
   Post,
   Query,
   Req,
@@ -17,13 +19,17 @@ import { IntentService } from './intent.service';
 import { INTENT_STAGES, IntentStage } from './intent.types';
 
 const createIntentSchema = z.object({
-  goal: z.string().min(1),
+  goal: z.string().optional().nullable(),
+  title: z.string().optional().nullable(),
+  sourceTextRaw: z.string().optional().nullable(),
   context: z.string().optional().nullable(),
   scope: z.string().optional().nullable(),
   kpi: z.string().optional().nullable(),
   risks: z.string().optional().nullable(),
   deadlineAt: z.string().optional().nullable(),
 });
+
+const MAX_SOURCE_TEXT_LENGTH = 100000;
 
 @UseGuards(AuthGuard, RolesGuard)
 @Controller('intents')
@@ -36,23 +42,46 @@ export class IntentController {
     const user = this.requireUser(req);
     const parsed = this.parseBody(createIntentSchema, body);
 
-    const goal = parsed.goal.trim();
-    if (goal.length < 3) {
+    const rawText = typeof parsed.sourceTextRaw === 'string' ? parsed.sourceTextRaw : '';
+    const rawTrimmed = rawText.trim();
+    const hasRaw = rawTrimmed.length > 0;
+
+    const goal = typeof parsed.goal === 'string' ? parsed.goal.trim() : '';
+    if (!hasRaw && goal.length < 3) {
       throw new BadRequestException('Goal must be at least 3 characters');
+    }
+    if (hasRaw && rawText.length > MAX_SOURCE_TEXT_LENGTH) {
+      throw new BadRequestException('sourceTextRaw exceeds max length');
     }
 
     const intent = await this.intentService.createIntent({
       orgId: user.orgId,
       actorUserId: user.id,
-      goal,
-      context: this.normalizeOptionalText(parsed.context),
-      scope: this.normalizeOptionalText(parsed.scope),
-      kpi: this.normalizeOptionalText(parsed.kpi),
-      risks: this.normalizeOptionalText(parsed.risks),
-      deadlineAt: this.parseDeadline(parsed.deadlineAt),
+      goal: hasRaw ? null : goal,
+      title: hasRaw ? this.normalizeOptionalText(parsed.title) : null,
+      sourceTextRaw: hasRaw ? rawText : null,
+      context: hasRaw ? null : this.normalizeOptionalText(parsed.context),
+      scope: hasRaw ? null : this.normalizeOptionalText(parsed.scope),
+      kpi: hasRaw ? null : this.normalizeOptionalText(parsed.kpi),
+      risks: hasRaw ? null : this.normalizeOptionalText(parsed.risks),
+      deadlineAt: hasRaw ? null : this.parseDeadline(parsed.deadlineAt),
     });
 
     return { intent };
+  }
+
+  @Post(':intentId/coach/run')
+  @HttpCode(202)
+  @Roles('Owner', 'BD_AM')
+  async runIntentCoach(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+  ) {
+    const user = this.requireUser(req);
+    return this.intentService.runIntentCoach({
+      orgId: user.orgId,
+      intentId,
+    });
   }
 
   @Get()
