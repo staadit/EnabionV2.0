@@ -7,6 +7,7 @@ export type AuthUser = {
   id: string;
   email: string;
   orgId: string;
+  orgSlug?: string;
   role: UserRole;
   isPlatformAdmin: boolean;
 };

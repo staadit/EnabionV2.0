@@ -10,7 +10,29 @@ export default function Login() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const nextPath = typeof router.query.next === 'string' ? router.query.next : '/';
+  const nextPath = typeof router.query.next === 'string' ? router.query.next : null;
+
+  const resolvePostLoginPath = async (fallback: string | null, slug?: string) => {
+    if (fallback && fallback !== '/') {
+      return fallback;
+    }
+    if (slug) {
+      return `/${slug}/intents`;
+    }
+    try {
+      const meRes = await fetch('/api/auth/me');
+      if (meRes.ok) {
+        const meData = await meRes.json();
+        const meSlug = meData?.user?.orgSlug;
+        if (typeof meSlug === 'string' && meSlug) {
+          return `/${meSlug}/intents`;
+        }
+      }
+    } catch {
+      // Ignore lookup errors and fall back to root.
+    }
+    return '/';
+  };
 
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -24,13 +46,14 @@ export default function Login() {
         body: JSON.stringify({ email, password }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         const message = Array.isArray(data?.message) ? data.message.join('; ') : data?.message;
         throw new Error(message || data?.error || 'Login failed');
       }
 
-      await router.push(nextPath);
+      const destination = await resolvePostLoginPath(nextPath, data?.user?.orgSlug);
+      await router.push(destination);
     } catch (err: any) {
       setError(err?.message ?? 'Login failed');
     } finally {
@@ -205,9 +228,11 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
       headers: { cookie: req.headers.cookie ?? '' },
     });
     if (res.status === 200) {
+      const data = await res.json();
+      const slug = data?.user?.orgSlug;
       return {
         redirect: {
-          destination: '/',
+          destination: typeof slug === 'string' && slug ? `/${slug}/intents` : '/',
           permanent: false,
         },
       };

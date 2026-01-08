@@ -278,6 +278,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req })
 
     const authData = await authRes.json();
     user = authData?.user || null;
+    orgSlug = authData?.user?.orgSlug ?? null;
   } catch {
     return {
       redirect: {
@@ -296,7 +297,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req })
     };
   }
 
-  if (user.role === 'Owner') {
+  if (user.role === 'Owner' && !orgSlug) {
     try {
       const orgRes = await fetch(`${backendBase}/v1/org/me`, {
         headers: { cookie: req.headers.cookie ?? '' },

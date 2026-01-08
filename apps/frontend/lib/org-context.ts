@@ -4,6 +4,7 @@ export type OrgUser = {
   id: string;
   email: string;
   orgId: string;
+  orgSlug?: string;
   role: string;
   isPlatformAdmin?: boolean;
 };
@@ -69,6 +70,7 @@ export async function requireOrgContext(
     }
 
     const paramSlug = typeof ctx.params?.orgSlug === 'string' ? ctx.params.orgSlug : undefined;
+    const authOrgSlug = typeof user.orgSlug === 'string' ? user.orgSlug : undefined;
     let org: OrgInfo | undefined;
 
     const orgRes = await fetch(`${BACKEND_BASE}/v1/org/me`, {
@@ -84,10 +86,13 @@ export async function requireOrgContext(
         return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, org.slug) };
       }
     } else {
-      const fallbackSlug = paramSlug || 'org';
+      if (authOrgSlug && paramSlug && paramSlug !== authOrgSlug) {
+        return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, authOrgSlug) };
+      }
+      const fallbackSlug = authOrgSlug || paramSlug || 'org';
       org = {
         id: user.orgId,
-        name: paramSlug || 'Organization',
+        name: authOrgSlug || paramSlug || 'Organization',
         slug: fallbackSlug,
       };
     }
