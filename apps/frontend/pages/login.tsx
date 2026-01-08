@@ -12,9 +12,16 @@ export default function Login() {
 
   const nextPath = typeof router.query.next === 'string' ? router.query.next : null;
 
-  const resolvePostLoginPath = async (fallback: string | null, slug?: string) => {
+  const resolvePostLoginPath = async (
+    fallback: string | null,
+    slug?: string,
+    isPlatformAdmin?: boolean,
+  ) => {
     if (fallback && fallback !== '/') {
       return fallback;
+    }
+    if (isPlatformAdmin) {
+      return '/platform-admin';
     }
     if (slug) {
       return `/${slug}/intents`;
@@ -23,7 +30,11 @@ export default function Login() {
       const meRes = await fetch('/api/auth/me');
       if (meRes.ok) {
         const meData = await meRes.json();
-        const meSlug = meData?.user?.orgSlug;
+        const meUser = meData?.user;
+        const meSlug = meUser?.orgSlug;
+        if (meUser?.isPlatformAdmin) {
+          return '/platform-admin';
+        }
         if (typeof meSlug === 'string' && meSlug) {
           return `/${meSlug}/intents`;
         }
@@ -52,7 +63,11 @@ export default function Login() {
         throw new Error(message || data?.error || 'Login failed');
       }
 
-      const destination = await resolvePostLoginPath(nextPath, data?.user?.orgSlug);
+      const destination = await resolvePostLoginPath(
+        nextPath,
+        data?.user?.orgSlug,
+        data?.user?.isPlatformAdmin,
+      );
       await router.push(destination);
     } catch (err: any) {
       setError(err?.message ?? 'Login failed');
@@ -229,10 +244,15 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     });
     if (res.status === 200) {
       const data = await res.json();
-      const slug = data?.user?.orgSlug;
+      const user = data?.user;
+      const slug = user?.orgSlug;
       return {
         redirect: {
-          destination: typeof slug === 'string' && slug ? `/${slug}/intents` : '/',
+          destination: user?.isPlatformAdmin
+            ? '/platform-admin'
+            : typeof slug === 'string' && slug
+              ? `/${slug}/intents`
+              : '/',
           permanent: false,
         },
       };

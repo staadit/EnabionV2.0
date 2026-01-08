@@ -29,16 +29,24 @@ export default function Signup() {
         throw new Error(message || data?.error || 'Signup failed');
       }
 
-      let destination = typeof data?.user?.orgSlug === 'string' && data.user.orgSlug
-        ? `/${data.user.orgSlug}/intents`
-        : null;
+      let destination =
+        data?.user?.isPlatformAdmin
+          ? '/platform-admin'
+          : typeof data?.user?.orgSlug === 'string' && data.user.orgSlug
+            ? `/${data.user.orgSlug}/intents`
+            : null;
 
       if (!destination) {
         try {
           const meRes = await fetch('/api/auth/me');
           if (meRes.ok) {
             const meData = await meRes.json();
-            const meSlug = meData?.user?.orgSlug;
+            const meUser = meData?.user;
+            const meSlug = meUser?.orgSlug;
+            if (meUser?.isPlatformAdmin) {
+              destination = '/platform-admin';
+              return;
+            }
             if (typeof meSlug === 'string' && meSlug) {
               destination = `/${meSlug}/intents`;
             }
@@ -233,10 +241,15 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
     });
     if (res.status === 200) {
       const data = await res.json();
-      const slug = data?.user?.orgSlug;
+      const user = data?.user;
+      const slug = user?.orgSlug;
       return {
         redirect: {
-          destination: typeof slug === 'string' && slug ? `/${slug}/intents` : '/',
+          destination: user?.isPlatformAdmin
+            ? '/platform-admin'
+            : typeof slug === 'string' && slug
+              ? `/${slug}/intents`
+              : '/',
           permanent: false,
         },
       };
