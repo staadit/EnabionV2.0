@@ -7,7 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "test": "node scripts/i18n-smoke.test.js"
+    "test": "node scripts/i18n-smoke.test.js && npm run test:tenant-proxy && npm run test:adminpanel",
+    "test:tenant-proxy": "ts-node --project tsconfig.tests.json scripts/tenant-isolation.proxy.test.ts",
+    "test:adminpanel": "ts-node --project tsconfig.tests.json scripts/adminpanel.smoke.test.ts"
   },
   "dependencies": {
     "next": "^15.0.3",
@@ -20,6 +22,7 @@
     "@types/react-dom": "^18.3.0",
     "eslint": "^8.57.1",
     "eslint-config-next": "^15.0.3",
+    "ts-node": "^10.9.2",
     "typescript": "^5.5.4"
   }
 }

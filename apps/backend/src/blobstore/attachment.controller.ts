@@ -41,7 +41,7 @@ export class AttachmentController {
   ) {}
 
   @Post('intents/:intentId/attachments')
-  @Roles('Owner', 'BD-AM')
+  @Roles('Owner', 'BD_AM')
   @UseInterceptors(FileInterceptor('file'))
   async uploadAttachment(
     @Req() req: AuthenticatedRequest,
@@ -80,7 +80,7 @@ export class AttachmentController {
   }
 
   @Get('attachments/:id')
-  @Roles('Owner', 'BD-AM', 'Viewer')
+  @Roles('Owner', 'BD_AM', 'Viewer')
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,

@@ -1,4 +1,5 @@
 ﻿import Head from 'next/head';
+import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 
@@ -8,6 +9,7 @@ type HomeProps = {
     email: string;
     orgId: string;
     role: string;
+    isPlatformAdmin: boolean;
   };
   backendHealth: string | null;
   backendError: string | null;
@@ -82,16 +84,34 @@ export default function Home({
               Signed in as {user.email} • {user.role}
             </p>
           </div>
-          <button
-            type="button"
-            style={{ ...buttonStyle('#0f3a4b'), border: 'none', cursor: 'pointer' }}
-            onClick={async () => {
-              await fetch('/api/auth/logout', { method: 'POST' });
-              window.location.href = '/login';
-            }}
-          >
-            Sign out
-          </button>
+          <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+            {user.role === 'Owner' ? (
+              <Link
+                href="/settings/org"
+                style={{ ...buttonStyle('#1c6e5a'), border: 'none', cursor: 'pointer' }}
+              >
+                Settings
+              </Link>
+            ) : null}
+            {user.isPlatformAdmin ? (
+              <Link
+                href="/platform-admin"
+                style={{ ...buttonStyle('#8b2a2a'), border: 'none', cursor: 'pointer' }}
+              >
+                Platform Admin
+              </Link>
+            ) : null}
+            <button
+              type="button"
+              style={{ ...buttonStyle('#0f3a4b'), border: 'none', cursor: 'pointer' }}
+              onClick={async () => {
+                await fetch('/api/auth/logout', { method: 'POST' });
+                window.location.href = '/login';
+              }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
 
         <p>Backend health (proxying <code>http://localhost:4000/health</code>):</p>

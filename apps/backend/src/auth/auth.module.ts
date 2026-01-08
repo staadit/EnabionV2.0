@@ -6,11 +6,12 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AuthGuard } from './auth.guard';
 import { RolesGuard } from './roles.guard';
+import { PlatformAdminGuard } from './platform-admin.guard';
 
 @Module({
   imports: [forwardRef(() => EventModule)],
   controllers: [AuthController],
-  providers: [AuthService, AuthGuard, RolesGuard, PrismaService, EmailService],
-  exports: [AuthService, AuthGuard, RolesGuard],
+  providers: [AuthService, AuthGuard, RolesGuard, PlatformAdminGuard, PrismaService, EmailService],
+  exports: [AuthService, AuthGuard, RolesGuard, PlatformAdminGuard],
 })
 export class AuthModule {}

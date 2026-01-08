@@ -68,6 +68,11 @@ export const EVENT_TYPES = {
   USER_LOGGED_OUT: 'USER_LOGGED_OUT',
   USER_PASSWORD_RESET_REQUESTED: 'USER_PASSWORD_RESET_REQUESTED',
   USER_PASSWORD_RESET_COMPLETED: 'USER_PASSWORD_RESET_COMPLETED',
+  ORG_PROFILE_UPDATED: 'ORG_PROFILE_UPDATED',
+  ORG_MEMBER_ROLE_CHANGED: 'ORG_MEMBER_ROLE_CHANGED',
+  ORG_MEMBER_DEACTIVATED: 'ORG_MEMBER_DEACTIVATED',
+  ORG_PREFERENCES_UPDATED: 'ORG_PREFERENCES_UPDATED',
+  PLATFORM_ADMIN_AUDIT: 'PLATFORM_ADMIN_AUDIT',
 } as const;
 
 export type EventType = (typeof EVENT_TYPES)[keyof typeof EVENT_TYPES];
@@ -255,6 +260,31 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     userId: z.string().min(1),
     orgId: z.string().min(1),
     resetTokenId: z.string().min(1),
+  }),
+  [EVENT_TYPES.ORG_PROFILE_UPDATED]: basePayload.extend({
+    orgId: z.string().min(1),
+    changedFields: z.array(z.string().min(1)),
+  }),
+  [EVENT_TYPES.ORG_MEMBER_ROLE_CHANGED]: basePayload.extend({
+    targetUserId: z.string().min(1),
+    fromRole: z.string().min(1),
+    toRole: z.string().min(1),
+  }),
+  [EVENT_TYPES.ORG_MEMBER_DEACTIVATED]: basePayload.extend({
+    targetUserId: z.string().min(1),
+  }),
+  [EVENT_TYPES.ORG_PREFERENCES_UPDATED]: basePayload.extend({
+    orgId: z.string().min(1),
+    changedFields: z.array(z.string().min(1)),
+  }),
+  [EVENT_TYPES.PLATFORM_ADMIN_AUDIT]: basePayload.extend({
+    action: z.string().min(1),
+    targetType: z.enum(['TENANT', 'USER', 'EVENTS', 'EMAIL_INGEST']),
+    targetOrgId: z.string().optional(),
+    targetUserId: z.string().optional(),
+    targetId: z.string().optional(),
+    query: z.record(z.any()).optional(),
+    resultCount: z.number().int().nonnegative().optional(),
   }),
 };
 
