@@ -131,7 +131,7 @@ export default function NewIntent({ user, org }: NewIntentProps) {
       <Head>
         <title>{org.name} - New Intent</title>
       </Head>
-      <form onSubmit={onSubmit} style={formStyle}>
+      <form onSubmit={onSubmit} style={formStyle} noValidate>
         {isViewer ? (
           <div style={noticeStyle}>
             You have view-only access. Ask an Owner or BD/AM to create an intent.
@@ -166,7 +166,6 @@ export default function NewIntent({ user, org }: NewIntentProps) {
                 rows={8}
                 placeholder="Paste the email or RFP text here."
                 disabled={isViewer || loading}
-                required
               />
             </label>
             <label style={labelStyle}>
@@ -196,7 +195,6 @@ export default function NewIntent({ user, org }: NewIntentProps) {
                 rows={3}
                 placeholder="What is the core intent goal?"
                 disabled={isViewer || loading}
-                required
               />
             </label>
 
