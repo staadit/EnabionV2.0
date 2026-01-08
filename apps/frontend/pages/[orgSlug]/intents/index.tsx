@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import OrgShell from '../../../components/OrgShell';
 import { getXNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
@@ -28,6 +29,13 @@ export default function IntentsIndex({ user, org, events }: IntentsIndexProps) {
         <p style={{ margin: 0 }}>
           This page will show the intents table, filters, and the new intent CTA.
         </p>
+        {user.role !== 'Viewer' ? (
+          <div style={{ marginTop: '1rem' }}>
+            <Link href={`/${org.slug}/intents/new`} style={buttonStyle}>
+              Create intent
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <section style={sectionStyle}>
@@ -56,6 +64,18 @@ const cardStyle = {
   borderRadius: '12px',
   border: '1px dashed rgba(15, 37, 54, 0.2)',
   background: 'rgba(15, 37, 54, 0.04)',
+};
+
+const buttonStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0.65rem 1rem',
+  borderRadius: '10px',
+  textDecoration: 'none',
+  fontWeight: 600,
+  background: '#0f3a4b',
+  color: '#fff',
 };
 
 const sectionStyle = {

@@ -99,6 +99,12 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     language: languageEnum,
     confidentialityLevel: z.enum(['L1', 'L2']),
     source: z.enum(['manual', 'paste', 'email']),
+    goal: z.string().min(1).optional(),
+    context: z.string().min(1).optional(),
+    scope: z.string().min(1).optional(),
+    kpi: z.string().min(1).optional(),
+    risks: z.string().min(1).optional(),
+    deadlineAt: z.string().min(1).optional(),
   }),
   [EVENT_TYPES.INTENT_UPDATED]: basePayload.extend({
     intentId: z.string().min(1),

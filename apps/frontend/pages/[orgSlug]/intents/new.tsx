@@ -1,5 +1,7 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
+import { useRouter } from 'next/router';
+import { useState, type FormEvent } from 'react';
 import OrgShell from '../../../components/OrgShell';
 import { getXNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
@@ -9,33 +11,264 @@ type NewIntentProps = {
   org: OrgInfo;
 };
 
+type IntentFormState = {
+  goal: string;
+  context: string;
+  scope: string;
+  kpi: string;
+  risks: string;
+  deadline: string;
+};
+
 export default function NewIntent({ user, org }: NewIntentProps) {
+  const router = useRouter();
+  const [form, setForm] = useState<IntentFormState>({
+    goal: '',
+    context: '',
+    scope: '',
+    kpi: '',
+    risks: '',
+    deadline: '',
+  });
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const isViewer = user.role === 'Viewer';
+
+  const updateField = (key: keyof IntentFormState) => (event: any) => {
+    setForm((prev) => ({ ...prev, [key]: event.target.value }));
+  };
+
+  const normalizeOptional = (value: string) => {
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  };
+
+  const onSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (isViewer || loading) return;
+
+    const goal = form.goal.trim();
+    if (goal.length < 3) {
+      setError('Goal must be at least 3 characters.');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    const deadlineAt = form.deadline
+      ? new Date(form.deadline).toISOString()
+      : null;
+
+    const payload = {
+      goal,
+      context: normalizeOptional(form.context),
+      scope: normalizeOptional(form.scope),
+      kpi: normalizeOptional(form.kpi),
+      risks: normalizeOptional(form.risks),
+      deadlineAt,
+    };
+
+    try {
+      const res = await fetch('/api/intents', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        const message = Array.isArray(data?.message) ? data.message.join('; ') : data?.message;
+        throw new Error(message || data?.error || 'Intent creation failed');
+      }
+
+      const intentId = data?.intent?.id || data?.id;
+      const destination = intentId
+        ? `/${org.slug}/intents/${intentId}`
+        : `/${org.slug}/pipeline`;
+      await router.push(destination);
+    } catch (err: any) {
+      setError(err?.message ?? 'Intent creation failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <OrgShell
       user={user}
       org={org}
       title="Create Intent"
-      subtitle="Paste an email or start from a blank intent."
+      subtitle="Start from scratch without email or RFP."
       navItems={getXNavItems(org.slug, 'intents')}
     >
       <Head>
         <title>{org.name} - New Intent</title>
       </Head>
-      <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Draft flow placeholder</p>
-        <p style={{ margin: 0 }}>
-          This page will host the paste/email form, mode selector, and intent creation flow.
-        </p>
-      </div>
+      <form onSubmit={onSubmit} style={formStyle}>
+        {isViewer ? (
+          <div style={noticeStyle}>
+            You have view-only access. Ask an Owner or BD/AM to create an intent.
+          </div>
+        ) : null}
+
+        <label style={labelStyle}>
+          Goal *
+          <textarea
+            value={form.goal}
+            onChange={updateField('goal')}
+            style={textAreaStyle}
+            rows={3}
+            placeholder="What is the core intent goal?"
+            disabled={isViewer || loading}
+            required
+          />
+        </label>
+
+        <label style={labelStyle}>
+          Context
+          <textarea
+            value={form.context}
+            onChange={updateField('context')}
+            style={textAreaStyle}
+            rows={3}
+            placeholder="Background, stakeholders, and constraints."
+            disabled={isViewer || loading}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          Scope
+          <textarea
+            value={form.scope}
+            onChange={updateField('scope')}
+            style={textAreaStyle}
+            rows={3}
+            placeholder="In/out of scope details."
+            disabled={isViewer || loading}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          KPI
+          <textarea
+            value={form.kpi}
+            onChange={updateField('kpi')}
+            style={textAreaStyle}
+            rows={2}
+            placeholder="Success metrics or KPIs."
+            disabled={isViewer || loading}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          Risks
+          <textarea
+            value={form.risks}
+            onChange={updateField('risks')}
+            style={textAreaStyle}
+            rows={2}
+            placeholder="Delivery, budget, or timeline risks."
+            disabled={isViewer || loading}
+          />
+        </label>
+
+        <label style={labelStyle}>
+          Deadline
+          <input
+            type="date"
+            value={form.deadline}
+            onChange={updateField('deadline')}
+            style={inputStyle}
+            disabled={isViewer || loading}
+          />
+        </label>
+
+        {error ? <p style={errorStyle}>{error}</p> : null}
+
+        <div style={buttonRowStyle}>
+          <button type="submit" style={buttonStyle} disabled={isViewer || loading}>
+            {loading ? 'Creating...' : 'Create Intent'}
+          </button>
+          <button
+            type="button"
+            style={ghostButtonStyle}
+            onClick={() => router.push(`/${org.slug}/intents`)}
+          >
+            Cancel
+          </button>
+        </div>
+      </form>
     </OrgShell>
   );
 }
 
-const cardStyle = {
-  padding: '1rem 1.25rem',
+const formStyle = {
+  display: 'grid',
+  gap: '1.2rem',
+};
+
+const labelStyle = {
+  display: 'grid',
+  gap: '0.5rem',
+  fontWeight: 600,
+  color: '#1f2933',
+};
+
+const textAreaStyle = {
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px solid rgba(15, 37, 54, 0.2)',
+  padding: '0.75rem 0.9rem',
+  fontSize: '0.95rem',
+  resize: 'vertical' as const,
+};
+
+const inputStyle = {
+  borderRadius: '12px',
+  border: '1px solid rgba(15, 37, 54, 0.2)',
+  padding: '0.65rem 0.9rem',
+  fontSize: '0.95rem',
+};
+
+const buttonRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.75rem',
+  alignItems: 'center',
+};
+
+const buttonStyle = {
+  padding: '0.75rem 1.4rem',
+  borderRadius: '12px',
+  border: 'none',
+  background: '#0f3a4b',
+  color: '#fff',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const ghostButtonStyle = {
+  padding: '0.7rem 1.3rem',
+  borderRadius: '12px',
+  border: '1px solid rgba(15, 37, 54, 0.2)',
+  background: 'transparent',
+  color: '#0f3a4b',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const errorStyle = {
+  color: '#b42318',
+  margin: 0,
+};
+
+const noticeStyle = {
+  padding: '0.9rem 1rem',
+  borderRadius: '12px',
+  background: 'rgba(15, 37, 54, 0.06)',
+  border: '1px solid rgba(15, 37, 54, 0.18)',
+  color: '#1f2933',
 };
 
 export const getServerSideProps: GetServerSideProps<NewIntentProps> = async (ctx) => {

@@ -18,6 +18,7 @@ model Organization {
   policyShareLinksEnabled Boolean @default(false)
   policyEmailIngestEnabled Boolean @default(false)
   users     User[]
+  intents   Intent[]
   events    Event[]
   blobs     Blob[]
   attachments Attachment[]
@@ -36,6 +37,7 @@ model User {
   org       Organization @relation(fields: [orgId], references: [id])
   sessions  Session[]
   passwordResetTokens PasswordResetToken[]
+  createdIntents Intent[] @relation("IntentCreatedBy")
   createdAt DateTime @default(now())
 }
 
@@ -85,6 +87,21 @@ enum AttachmentSource {
   email_ingest
   manual_upload
   export
+}
+
+enum IntentStage {
+  NEW
+  CLARIFY
+  MATCH
+  COMMIT
+  WON
+  LOST
+}
+
+enum IntentSource {
+  manual
+  paste
+  email
 }
 
 model Event {
@@ -147,4 +164,28 @@ model Attachment {
 
   @@index([orgId])
   @@index([intentId])
+}
+
+model Intent {
+  id                   String               @id @default(cuid())
+  orgId                String
+  createdByUserId      String
+  goal                 String
+  context              String?
+  scope                String?
+  kpi                  String?
+  risks                String?
+  deadlineAt           DateTime?
+  stage                IntentStage          @default(NEW)
+  confidentialityLevel ConfidentialityLevel @default(L1)
+  source               IntentSource         @default(manual)
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
+
+  org            Organization @relation(fields: [orgId], references: [id])
+  createdByUser  User         @relation("IntentCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([orgId])
+  @@index([orgId, stage])
+  @@index([createdByUserId])
 }

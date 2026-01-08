@@ -4,14 +4,16 @@ import OrgShell from '../../components/OrgShell';
 import { getXNavItems } from '../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../lib/org-context';
 import { fetchOrgEvents, type OrgEvent } from '../../lib/org-events';
+import { fetchOrgIntents, type OrgIntent } from '../../lib/org-intents';
 
 type PipelineProps = {
   user: OrgUser;
   org: OrgInfo;
+  newIntents: OrgIntent[];
   events: OrgEvent[];
 };
 
-export default function Pipeline({ user, org, events }: PipelineProps) {
+export default function Pipeline({ user, org, newIntents, events }: PipelineProps) {
   return (
     <OrgShell
       user={user}
@@ -29,6 +31,24 @@ export default function Pipeline({ user, org, events }: PipelineProps) {
           This page will render the stage board and stage change actions.
         </p>
       </div>
+
+      <section style={sectionStyle}>
+        <h3 style={{ marginTop: 0 }}>New intents</h3>
+        {newIntents.length ? (
+          <ul style={listStyle}>
+            {newIntents.map((intent) => (
+              <li key={intent.id} style={listItemStyle}>
+                <span style={{ fontWeight: 600 }}>{intent.goal}</span>
+                <span style={metaStyle}>
+                  {intent.deadlineAt ? `Deadline ${intent.deadlineAt}` : 'No deadline'}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p style={{ margin: 0, color: '#4b4f54' }}>No new intents yet.</p>
+        )}
+      </section>
 
       <section style={sectionStyle}>
         <h3 style={{ marginTop: 0 }}>Recent events</h3>
@@ -90,11 +110,13 @@ export const getServerSideProps: GetServerSideProps<PipelineProps> = async (ctx)
   if (result.redirect) {
     return { redirect: result.redirect };
   }
+  const newIntents = await fetchOrgIntents(result.context!.cookie, { stage: 'NEW', limit: 12 });
   const events = await fetchOrgEvents(result.context!.cookie, { limit: 8 });
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
+      newIntents,
       events,
     },
   };
