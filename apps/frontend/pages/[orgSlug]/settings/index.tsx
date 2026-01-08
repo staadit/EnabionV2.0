@@ -1,5 +1,5 @@
 import type { GetServerSideProps } from 'next';
-import { getOwnerContext } from '../../lib/admin-server';
+import { getOwnerContext } from '../../../lib/admin-server';
 
 export default function SettingsIndex() {
   return null;
@@ -10,10 +10,9 @@ export const getServerSideProps: GetServerSideProps = async (ctx) => {
   if (result.redirect) {
     return { redirect: result.redirect };
   }
-  const orgSlug = result.context!.org.slug;
   return {
     redirect: {
-      destination: `/${orgSlug}/settings/org`,
+      destination: `/${result.context!.org.slug}/settings/org`,
       permanent: false,
     },
   };

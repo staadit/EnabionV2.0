@@ -1,9 +1,9 @@
 import Head from 'next/head';
 import { useState } from 'react';
 import type { GetServerSideProps } from 'next';
-import SettingsLayout from '../../components/SettingsLayout';
-import { getAdminLabels } from '../../lib/admin-i18n';
-import { getOwnerContext, type AdminOrg, type AdminUser } from '../../lib/admin-server';
+import SettingsLayout from '../../../components/SettingsLayout';
+import { getAdminLabels } from '../../../lib/admin-i18n';
+import { getOwnerContext, type AdminOrg, type AdminUser } from '../../../lib/admin-server';
 
 type PreferencesProps = {
   user: AdminUser;
@@ -173,9 +173,9 @@ export const getServerSideProps: GetServerSideProps<PreferencesProps> = async (c
     return { redirect: result.redirect };
   }
   return {
-    redirect: {
-      destination: `/${result.context!.org.slug}/settings/preferences`,
-      permanent: false,
+    props: {
+      user: result.context!.user,
+      org: result.context!.org,
     },
   };
 };

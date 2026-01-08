@@ -1,26 +1,23 @@
 import type { GetServerSidePropsContext, Redirect } from 'next';
 
-export type AdminUser = {
+export type OrgUser = {
   id: string;
   email: string;
   orgId: string;
   role: string;
+  isPlatformAdmin?: boolean;
 };
 
-export type AdminOrg = {
+export type OrgInfo = {
   id: string;
   name: string;
   slug: string;
-  defaultLanguage: string;
-  policyAiEnabled: boolean;
-  policyShareLinksEnabled: boolean;
-  policyEmailIngestEnabled: boolean;
-  inboundEmailAddress?: string;
+  defaultLanguage?: string;
 };
 
-export type OwnerContext = {
-  user: AdminUser;
-  org: AdminOrg;
+export type OrgContext = {
+  user: OrgUser;
+  org: OrgInfo;
   cookie: string;
 };
 
@@ -53,9 +50,9 @@ function buildOrgSlugRedirect(path: string, orgSlug: string): Redirect {
   };
 }
 
-export async function getOwnerContext(
+export async function requireOrgContext(
   ctx: GetServerSidePropsContext,
-): Promise<{ context?: OwnerContext; redirect?: Redirect }> {
+): Promise<{ context?: OrgContext; redirect?: Redirect }> {
   const cookie = ctx.req.headers.cookie ?? '';
   try {
     const authRes = await fetch(`${BACKEND_BASE}/auth/me`, {
@@ -66,29 +63,33 @@ export async function getOwnerContext(
     }
 
     const authData = await authRes.json();
-    const user = authData?.user as AdminUser | undefined;
+    const user = authData?.user as OrgUser | undefined;
     if (!user) {
       return loginRedirect(ctx.resolvedUrl);
     }
-    if (user.role !== 'Owner') {
-      return { redirect: { destination: '/', permanent: false } };
-    }
+
+    const paramSlug = typeof ctx.params?.orgSlug === 'string' ? ctx.params.orgSlug : undefined;
+    let org: OrgInfo | undefined;
 
     const orgRes = await fetch(`${BACKEND_BASE}/v1/org/me`, {
       headers: { cookie },
     });
-    if (!orgRes.ok) {
-      return { redirect: { destination: '/', permanent: false } };
-    }
-    const orgData = await orgRes.json();
-    const org = orgData?.org as AdminOrg | undefined;
-    if (!org) {
-      return { redirect: { destination: '/', permanent: false } };
-    }
-
-    const paramSlug = ctx.params?.orgSlug;
-    if (typeof paramSlug === 'string' && paramSlug !== org.slug) {
-      return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, org.slug) };
+    if (orgRes.ok) {
+      const orgData = await orgRes.json();
+      org = orgData?.org as OrgInfo | undefined;
+      if (!org) {
+        return { redirect: { destination: '/', permanent: false } };
+      }
+      if (paramSlug && paramSlug !== org.slug) {
+        return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, org.slug) };
+      }
+    } else {
+      const fallbackSlug = paramSlug || 'org';
+      org = {
+        id: user.orgId,
+        name: paramSlug || 'Organization',
+        slug: fallbackSlug,
+      };
     }
 
     return { context: { user, org, cookie } };

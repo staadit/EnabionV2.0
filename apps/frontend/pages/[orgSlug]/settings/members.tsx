@@ -1,9 +1,9 @@
 import Head from 'next/head';
 import { useMemo, useState } from 'react';
 import type { GetServerSideProps } from 'next';
-import SettingsLayout from '../../components/SettingsLayout';
-import { getAdminLabels } from '../../lib/admin-i18n';
-import { getOwnerContext, type AdminOrg, type AdminUser } from '../../lib/admin-server';
+import SettingsLayout from '../../../components/SettingsLayout';
+import { getAdminLabels } from '../../../lib/admin-i18n';
+import { getOwnerContext, type AdminOrg, type AdminUser } from '../../../lib/admin-server';
 
 type Member = {
   id: string;
@@ -402,10 +402,20 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   if (result.redirect) {
     return { redirect: result.redirect };
   }
+  const { user, org, cookie } = result.context!;
+  const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
+  const res = await fetch(`${backendBase}/v1/org/members`, {
+    headers: { cookie },
+  });
+  if (!res.ok) {
+    return { redirect: { destination: '/', permanent: false } };
+  }
+  const data = await res.json();
   return {
-    redirect: {
-      destination: `/${result.context!.org.slug}/settings/members`,
-      permanent: false,
+    props: {
+      user,
+      org,
+      members: data.members || [],
     },
   };
 };

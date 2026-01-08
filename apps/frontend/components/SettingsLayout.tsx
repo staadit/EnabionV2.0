@@ -6,7 +6,7 @@ import type { AdminOrg, AdminUser } from '../lib/admin-server';
 type SettingsLayoutProps = {
   user: AdminUser;
   org: AdminOrg;
-  active: 'org' | 'members' | 'preferences';
+  active: 'org' | 'members' | 'preferences' | 'nda';
   labels: AdminLabels;
   children: ReactNode;
 };
@@ -25,11 +25,11 @@ export default function SettingsLayout({
           <p style={eyebrowStyle}>{labels.settingsTitle}</p>
           <h1 style={titleStyle}>{org.name}</h1>
           <p style={subTitleStyle}>
-            {org.slug} • {user.email}
+            {org.slug} - {user.email}
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <Link href="/" style={ghostButtonStyle}>
+          <Link href={`/${org.slug}/intents`} style={ghostButtonStyle}>
             {labels.navHome}
           </Link>
           <button
@@ -47,14 +47,17 @@ export default function SettingsLayout({
 
       <div style={contentGridStyle}>
         <nav style={navStyle}>
-          <NavItem href="/settings/org" active={active === 'org'}>
+          <NavItem href={`/${org.slug}/settings/org`} active={active === 'org'}>
             {labels.navOrg}
           </NavItem>
-          <NavItem href="/settings/members" active={active === 'members'}>
+          <NavItem href={`/${org.slug}/settings/members`} active={active === 'members'}>
             {labels.navMembers}
           </NavItem>
-          <NavItem href="/settings/preferences" active={active === 'preferences'}>
+          <NavItem href={`/${org.slug}/settings/preferences`} active={active === 'preferences'}>
             {labels.navPreferences}
+          </NavItem>
+          <NavItem href={`/${org.slug}/settings/nda`} active={active === 'nda'}>
+            {labels.navNda}
           </NavItem>
         </nav>
         <section style={panelStyle}>{children}</section>

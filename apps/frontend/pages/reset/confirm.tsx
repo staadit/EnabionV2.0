@@ -7,6 +7,7 @@ export default function ResetConfirm() {
   const router = useRouter();
   const [token, setToken] = useState('');
   const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle');
   const [error, setError] = useState<string | null>(null);
 
@@ -16,10 +17,32 @@ export default function ResetConfirm() {
     }
   }, [router.query.token]);
 
+  const tokenMissing = router.isReady && !token;
+  const passwordTooShort = password.length > 0 && password.length < 12;
+  const confirmTooShort = confirmPassword.length > 0 && confirmPassword.length < 12;
+  const passwordsMismatch = confirmPassword.length > 0 && password !== confirmPassword;
+  const canSubmit = !tokenMissing && !passwordTooShort && !confirmTooShort && !passwordsMismatch;
+
   const onSubmit = async (event: FormEvent) => {
     event.preventDefault();
-    setStatus('loading');
     setError(null);
+
+    if (!token) {
+      setError('Reset link is missing or invalid.');
+      return;
+    }
+
+    if (password.length < 12 || confirmPassword.length < 12) {
+      setError('Password must be at least 12 characters.');
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      setError('Passwords do not match.');
+      return;
+    }
+
+    setStatus('loading');
 
     try {
       const res = await fetch('/api/auth/password-reset/confirm', {
@@ -50,7 +73,7 @@ export default function ResetConfirm() {
       <main style={{ ...cardStyle, animation: 'panelIn 480ms ease' }}>
         <div style={badgeStyle}>Enabion R1.0</div>
         <h1 style={titleStyle}>Set a new password</h1>
-        <p style={subtitleStyle}>Paste your reset token and choose a new password.</p>
+        <p style={subtitleStyle}>Choose a new password for your account.</p>
 
         {status === 'done' ? (
           <div style={successStyle}>
@@ -61,19 +84,9 @@ export default function ResetConfirm() {
           </div>
         ) : (
           <form onSubmit={onSubmit} style={{ marginTop: '2rem' }}>
-            <label style={labelStyle}>
-              Reset token
-              <input
-                type="text"
-                value={token}
-                onChange={(event) => setToken(event.target.value)}
-                placeholder="Paste token"
-                required
-                style={inputStyle}
-              />
-            </label>
+            {tokenMissing ? <p style={errorStyle}>Reset link is missing or invalid.</p> : null}
 
-            <label style={{ ...labelStyle, marginTop: '1rem' }}>
+            <label style={labelStyle}>
               New password
               <input
                 type="password"
@@ -82,13 +95,36 @@ export default function ResetConfirm() {
                 placeholder="Minimum 12 characters"
                 required
                 minLength={12}
+                autoComplete="new-password"
                 style={inputStyle}
               />
             </label>
+            {passwordTooShort ? (
+              <p style={inlineErrorStyle}>Password must be at least 12 characters.</p>
+            ) : null}
+
+            <label style={{ ...labelStyle, marginTop: '1rem' }}>
+              Confirm new password
+              <input
+                type="password"
+                value={confirmPassword}
+                onChange={(event) => setConfirmPassword(event.target.value)}
+                placeholder="Repeat new password"
+                required
+                minLength={12}
+                autoComplete="new-password"
+                style={inputStyle}
+              />
+            </label>
+            {confirmTooShort ? (
+              <p style={inlineErrorStyle}>Password must be at least 12 characters.</p>
+            ) : passwordsMismatch ? (
+              <p style={inlineErrorStyle}>Passwords do not match.</p>
+            ) : null}
 
             {error ? <p style={errorStyle}>{error}</p> : null}
 
-            <button type="submit" style={buttonStyle} disabled={status === 'loading'}>
+            <button type="submit" style={buttonStyle} disabled={status === 'loading' || !canSubmit}>
               {status === 'loading' ? 'Updating...' : 'Update password'}
             </button>
           </form>
@@ -187,6 +223,12 @@ const buttonStyle: CSSProperties = {
 const errorStyle: CSSProperties = {
   marginTop: '1rem',
   color: '#b42318',
+};
+
+const inlineErrorStyle: CSSProperties = {
+  marginTop: '0.4rem',
+  color: '#b42318',
+  fontSize: '0.85rem',
 };
 
 const successStyle: CSSProperties = {

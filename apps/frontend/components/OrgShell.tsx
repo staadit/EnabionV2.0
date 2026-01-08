@@ -1,24 +1,44 @@
 import Link from 'next/link';
 import type { ReactNode, CSSProperties } from 'react';
-import type { PlatformAdminUser } from '../lib/require-platform-admin';
+import type { OrgInfo, OrgUser } from '../lib/org-context';
 
-type PlatformAdminLayoutProps = {
-  user: PlatformAdminUser;
-  active: 'home' | 'tenants' | 'users' | 'events' | 'email' | 'telemetry';
+export type NavItem = {
+  label: string;
+  href: string;
+  active?: boolean;
+};
+
+type OrgShellProps = {
+  user: OrgUser;
+  org: OrgInfo;
+  title?: string;
+  subtitle?: string;
+  eyebrow?: string;
+  navItems: NavItem[];
   children: ReactNode;
 };
 
-export default function PlatformAdminLayout({ user, active, children }: PlatformAdminLayoutProps) {
+export default function OrgShell({
+  user,
+  org,
+  title,
+  subtitle,
+  eyebrow = 'Workspace',
+  navItems,
+  children,
+}: OrgShellProps) {
   return (
     <div style={shellStyle}>
       <header style={headerStyle}>
         <div>
-          <p style={eyebrowStyle}>Platform Admin</p>
-          <h1 style={titleStyle}>Operations Console</h1>
-          <p style={subTitleStyle}>{user.email}</p>
+          <p style={eyebrowStyle}>{eyebrow}</p>
+          <h1 style={titleStyle}>{org.name}</h1>
+          <p style={subTitleStyle}>
+            {org.slug} - {user.email}
+          </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
-          <Link href="/" style={ghostButtonStyle}>
+          <Link href={`/${org.slug}/intents`} style={ghostButtonStyle}>
             Home
           </Link>
           <button
@@ -36,26 +56,21 @@ export default function PlatformAdminLayout({ user, active, children }: Platform
 
       <div style={contentGridStyle}>
         <nav style={navStyle}>
-          <NavItem href="/platform-admin" active={active === 'home'}>
-            Overview
-          </NavItem>
-          <NavItem href="/platform-admin/tenants" active={active === 'tenants'}>
-            Tenants
-          </NavItem>
-          <NavItem href="/platform-admin/users" active={active === 'users'}>
-            Users
-          </NavItem>
-          <NavItem href="/platform-admin/events" active={active === 'events'}>
-            Events
-          </NavItem>
-          <NavItem href="/platform-admin/telemetry" active={active === 'telemetry'}>
-            Telemetry
-          </NavItem>
-          <NavItem href="/platform-admin/email-ingest" active={active === 'email'}>
-            Email ingest
-          </NavItem>
+          {navItems.map((item) => (
+            <NavItem key={item.href} href={item.href} active={Boolean(item.active)}>
+              {item.label}
+            </NavItem>
+          ))}
         </nav>
-        <section style={panelStyle}>{children}</section>
+        <section style={panelStyle}>
+          {title ? (
+            <div style={panelHeaderStyle}>
+              <h2 style={{ margin: 0 }}>{title}</h2>
+              {subtitle ? <p style={panelSubtitleStyle}>{subtitle}</p> : null}
+            </div>
+          ) : null}
+          {children}
+        </section>
       </div>
     </div>
   );
@@ -73,7 +88,7 @@ const shellStyle: CSSProperties = {
   minHeight: '100vh',
   padding: '2.5rem',
   fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif',
-  background: 'radial-gradient(120% 120% at 10% 0%, #f3efe6 0%, #e7eef5 45%, #d8e5f0 100%)',
+  background: 'radial-gradient(120% 120% at 10% 0%, #f6e1c7 0%, #edf2f0 45%, #d2e4ef 100%)',
   color: '#1b1d1f',
 };
 
@@ -87,7 +102,7 @@ const headerStyle: CSSProperties = {
 
 const eyebrowStyle: CSSProperties = {
   textTransform: 'uppercase',
-  letterSpacing: '0.18em',
+  letterSpacing: '0.2em',
   fontSize: '0.7rem',
   color: '#6a6f76',
   marginBottom: '0.5rem',
@@ -125,7 +140,7 @@ const navItemStyle: CSSProperties = {
   fontWeight: 600,
   color: '#1f2933',
   border: '1px solid transparent',
-  background: 'rgba(255, 255, 255, 0.7)',
+  background: 'rgba(255, 255, 255, 0.65)',
 };
 
 const navItemActiveStyle: CSSProperties = {
@@ -145,6 +160,15 @@ const panelStyle: CSSProperties = {
   minWidth: '280px',
 };
 
+const panelHeaderStyle: CSSProperties = {
+  marginBottom: '1.5rem',
+};
+
+const panelSubtitleStyle: CSSProperties = {
+  marginTop: '0.5rem',
+  color: '#4b4f54',
+};
+
 const buttonStyle: CSSProperties = {
   padding: '0.75rem 1.2rem',
   borderRadius: '12px',
@@ -162,5 +186,5 @@ const ghostButtonStyle: CSSProperties = {
   color: '#0f3a4b',
   textDecoration: 'none',
   fontWeight: 600,
-  background: 'rgba(255, 255, 255, 0.75)',
+  background: 'rgba(255, 255, 255, 0.7)',
 };
