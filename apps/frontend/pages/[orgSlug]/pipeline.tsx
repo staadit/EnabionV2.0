@@ -25,7 +25,10 @@ const STAGE_LABELS: Record<PipelineStage, string> = {
   WON: 'Won',
 };
 
-const STAGE_SET = new Set(STAGE_ORDER);
+const STAGE_SET = new Set<PipelineStage>(STAGE_ORDER);
+
+const isPipelineStage = (value: string): value is PipelineStage =>
+  STAGE_SET.has(value as PipelineStage);
 
 export default function Pipeline({ user, org, intents }: PipelineProps) {
   const router = useRouter();
@@ -309,8 +312,8 @@ const sortByActivity = (items: OrgIntent[]) => {
 
 const normalizeStage = (intent: OrgIntent): PipelineStage => {
   const raw = (intent.stage || intent.status || 'NEW').toUpperCase();
-  if (STAGE_SET.has(raw)) {
-    return raw as PipelineStage;
+  if (isPipelineStage(raw)) {
+    return raw;
   }
   return 'NEW';
 };
