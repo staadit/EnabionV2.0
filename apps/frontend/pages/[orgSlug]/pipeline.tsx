@@ -167,7 +167,10 @@ export default function Pipeline({ user, org, intents }: PipelineProps) {
                     </div>
                     <div style={cardFooterStyle}>
                       <span>{intent.owner?.email || 'Unassigned'}</span>
-                      <span>{formatDateTime(intent.lastActivityAt)}</span>
+                      <span style={activityLabelStyle}>Last activity</span>
+                      <span style={activityValueStyle}>
+                        {formatDateTime(intent.lastActivityAt)}
+                      </span>
                     </div>
                     {savingId === intent.id ? (
                       <div style={savingBadgeStyle}>Saving...</div>
@@ -262,10 +265,21 @@ const cardMetaStyle = {
 
 const cardFooterStyle = {
   display: 'flex',
-  justifyContent: 'space-between',
-  gap: '0.5rem',
+  flexDirection: 'column' as const,
+  gap: '0.2rem',
   color: '#4b4f54',
   fontSize: '0.75rem',
+};
+
+const activityLabelStyle = {
+  fontSize: '0.65rem',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: '#7b8288',
+};
+
+const activityValueStyle = {
+  color: '#4b4f54',
 };
 
 const emptyColumnStyle = {
