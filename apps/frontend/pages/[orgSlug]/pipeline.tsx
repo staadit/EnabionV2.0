@@ -111,7 +111,10 @@ export const getServerSideProps: GetServerSideProps<PipelineProps> = async (ctx)
   if (result.redirect) {
     return { redirect: result.redirect };
   }
-  const newIntents = await fetchOrgIntents(result.context!.cookie, { stage: 'NEW', limit: 12 });
+  const { items: newIntents } = await fetchOrgIntents(result.context!.cookie, {
+    stage: 'NEW',
+    limit: 12,
+  });
   const events = await fetchOrgEvents(result.context!.cookie, { limit: 8 });
   return {
     props: {

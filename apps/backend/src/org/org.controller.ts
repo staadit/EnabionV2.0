@@ -70,6 +70,13 @@ export class OrgController {
     return { members };
   }
 
+  @Get('members/lookup')
+  async listMemberLookup(@Req() req: AuthenticatedRequest) {
+    const user = this.requireUser(req);
+    const members = await this.orgService.listMemberOptions(user.orgId);
+    return { members };
+  }
+
   @Post('members')
   async createMember(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
     const user = this.requireUser(req);

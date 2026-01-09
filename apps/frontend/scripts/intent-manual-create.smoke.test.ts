@@ -36,13 +36,26 @@ async function run() {
   try {
     const reqGet = {
       method: 'GET',
-      query: { stage: 'NEW', orgId: 'evil', limit: '5' },
+      query: {
+        stage: 'NEW',
+        status: ['NEW', 'CLARIFY'],
+        ownerId: 'user-1',
+        language: 'EN',
+        from: '2026-01-01',
+        to: '2026-01-07',
+        q: 'test',
+        orgId: 'evil',
+        limit: '5',
+      },
       headers: { cookie: 'enabion_session=tokenA' },
     } as any;
 
     await handler(reqGet, res);
     assert(capturedUrl.includes('/intents'), 'Proxy must call /intents');
     assert(capturedUrl.includes('stage=NEW'), 'Proxy must forward stage filter');
+    assert(capturedUrl.includes('status=NEW'), 'Proxy must forward status filter');
+    assert(capturedUrl.includes('ownerId=user-1'), 'Proxy must forward owner filter');
+    assert(capturedUrl.includes('language=EN'), 'Proxy must forward language filter');
     assert(!capturedUrl.includes('orgId='), 'Proxy must not forward orgId');
     assert(
       capturedOptions?.headers?.cookie === 'enabion_session=tokenA',

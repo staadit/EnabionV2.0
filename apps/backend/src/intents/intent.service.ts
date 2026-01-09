@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
@@ -9,6 +10,9 @@ import { IntentStage } from './intent.types';
 export type CreateIntentInput = {
   orgId: string;
   actorUserId: string;
+  ownerUserId?: string | null;
+  client?: string | null;
+  language?: string | null;
   goal?: string | null;
   title?: string | null;
   sourceTextRaw?: string | null;
@@ -21,8 +25,16 @@ export type CreateIntentInput = {
 
 export type ListIntentInput = {
   orgId: string;
-  stage?: IntentStage;
+  q?: string | null;
+  statuses?: IntentStage[];
+  ownerId?: string | null;
+  language?: string | null;
+  from?: Date;
+  to?: Date;
+  sort?: 'lastActivityAt' | 'createdAt';
+  order?: 'asc' | 'desc';
   limit?: number;
+  cursor?: string | null;
 };
 
 export type RunIntentCoachInput = {
@@ -50,6 +62,9 @@ export class IntentService {
     const isPaste = Boolean(rawText && rawText.trim().length > 0);
     const title = isPaste ? this.deriveTitle(rawText!, input.title) : input.goal ?? '';
     const goal = isPaste ? title : input.goal ?? '';
+    const language = (input.language ?? org.defaultLanguage ?? 'EN').toUpperCase();
+    const ownerUserId = input.ownerUserId ?? input.actorUserId;
+    const now = new Date();
 
     const sourceTextSha256 = isPaste ? this.hashText(rawText!) : null;
     const sourceTextLength = isPaste ? rawText!.length : null;
@@ -58,6 +73,9 @@ export class IntentService {
       data: {
         orgId: input.orgId,
         createdByUserId: input.actorUserId,
+        ownerUserId,
+        client: input.client ?? null,
+        language,
         goal,
         title,
         context: input.context ?? null,
@@ -71,6 +89,7 @@ export class IntentService {
         sourceTextRaw: rawText,
         sourceTextSha256,
         sourceTextLength,
+        lastActivityAt: now,
       },
     });
 
@@ -78,7 +97,7 @@ export class IntentService {
       payloadVersion: 1,
       intentId: intent.id,
       title,
-      language: org.defaultLanguage || 'EN',
+      language,
       confidentialityLevel: 'L1',
       source: isPaste ? 'paste' : 'manual',
     };
@@ -99,7 +118,7 @@ export class IntentService {
 
     await this.events.emitEvent({
       type: EVENT_TYPES.INTENT_CREATED,
-      occurredAt: new Date(),
+      occurredAt: now,
       orgId: input.orgId,
       actorUserId: input.actorUserId,
       actorOrgId: input.orgId,
@@ -116,15 +135,101 @@ export class IntentService {
   }
 
   async listIntents(input: ListIntentInput) {
-    const take = input.limit && input.limit > 0 ? Math.min(input.limit, 200) : 50;
-    return this.prisma.intent.findMany({
-      where: {
-        orgId: input.orgId,
-        stage: input.stage,
+    const take = input.limit && input.limit > 0 ? Math.min(input.limit, 100) : 25;
+    const sort = input.sort ?? 'lastActivityAt';
+    const order = input.order ?? 'desc';
+
+    const where: Prisma.IntentWhereInput = {
+      orgId: input.orgId,
+    };
+
+    if (input.statuses && input.statuses.length > 0) {
+      where.stage = { in: input.statuses };
+    }
+    if (input.ownerId) {
+      where.ownerUserId = input.ownerId;
+    }
+    if (input.language) {
+      where.language = input.language;
+    }
+    if (input.q) {
+      where.OR = [
+        { title: { contains: input.q, mode: 'insensitive' } },
+        { client: { contains: input.q, mode: 'insensitive' } },
+      ];
+    }
+    if (input.from || input.to) {
+      where.lastActivityAt = {
+        ...(input.from ? { gte: input.from } : {}),
+        ...(input.to ? { lte: input.to } : {}),
+      };
+    }
+
+    const cursor = this.decodeCursor(input.cursor);
+    if (cursor && cursor.sort === sort) {
+      const cursorFilter: Prisma.IntentWhereInput = {
+        OR: [
+          {
+            [sort]: order === 'desc' ? { lt: cursor.value } : { gt: cursor.value },
+          },
+          {
+            [sort]: cursor.value,
+            id: order === 'desc' ? { lt: cursor.id } : { gt: cursor.id },
+          },
+        ],
+      };
+      if (where.AND) {
+        const existing = Array.isArray(where.AND) ? where.AND : [where.AND];
+        where.AND = [...existing, cursorFilter];
+      } else {
+        where.AND = [cursorFilter];
+      }
+    }
+
+    const results = await this.prisma.intent.findMany({
+      where,
+      select: {
+        id: true,
+        goal: true,
+        title: true,
+        client: true,
+        stage: true,
+        ownerUserId: true,
+        language: true,
+        lastActivityAt: true,
+        deadlineAt: true,
+        source: true,
+        createdAt: true,
+        updatedAt: true,
+        owner: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
       },
-      orderBy: { createdAt: 'desc' },
-      take,
+      orderBy: [{ [sort]: order }, { id: order }],
+      take: take + 1,
     });
+
+    const items = results.slice(0, take).map((intent) => ({
+      ...intent,
+      status: intent.stage,
+      owner: intent.owner
+        ? {
+            id: intent.owner.id,
+            email: intent.owner.email,
+            name: null,
+          }
+        : null,
+    }));
+
+    const nextCursor =
+      results.length > take && items.length
+        ? this.encodeCursor(items[items.length - 1], sort)
+        : null;
+
+    return { items, nextCursor };
   }
 
   async runIntentCoach(input: RunIntentCoachInput) {
@@ -143,6 +248,45 @@ export class IntentService {
       status: 'not_implemented',
       intentId: intent.id,
     };
+  }
+
+  private encodeCursor(
+    intent: { id: string; lastActivityAt: Date; createdAt: Date },
+    sort: 'lastActivityAt' | 'createdAt',
+  ) {
+    const value = sort === 'createdAt' ? intent.createdAt : intent.lastActivityAt;
+    return Buffer.from(
+      JSON.stringify({
+        sort,
+        value: value.toISOString(),
+        id: intent.id,
+      }),
+    ).toString('base64');
+  }
+
+  private decodeCursor(cursor?: string | null) {
+    if (!cursor) return null;
+    try {
+      const decoded = JSON.parse(Buffer.from(cursor, 'base64').toString('utf8')) as {
+        sort?: 'lastActivityAt' | 'createdAt';
+        value?: string;
+        id?: string;
+      };
+      if (!decoded?.sort || !decoded?.value || !decoded?.id) {
+        return null;
+      }
+      const parsedDate = new Date(decoded.value);
+      if (Number.isNaN(parsedDate.getTime())) {
+        return null;
+      }
+      return {
+        sort: decoded.sort,
+        value: parsedDate,
+        id: decoded.id,
+      };
+    } catch {
+      return null;
+    }
   }
 
   private hashText(value: string) {

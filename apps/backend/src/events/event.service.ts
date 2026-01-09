@@ -53,6 +53,17 @@ export class EventService {
       },
     });
 
+    if (validated.subjectType === 'INTENT') {
+      await this.prisma.intent.updateMany({
+        where: {
+          id: validated.subjectId,
+          orgId: validated.orgId,
+          lastActivityAt: { lt: validated.occurredAt },
+        },
+        data: { lastActivityAt: validated.occurredAt },
+      });
+    }
+
     return validated;
   }
 

@@ -172,6 +172,22 @@ export class OrgService {
     }));
   }
 
+  async listMemberOptions(orgId: string) {
+    const members = await this.prisma.user.findMany({
+      where: { orgId, deactivatedAt: null },
+      select: {
+        id: true,
+        email: true,
+        role: true,
+      },
+      orderBy: { email: 'asc' },
+    });
+    return members.map((member) => ({
+      ...member,
+      role: this.normalizeRole(member.role),
+    }));
+  }
+
   async createMember(input: CreateMemberInput) {
     const existing = await this.prisma.user.findUnique({
       where: { email: input.email },
