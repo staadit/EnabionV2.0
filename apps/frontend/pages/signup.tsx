@@ -23,13 +23,40 @@ export default function Signup() {
         body: JSON.stringify({ email, password, orgName }),
       });
 
+      const data = await res.json();
       if (!res.ok) {
-        const data = await res.json();
         const message = Array.isArray(data?.message) ? data.message.join('; ') : data?.message;
         throw new Error(message || data?.error || 'Signup failed');
       }
 
-      await router.push('/');
+      let destination =
+        data?.user?.isPlatformAdmin
+          ? '/platform-admin'
+          : typeof data?.user?.orgSlug === 'string' && data.user.orgSlug
+            ? `/${data.user.orgSlug}/intents`
+            : null;
+
+      if (!destination) {
+        try {
+          const meRes = await fetch('/api/auth/me');
+          if (meRes.ok) {
+            const meData = await meRes.json();
+            const meUser = meData?.user;
+            const meSlug = meUser?.orgSlug;
+            if (meUser?.isPlatformAdmin) {
+              destination = '/platform-admin';
+              return;
+            }
+            if (typeof meSlug === 'string' && meSlug) {
+              destination = `/${meSlug}/intents`;
+            }
+          }
+        } catch {
+          // Ignore lookup errors and fall back to root.
+        }
+      }
+
+      await router.push(destination || '/');
     } catch (err: any) {
       setError(err?.message ?? 'Signup failed');
     } finally {
@@ -213,9 +240,16 @@ export const getServerSideProps: GetServerSideProps = async ({ req }) => {
       headers: { cookie: req.headers.cookie ?? '' },
     });
     if (res.status === 200) {
+      const data = await res.json();
+      const user = data?.user;
+      const slug = user?.orgSlug;
       return {
         redirect: {
-          destination: '/',
+          destination: user?.isPlatformAdmin
+            ? '/platform-admin'
+            : typeof slug === 'string' && slug
+              ? `/${slug}/intents`
+              : '/',
           permanent: false,
         },
       };

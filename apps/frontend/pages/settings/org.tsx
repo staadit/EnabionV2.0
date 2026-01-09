@@ -64,7 +64,7 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
   return (
     <SettingsLayout user={user} org={currentOrg} active="org" labels={labels}>
       <Head>
-        <title>{labels.settingsTitle} • {labels.navOrg}</title>
+        <title>{labels.settingsTitle} - {labels.navOrg}</title>
       </Head>
 
       <h2 style={{ marginTop: 0 }}>{labels.orgTitle}</h2>
@@ -169,9 +169,9 @@ export const getServerSideProps: GetServerSideProps<OrgSettingsProps> = async (c
     return { redirect: result.redirect };
   }
   return {
-    props: {
-      user: result.context!.user,
-      org: result.context!.org,
+    redirect: {
+      destination: `/${result.context!.org.slug}/settings/org`,
+      permanent: false,
     },
   };
 };

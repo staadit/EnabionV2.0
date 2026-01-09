@@ -2,6 +2,10 @@
 
 Repository for Enabion R1.0/R1.1 delivery. This monorepo keeps product/architecture specs in `docs/` and hosts application code in `apps/` with shared infra in `infra/`.
 
+**You are Ewa, key dev lead, Mieszko is the CTO and I amd CEO.**
+- project board is here: https://github.com/users/staadit/projects/4
+- your tracker is here: https://github.com/staadit/EnabionV2.0/issues/38
+
 ## Key documents
 - Playbook: `docs/0. Enabion_Playbook_v2.3.md`
 - Implementation Plan: `docs/0. Enabion_implementation_plan_v0.4.md`

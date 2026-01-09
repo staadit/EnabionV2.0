@@ -64,7 +64,7 @@ export default function PreferencesSettings({ user, org }: PreferencesProps) {
   return (
     <SettingsLayout user={user} org={currentOrg} active="preferences" labels={labels}>
       <Head>
-        <title>{labels.settingsTitle} • {labels.navPreferences}</title>
+        <title>{labels.settingsTitle} - {labels.navPreferences}</title>
       </Head>
 
       <h2 style={{ marginTop: 0 }}>{labels.preferencesTitle}</h2>
@@ -173,9 +173,9 @@ export const getServerSideProps: GetServerSideProps<PreferencesProps> = async (c
     return { redirect: result.redirect };
   }
   return {
-    props: {
-      user: result.context!.user,
-      org: result.context!.org,
+    redirect: {
+      destination: `/${result.context!.org.slug}/settings/preferences`,
+      permanent: false,
     },
   };
 };

@@ -130,7 +130,7 @@ export default function MembersSettings({ user, org, members: initial }: Members
   return (
     <SettingsLayout user={user} org={org} active="members" labels={labels}>
       <Head>
-        <title>{labels.settingsTitle} • {labels.navMembers}</title>
+        <title>{labels.settingsTitle} - {labels.navMembers}</title>
       </Head>
 
       <div style={headerRowStyle}>
@@ -402,20 +402,10 @@ export const getServerSideProps: GetServerSideProps<MembersProps> = async (ctx) 
   if (result.redirect) {
     return { redirect: result.redirect };
   }
-  const { user, org, cookie } = result.context!;
-  const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
-  const res = await fetch(`${backendBase}/v1/org/members`, {
-    headers: { cookie },
-  });
-  if (!res.ok) {
-    return { redirect: { destination: '/', permanent: false } };
-  }
-  const data = await res.json();
   return {
-    props: {
-      user,
-      org,
-      members: data.members || [],
+    redirect: {
+      destination: `/${result.context!.org.slug}/settings/members`,
+      permanent: false,
     },
   };
 };

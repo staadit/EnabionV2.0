@@ -122,7 +122,7 @@ export class AuthService {
       await this.emitUserEvent(EVENT_TYPES.USER_SIGNED_UP, result.user, result.session.sessionId);
 
       return {
-        user: this.toAuthUser(result.user),
+        user: this.toAuthUser(result.user, result.org.slug),
         session: result.session,
       };
     } catch (err: any) {
@@ -162,12 +162,16 @@ export class AuthService {
       });
       return this.createSession(tx, user.id, now);
     });
+    const org = await this.prisma.organization.findUnique({
+      where: { id: user.orgId },
+      select: { slug: true },
+    });
 
     this.clearLoginAttempts(attemptKey);
     await this.emitUserEvent(EVENT_TYPES.USER_LOGGED_IN, user, session.sessionId);
 
     return {
-      user: this.toAuthUser(user),
+      user: this.toAuthUser(user, org?.slug),
       session,
     };
   }
@@ -180,7 +184,13 @@ export class AuthService {
     const tokenHash = hashSessionToken(token);
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: {
+        user: {
+          include: {
+            org: { select: { slug: true } },
+          },
+        },
+      },
     });
 
     if (!session || session.revokedAt || session.expiresAt <= new Date()) {
@@ -199,7 +209,13 @@ export class AuthService {
     const tokenHash = hashSessionToken(token);
     const session = await this.prisma.session.findUnique({
       where: { tokenHash },
-      include: { user: true },
+      include: {
+        user: {
+          include: {
+            org: { select: { slug: true } },
+          },
+        },
+      },
     });
 
     if (!session || session.revokedAt || session.expiresAt <= new Date()) {
@@ -209,8 +225,9 @@ export class AuthService {
       throw new UnauthorizedException('Account deactivated');
     }
 
+    const orgSlug = session.user.org?.slug;
     return {
-      user: this.toAuthUser(session.user),
+      user: this.toAuthUser(session.user, orgSlug),
       sessionId: session.id,
     };
   }
@@ -471,11 +488,12 @@ export class AuthService {
     return 'unknown';
   }
 
-  private toAuthUser(user: User): AuthUser {
+  private toAuthUser(user: User, orgSlug?: string | null): AuthUser {
     return {
       id: user.id,
       email: user.email,
       orgId: user.orgId,
+      orgSlug: orgSlug ?? undefined,
       role: this.normalizeRole(user.role),
       isPlatformAdmin: this.isPlatformAdminEmail(user.email),
     };

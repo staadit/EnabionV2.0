@@ -36,6 +36,23 @@ function loginRedirect(path: string): { redirect: Redirect } {
   };
 }
 
+function buildOrgSlugRedirect(path: string, orgSlug: string): Redirect {
+  const [rawPath, query] = path.split('?');
+  const segments = rawPath.split('/').filter(Boolean);
+  if (segments.length === 0) {
+    return {
+      destination: `/${orgSlug}`,
+      permanent: false,
+    };
+  }
+  segments[0] = orgSlug;
+  const nextPath = `/${segments.join('/')}`;
+  return {
+    destination: query ? `${nextPath}?${query}` : nextPath,
+    permanent: false,
+  };
+}
+
 export async function getOwnerContext(
   ctx: GetServerSidePropsContext,
 ): Promise<{ context?: OwnerContext; redirect?: Redirect }> {
@@ -67,6 +84,11 @@ export async function getOwnerContext(
     const org = orgData?.org as AdminOrg | undefined;
     if (!org) {
       return { redirect: { destination: '/', permanent: false } };
+    }
+
+    const paramSlug = ctx.params?.orgSlug;
+    if (typeof paramSlug === 'string' && paramSlug !== org.slug) {
+      return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, org.slug) };
     }
 
     return { context: { user, org, cookie } };

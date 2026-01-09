@@ -11,6 +11,7 @@ type HomeProps = {
     role: string;
     isPlatformAdmin: boolean;
   };
+  orgSlug: string | null;
   backendHealth: string | null;
   backendError: string | null;
   apiHealth: string | null;
@@ -34,6 +35,7 @@ type VpsLoad = {
 
 export default function Home({
   user,
+  orgSlug,
   backendHealth,
   backendError,
   apiHealth,
@@ -45,6 +47,7 @@ export default function Home({
   prodBackendHealth,
   prodBackendError,
 }: HomeProps) {
+  const settingsHref = orgSlug ? `/${orgSlug}/settings/org` : '/settings/org';
   const [vpsLoad, setVpsLoad] = useState<VpsLoad | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -81,13 +84,13 @@ export default function Home({
           <div>
             <h1>Enabion R1.0 - Intent & Pre-Sales OS (skeleton)</h1>
             <p style={{ marginTop: '0.5rem', color: '#52565c' }}>
-              Signed in as {user.email} • {user.role}
+              Signed in as {user.email} - {user.role}
             </p>
           </div>
           <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
             {user.role === 'Owner' ? (
               <Link
-                href="/settings/org"
+                href={settingsHref}
                 style={{ ...buttonStyle('#1c6e5a'), border: 'none', cursor: 'pointer' }}
               >
                 Settings
@@ -258,6 +261,7 @@ function formatUptime(seconds: number) {
 export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req }) => {
   const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
   let user: HomeProps['user'] | null = null;
+  let orgSlug: string | null = null;
   try {
     const authRes = await fetch(`${backendBase}/auth/me`, {
       headers: { cookie: req.headers.cookie ?? '' },
@@ -274,6 +278,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req })
 
     const authData = await authRes.json();
     user = authData?.user || null;
+    orgSlug = authData?.user?.orgSlug ?? null;
   } catch {
     return {
       redirect: {
@@ -290,6 +295,20 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req })
         permanent: false,
       },
     };
+  }
+
+  if (user.role === 'Owner' && !orgSlug) {
+    try {
+      const orgRes = await fetch(`${backendBase}/v1/org/me`, {
+        headers: { cookie: req.headers.cookie ?? '' },
+      });
+      if (orgRes.ok) {
+        const orgData = await orgRes.json();
+        orgSlug = orgData?.org?.slug ?? null;
+      }
+    } catch {
+      orgSlug = null;
+    }
   }
 
   const fetchText = async (url: string) => {
@@ -311,6 +330,7 @@ export const getServerSideProps: GetServerSideProps<HomeProps> = async ({ req })
   return {
     props: {
       user,
+      orgSlug,
       backendHealth: backend.text,
       backendError: backend.error,
       apiHealth: api.text,
