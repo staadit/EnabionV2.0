@@ -223,7 +223,8 @@ const columnCountStyle = {
 
 const columnBodyStyle = {
   padding: '0.85rem',
-  display: 'grid',
+  display: 'flex',
+  flexDirection: 'column' as const,
   gap: '0.75rem',
   flex: 1,
 };
