@@ -1,3 +1,4 @@
+import { NdaChannel } from '@prisma/client';
 import { BadRequestException, Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { z } from 'zod';
 import { AuthGuard } from '../auth/auth.guard';
@@ -74,7 +75,7 @@ export class NdaController {
       typedName,
       typedRole,
       language: parsed.language ?? 'EN',
-      channel: 'ui',
+      channel: NdaChannel.ui,
       counterpartyOrgId: parsed.counterpartyOrgId ?? null,
     });
     return {

@@ -1,10 +1,11 @@
 import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
+import { NdaChannel, NdaType } from '@prisma/client';
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
-import { EVENT_TYPES } from '../events/event-registry';
+import { EVENT_TYPES, type Channel } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
 import {
   NDA_FILES,
@@ -18,7 +19,7 @@ type NdaDocumentSource = 'db' | 'file';
 
 export type NdaDocumentPayload = {
   id?: string;
-  ndaType: string;
+  ndaType: NdaType;
   ndaVersion: string;
   enMarkdown: string;
   summaryPl?: string | null;
@@ -35,13 +36,13 @@ export type NdaAcceptancePayload = {
   id: string;
   orgId: string;
   counterpartyOrgId?: string | null;
-  ndaType: string;
+  ndaType: NdaType;
   ndaVersion: string;
   enHashSha256: string;
   acceptedByUserId: string;
   acceptedAt: Date;
   language: string;
-  channel: string;
+  channel: NdaChannel;
   typedName: string;
   typedRole: string;
 };
@@ -223,7 +224,7 @@ export class NdaService {
     typedName: string;
     typedRole: string;
     language: string;
-    channel: string;
+    channel: NdaChannel;
     counterpartyOrgId?: string | null;
   }): Promise<NdaAcceptancePayload> {
     const doc = await this.getCurrentDocument();
@@ -238,6 +239,7 @@ export class NdaService {
     }
 
     const now = new Date();
+    const eventChannel = input.channel as Channel;
     const acceptance = await this.prisma.ndaAcceptance.create({
       data: {
         orgId: input.orgId,
@@ -264,7 +266,7 @@ export class NdaService {
       subjectId: acceptance.id,
       lifecycleStep: 'CLARIFY',
       pipelineStage: 'NEW',
-      channel: input.channel,
+      channel: eventChannel,
       correlationId: ulid(),
       payload: {
         payloadVersion: 1,
@@ -272,7 +274,7 @@ export class NdaService {
         ndaVersion: doc.ndaVersion,
         enHashSha256: doc.enHashSha256,
         language,
-        channel: input.channel,
+        channel: eventChannel,
         typedName: input.typedName,
         typedRole: input.typedRole,
         acceptedByUserId: input.userId,

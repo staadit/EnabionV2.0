@@ -1,9 +1,11 @@
+import { NdaType } from '@prisma/client';
+
 export const NDA_VERSION = 'Enabion_mutual_nda_v0.1_en';
 
 export const NDA_LANGUAGES = ['EN', 'PL', 'DE', 'NL'] as const;
 export type NdaLanguage = (typeof NDA_LANGUAGES)[number];
 
-export const NDA_TYPE_MUTUAL = 'MUTUAL';
+export const NDA_TYPE_MUTUAL: NdaType = NdaType.MUTUAL;
 
 export const NDA_FILES = {
   en: 'mutual_nda_v0.1_en.md',
