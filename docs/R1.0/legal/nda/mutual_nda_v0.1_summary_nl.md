@@ -1,9 +1,9 @@
-# Enabion Mutual NDA — Summary (NL) — v0.1 (UI copy)
+# Enabion Mutual NDA - Summary (NL) - v0.1 (UI copy)
 
-> **Let op:** Dit is een samenvatting (UI-tekst). De juridisch leidende tekst is de EN-versie: `enabion_mutual_nda_v0.1_en`.
+> **Let op:** Dit is een samenvatting (UI-tekst). De juridisch leidende tekst is de EN-versie: `Enabion_mutual_nda_v0.1_en`.
 
 ## Wat is dit?
-Een wederzijdse geheimhoudingsovereenkomst tussen Enabion en de wederpartij (partner X↔Y) om **L2 (NDA‑Required)** informatie uit te wisselen in pre‑sales.
+Een wederzijdse geheimhoudingsovereenkomst tussen Enabion en de wederpartij (partner X<->Y) om **L2 (NDA-Required)** informatie uit te wisselen in pre-sales.
 
 ## Wat wordt beschermd?
 - zakelijke en technische informatie,
@@ -13,7 +13,7 @@ Een wederzijdse geheimhoudingsovereenkomst tussen Enabion en de wederpartij (par
 - afgeleide notities/analyses.
 
 ## Kernverplichtingen
-- gebruik alleen voor het doel (“Purpose”),
+- gebruik alleen voor het doel ("Purpose"),
 - geen delen met derden (behalve geautoriseerde personen),
 - redelijke beveiliging,
 - op verzoek teruggeven/verwijderen.

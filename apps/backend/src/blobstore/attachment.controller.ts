@@ -96,7 +96,7 @@ export class AttachmentController {
   async listIntentAttachments(
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
-    @Query('ndaAccepted') ndaAccepted?: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
   ) {
     const user = this.requireUser(req);
     const intent = await this.attachmentService.findIntent(intentId);
@@ -108,12 +108,7 @@ export class AttachmentController {
       orgId: intent.orgId,
     });
 
-    const items = await this.mapAttachmentList(
-      attachments,
-      user.orgId,
-      user.id,
-      ndaAccepted,
-    );
+    const items = await this.mapAttachmentList(attachments, user.orgId, user.id);
     return { items };
   }
 
@@ -123,14 +118,14 @@ export class AttachmentController {
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
     @Param('attachmentId') attachmentId: string,
-    @Query('ndaAccepted') ndaAccepted?: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(attachmentId);
     if (attachment.intentId !== intentId) {
       throw new NotFoundException('Attachment not found');
     }
-    return this.handleDownload(req, attachment, ndaAccepted, asInline);
+    return this.handleDownload(req, attachment, asInline);
   }
 
   @Get('attachments/:id')
@@ -138,11 +133,11 @@ export class AttachmentController {
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Query('ndaAccepted') ndaAccepted?: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(id);
-    return this.handleDownload(req, attachment, ndaAccepted, asInline);
+    return this.handleDownload(req, attachment, asInline);
   }
 
   private parseBool(value?: string): boolean {
@@ -161,7 +156,6 @@ export class AttachmentController {
   private async handleDownload(
     req: AuthenticatedRequest,
     attachment: any,
-    ndaAccepted?: string,
     asInline?: string,
   ) {
     const user = this.requireUser(req);
@@ -173,7 +167,6 @@ export class AttachmentController {
       userId: user.id,
       intentId: attachment.intentId || undefined,
       confidentiality,
-      ndaAccepted,
     });
     this.policy.assertCanDownload({
       requestOrgId: orgId,
@@ -211,20 +204,13 @@ export class AttachmentController {
     userId: string;
     intentId?: string;
     confidentiality: ConfidentialityLevel;
-    ndaAccepted?: string;
   }): Promise<boolean> {
-    if (input.requestOrgId === input.resourceOrgId) {
-      return true;
-    }
-    if (input.confidentiality === 'L1') {
-      return true;
-    }
     return this.ndaPolicy.canAccess({
-      orgId: input.requestOrgId,
+      requestOrgId: input.requestOrgId,
+      resourceOrgId: input.resourceOrgId,
       userId: input.userId,
       intentId: input.intentId,
       confidentiality: input.confidentiality,
-      assumedAccepted: this.parseBool(input.ndaAccepted),
     });
   }
 
@@ -232,7 +218,6 @@ export class AttachmentController {
     attachments: AttachmentListItem[],
     requestOrgId: string,
     userId: string,
-    ndaAccepted?: string,
   ) {
     const mapped = await Promise.all(
       attachments.map(async (attachment) => {
@@ -243,7 +228,6 @@ export class AttachmentController {
           userId,
           intentId: attachment.intentId || undefined,
           confidentiality,
-          ndaAccepted,
         });
         const canDownload = this.policy.canDownload({
           requestOrgId,

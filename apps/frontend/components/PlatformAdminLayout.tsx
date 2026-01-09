@@ -4,7 +4,7 @@ import type { PlatformAdminUser } from '../lib/require-platform-admin';
 
 type PlatformAdminLayoutProps = {
   user: PlatformAdminUser;
-  active: 'home' | 'tenants' | 'users' | 'events' | 'email' | 'telemetry';
+  active: 'home' | 'tenants' | 'users' | 'events' | 'email' | 'telemetry' | 'nda';
   children: ReactNode;
 };
 
@@ -47,6 +47,9 @@ export default function PlatformAdminLayout({ user, active, children }: Platform
           </NavItem>
           <NavItem href="/platform-admin/events" active={active === 'events'}>
             Events
+          </NavItem>
+          <NavItem href="/platform-admin/nda" active={active === 'nda'}>
+            NDA
           </NavItem>
           <NavItem href="/platform-admin/telemetry" active={active === 'telemetry'}>
             Telemetry

@@ -11,6 +11,7 @@ import { NdaPolicy } from '../src/blobstore/nda.policy';
 import { ConfidentialityLevel } from '../src/blobstore/types';
 import { EventService } from '../src/events/event.service';
 import { EVENT_TYPES } from '../src/events/event-registry';
+import { NdaService } from '../src/nda/nda.service';
 
 type BlobRecord = {
   id: string;
@@ -45,6 +46,34 @@ class MockPrismaService {
   public attachments: AttachmentRecord[] = [];
   public intents: Array<{ id: string; orgId: string; confidentialityLevel: ConfidentialityLevel }> = [];
   public users: Array<{ id: string; email: string }> = [];
+  public ndaDocuments: Array<{
+    id: string;
+    ndaType: string;
+    ndaVersion: string;
+    enMarkdown: string;
+    summaryPl?: string | null;
+    summaryDe?: string | null;
+    summaryNl?: string | null;
+    enHashSha256: string;
+    isActive: boolean;
+    createdAt: Date;
+    updatedAt: Date;
+  }> = [];
+  public ndaAcceptances: Array<{
+    id: string;
+    orgId: string;
+    counterpartyOrgId?: string | null;
+    ndaType: string;
+    ndaVersion: string;
+    enHashSha256: string;
+    acceptedByUserId: string;
+    acceptedAt: Date;
+    language: string;
+    channel: string;
+    typedName: string;
+    typedRole: string;
+    createdAt: Date;
+  }> = [];
 
   blob = {
     create: async (args: any) => {
@@ -118,6 +147,45 @@ class MockPrismaService {
       return this.users.filter((user) => ids.has(user.id));
     },
   };
+
+  ndaDocument = {
+    findFirst: async (args: any) => {
+      const filtered = this.ndaDocuments.filter((doc) => {
+        if (args.where?.ndaType && doc.ndaType !== args.where.ndaType) return false;
+        if (args.where?.isActive !== undefined && doc.isActive !== args.where.isActive) return false;
+        return true;
+      });
+      if (!filtered.length) return null;
+      return filtered[0];
+    },
+  };
+
+  ndaAcceptance = {
+    findFirst: async (args: any) => {
+      const candidates = this.ndaAcceptances.filter((acc) => {
+        if (args.where?.orgId && acc.orgId !== args.where.orgId) return false;
+        if (args.where?.ndaType && acc.ndaType !== args.where.ndaType) return false;
+        if (args.where?.ndaVersion && acc.ndaVersion !== args.where.ndaVersion) return false;
+        if (args.where?.enHashSha256 && acc.enHashSha256 !== args.where.enHashSha256) return false;
+        if (args.where?.counterpartyOrgId !== undefined) {
+          return acc.counterpartyOrgId === args.where.counterpartyOrgId;
+        }
+        return true;
+      });
+      if (args.where?.OR) {
+        const orMatches = candidates.filter((acc) =>
+          args.where.OR.some((clause: any) => acc.counterpartyOrgId === clause.counterpartyOrgId),
+        );
+        return orMatches[0] ?? null;
+      }
+      return candidates[0] ?? null;
+    },
+    create: async (args: any) => {
+      const record = { id: crypto.randomUUID(), createdAt: new Date(), ...args.data };
+      this.ndaAcceptances.push(record);
+      return record;
+    },
+  };
 }
 
 class MockEventService extends EventService {
@@ -175,8 +243,10 @@ async function run() {
   });
   const attachmentService = new AttachmentService(prisma as any, blobService, eventService as any);
   const policy = new AttachmentAccessPolicy();
-  const ndaPolicy = new NdaPolicy();
+  const ndaService = new NdaService(prisma as any, eventService as any);
+  const ndaPolicy = new NdaPolicy(ndaService);
   const controller = new AttachmentController(attachmentService, policy, blobService, ndaPolicy);
+  const currentDoc = await ndaService.getCurrentDocument();
   const ownerReq = {
     user: {
       id: 'user-1',
@@ -284,16 +354,32 @@ async function run() {
   }
   assert(threw, 'cross-tenant L2 without NDA should be forbidden');
 
+  prisma.ndaAcceptances.push({
+    id: crypto.randomUUID(),
+    orgId: 'other-org',
+    counterpartyOrgId: 'org-1',
+    ndaType: 'MUTUAL',
+    ndaVersion: currentDoc.ndaVersion,
+    enHashSha256: currentDoc.enHashSha256,
+    acceptedByUserId: 'user-3',
+    acceptedAt: new Date(),
+    language: 'EN',
+    channel: 'ui',
+    typedName: 'Other User',
+    typedRole: 'Viewer',
+    createdAt: new Date(),
+  });
+
   const okDownload: any = await controller.downloadAttachment(
     otherOrgReq,
     uploadL2.attachmentId,
-    'true',
+    undefined,
     undefined,
   );
   const l2CrossBuffer = await streamToBuffer(okDownload.getStream());
   assert(l2CrossBuffer.toString() === 'top-secret', 'cross-tenant L2 decrypt mismatch');
 
-  const listOtherL2Ok: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2', 'true');
+  const listOtherL2Ok: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2', undefined);
   assert(listOtherL2Ok.items[0].canDownload === true, 'NDA should unlock L2 download');
   const downloadEvents = eventService.emitted.filter(
     (e) => e.type === EVENT_TYPES.ATTACHMENT_DOWNLOADED,

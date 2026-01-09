@@ -30,6 +30,10 @@ export default function PlatformAdminHome({ user }: PlatformAdminHomeProps) {
           <h3 style={cardTitleStyle}>Events</h3>
           <p style={cardBodyStyle}>Cross-tenant event explorer with redaction.</p>
         </Link>
+        <Link href="/platform-admin/nda" style={cardStyle}>
+          <h3 style={cardTitleStyle}>NDA</h3>
+          <p style={cardBodyStyle}>Manage mutual NDA versions and summaries.</p>
+        </Link>
         <Link href="/platform-admin/email-ingest" style={cardStyle}>
           <h3 style={cardTitleStyle}>Email ingest</h3>
           <p style={cardBodyStyle}>Monitor inbound pipeline status.</p>

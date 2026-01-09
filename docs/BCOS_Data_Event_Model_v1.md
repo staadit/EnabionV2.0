@@ -689,4 +689,4 @@ This completes the scope of **Issue #2 ??" [M0] BCOS Data & Event Model v1 (MVP)
 This document is a standalone version of section 16 from Phase1_MVP-Spec. If there is any discrepancy, Phase1_MVP-Spec remains the source of truth for R1.0.
 
 
-Reference: NDA legal text lives in docs/legal/enabion_mutual_nda_layer1_legal_R1.0.md; UX copy for L0/L1 in docs/legal/enabion_mutual_nda_layer1_L0-L1_product_copy_R1.0.md. Logging/retention rules follow docs/Security_Privacy_Model1_MVP.md (R1.0).
+Reference: NDA legal text lives in docs/R1.0/legal/nda/mutual_nda_v0.1_en.md; UX summaries in docs/R1.0/legal/nda/mutual_nda_v0.1_summary_*.md. Logging/retention rules follow docs/Security_Privacy_Model1_MVP.md (R1.0).

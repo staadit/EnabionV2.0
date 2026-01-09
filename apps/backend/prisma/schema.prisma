@@ -22,6 +22,7 @@ model Organization {
   events    Event[]
   blobs     Blob[]
   attachments Attachment[]
+  ndaAcceptances NdaAcceptance[]
   createdAt DateTime @default(now())
 }
 
@@ -39,6 +40,7 @@ model User {
   passwordResetTokens PasswordResetToken[]
   createdIntents Intent[] @relation("IntentCreatedBy")
   ownedIntents Intent[] @relation("IntentOwner")
+  ndaAcceptances NdaAcceptance[] @relation("NdaAcceptanceByUser")
   createdAt DateTime @default(now())
 }
 
@@ -88,6 +90,15 @@ enum AttachmentSource {
   email_ingest
   manual_upload
   export
+}
+
+enum NdaType {
+  MUTUAL
+}
+
+enum NdaChannel {
+  ui
+  api
 }
 
 enum IntentStage {
@@ -166,6 +177,45 @@ model Attachment {
   @@index([orgId])
   @@index([intentId])
   @@index([orgId, intentId, createdAt])
+}
+
+model NdaDocument {
+  id            String   @id @default(cuid())
+  ndaType       NdaType  @default(MUTUAL)
+  ndaVersion    String   @unique
+  enMarkdown    String
+  summaryPl     String?
+  summaryDe     String?
+  summaryNl     String?
+  enHashSha256  String   @db.Char(64)
+  isActive      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ndaType, isActive])
+}
+
+model NdaAcceptance {
+  id                String     @id @default(cuid())
+  orgId             String
+  counterpartyOrgId String?
+  ndaType           NdaType    @default(MUTUAL)
+  ndaVersion        String
+  enHashSha256      String     @db.Char(64)
+  acceptedByUserId  String
+  acceptedAt        DateTime
+  language          String
+  channel           NdaChannel
+  typedName         String
+  typedRole         String
+  createdAt         DateTime   @default(now())
+
+  org Organization @relation(fields: [orgId], references: [id])
+  acceptedByUser User @relation("NdaAcceptanceByUser", fields: [acceptedByUserId], references: [id])
+
+  @@unique([orgId, counterpartyOrgId, ndaType, ndaVersion, enHashSha256])
+  @@index([acceptedByUserId, acceptedAt])
+  @@index([orgId, ndaType, ndaVersion, enHashSha256])
 }
 
 model Intent {

@@ -115,7 +115,12 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
                           Download
                         </a>
                       ) : (
-                        <span style={lockedStyle}>Locked (NDA required)</span>
+                        <div style={actionStackStyle}>
+                          <span style={lockedStyle}>Locked (NDA required)</span>
+                          <a href={`/${org.slug}/intents/${intentId}/nda`} style={linkStyle}>
+                            Review NDA
+                          </a>
+                        </div>
                       )}
                     </td>
                   </tr>
@@ -245,6 +250,12 @@ const linkStyle = {
 const lockedStyle = {
   color: '#b42318',
   fontWeight: 600,
+};
+
+const actionStackStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '0.3rem',
 };
 
 const formatBytes = (value: number) => {
