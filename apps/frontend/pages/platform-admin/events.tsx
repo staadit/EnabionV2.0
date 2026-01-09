@@ -2,6 +2,7 @@ import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
 import PlatformAdminLayout from '../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../lib/require-platform-admin';
+import { formatDateTime } from '../../lib/date-format';
 
 type EventRow = {
   orgId: string;
@@ -85,7 +86,7 @@ export default function EventsPage({ user, filters, events, error }: EventsProps
                 </div>
                 <div>
                   <p style={metaLabelStyle}>Occurred</p>
-                  <p style={metaValueStyle}>{new Date(event.occurredAt).toISOString()}</p>
+                  <p style={metaValueStyle}>{formatDateTime(event.occurredAt)}</p>
                 </div>
               </div>
               <p style={metaSubStyle}>

@@ -4,6 +4,7 @@ import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
 import { fetchIntentAttachments, type IntentAttachment } from '../../../lib/org-attachments';
+import { formatDateTime } from '../../../lib/date-format';
 
 type IncomingIntentDetailProps = {
   user: OrgUser;
@@ -59,7 +60,7 @@ export default function IncomingIntentDetail({
                     <td style={tdStyle}>
                       <span style={badgeStyle}>{attachment.confidentialityLevel}</span>
                     </td>
-                    <td style={tdStyle}>{formatDate(attachment.createdAt)}</td>
+                    <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
                     <td style={tdStyle}>
                       {attachment.canDownload ? (
                         <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
@@ -161,11 +162,6 @@ const formatBytes = (value: number) => {
   const kb = value / 1024;
   if (kb < 1024) return `${kb.toFixed(1)} KB`;
   return `${(kb / 1024).toFixed(1)} MB`;
-};
-
-const formatDate = (value: string) => {
-  if (!value) return '-';
-  return value.slice(0, 10);
 };
 
 export const getServerSideProps: GetServerSideProps<IncomingIntentDetailProps> = async (ctx) => {

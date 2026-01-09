@@ -8,6 +8,7 @@ import { getXNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
 import { fetchOrgIntents, type OrgIntent } from '../../../lib/org-intents';
 import { fetchOrgMembers, type OrgMemberOption } from '../../../lib/org-members';
+import { formatDateTime } from '../../../lib/date-format';
 
 type IntentFilters = {
   q: string;
@@ -434,12 +435,7 @@ const emptyStateStyle = {
   gap: '0.5rem',
 };
 
-const formatDate = (value?: string | null) => {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  return parsed.toLocaleString();
-};
+const formatDate = (value?: string | null) => formatDateTime(value);
 
 const today = () => new Date().toISOString().slice(0, 10);
 

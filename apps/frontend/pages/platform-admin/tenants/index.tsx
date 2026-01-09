@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { GetServerSideProps } from 'next';
 import PlatformAdminLayout from '../../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../../lib/require-platform-admin';
+import { formatDateTime } from '../../../lib/date-format';
 
 type TenantRow = {
   id: string;
@@ -74,7 +75,7 @@ export default function TenantsPage({ user, tenants, q, limit, nextCursor }: Ten
                 <td style={tdStyle}>{tenant.status}</td>
                 <td style={tdStyle}>{tenant.userCount}</td>
                 <td style={tdStyle}>{tenant.intentCount}</td>
-                <td style={tdStyle}>{new Date(tenant.createdAt).toISOString().slice(0, 10)}</td>
+                <td style={tdStyle}>{formatDateTime(tenant.createdAt)}</td>
               </tr>
             ))}
             {!tenants.length ? (

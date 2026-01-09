@@ -2,6 +2,7 @@ import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
 import OrgShell from '../../components/OrgShell';
 import { getXNavItems } from '../../lib/org-nav';
+import { formatDateTime } from '../../lib/date-format';
 import { getOwnerContext, type AdminOrg, type AdminUser } from '../../lib/admin-server';
 
 type OrgEvent = {
@@ -48,7 +49,7 @@ export default function EventsLog({ user, org, events, error }: EventsLogProps) 
                 </div>
                 <div>
                   <p style={metaLabelStyle}>Occurred</p>
-                  <p style={metaValueStyle}>{new Date(event.occurredAt).toISOString()}</p>
+                  <p style={metaValueStyle}>{formatDateTime(event.occurredAt)}</p>
                 </div>
                 <div>
                   <p style={metaLabelStyle}>Subject</p>

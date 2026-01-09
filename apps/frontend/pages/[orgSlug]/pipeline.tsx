@@ -6,6 +6,7 @@ import OrgShell from '../../components/OrgShell';
 import { getXNavItems } from '../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../lib/org-context';
 import { fetchOrgIntents, type OrgIntent } from '../../lib/org-intents';
+import { formatDateTime } from '../../lib/date-format';
 
 type PipelineProps = {
   user: OrgUser;
@@ -166,7 +167,7 @@ export default function Pipeline({ user, org, intents }: PipelineProps) {
                     </div>
                     <div style={cardFooterStyle}>
                       <span>{intent.owner?.email || 'Unassigned'}</span>
-                      <span>{formatRelativeDate(intent.lastActivityAt)}</span>
+                      <span>{formatDateTime(intent.lastActivityAt)}</span>
                     </div>
                     {savingId === intent.id ? (
                       <div style={savingBadgeStyle}>Saving...</div>
@@ -364,21 +365,6 @@ const moveIntent = (
     [fromStage]: board[fromStage].filter((item) => item.id !== intent.id),
     [toStage]: [updated, ...board[toStage]],
   };
-};
-
-const formatRelativeDate = (value?: string | null) => {
-  if (!value) return '-';
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) return value;
-  const diffMs = Date.now() - parsed.getTime();
-  const diffMin = Math.round(diffMs / 60000);
-  if (diffMin < 1) return 'Just now';
-  if (diffMin < 60) return `${diffMin}m ago`;
-  const diffHours = Math.round(diffMin / 60);
-  if (diffHours < 24) return `${diffHours}h ago`;
-  const diffDays = Math.round(diffHours / 24);
-  if (diffDays < 30) return `${diffDays}d ago`;
-  return parsed.toLocaleDateString();
 };
 
 export const getServerSideProps: GetServerSideProps<PipelineProps> = async (ctx) => {
