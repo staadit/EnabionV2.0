@@ -23,7 +23,11 @@ export async function fetchIntentAttachments(
       return [];
     }
     const data = await res.json();
-    const items = Array.isArray(data?.items) ? data.items : Array.isArray(data) ? data : [];
+    const items: Array<Record<string, any>> = Array.isArray(data?.items)
+      ? data.items
+      : Array.isArray(data)
+        ? data
+        : [];
     return items.map((row) => ({
       id: String(row.id ?? ''),
       originalName: String(row.originalName ?? row.filename ?? 'attachment'),
