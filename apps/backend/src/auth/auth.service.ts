@@ -12,6 +12,7 @@ import { PrismaService } from '../prisma.service';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { EmailService } from '../email/email.service';
+import { isReservedOrgSlug } from '../org/org-slug';
 import { AuthUser, UserRole } from './auth.types';
 import {
   generateResetToken,
@@ -518,40 +519,71 @@ export class AuthService {
   }
 
   private slugifyOrgName(name: string): string {
-    const normalized = name
+    return name
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
       .trim()
       .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-+|-+$/g, '');
-    return normalized;
+      .replace(/[^a-z0-9]/g, '');
   }
 
   private buildSlugCandidate(base: string, suffix?: number): string {
     if (!suffix) return base;
-    const suffixText = String(suffix);
-    const maxBaseLen = Math.max(3, 40 - suffixText.length - 1);
-    const trimmedBase = base.slice(0, maxBaseLen).replace(/-+$/g, '');
-    return `${trimmedBase}-${suffixText}`;
+    const suffixText = String(suffix).padStart(2, '0').slice(-2);
+    return `${base}-${suffixText}`;
   }
 
   private async generateOrgSlug(tx: Prisma.TransactionClient, orgName: string): Promise<string> {
-    const base = this.slugifyOrgName(orgName);
-    const baseCandidate = base.length >= 3 ? base.slice(0, 40) : 'org';
-    let candidate =
-      base.length >= 3
-        ? baseCandidate
-        : `org-${ulid().toLowerCase().slice(0, 8)}`;
-    candidate = candidate.replace(/-+$/g, '');
-    if (candidate.length < 3) {
-      candidate = `org-${ulid().toLowerCase().slice(0, 8)}`.slice(0, 40);
+    const rawBase = this.slugifyOrgName(orgName);
+    let base = rawBase.slice(0, 6);
+    if (base.length < 3) {
+      const filler = ulid().toLowerCase().replace(/[^a-z0-9]/g, '');
+      base = `${base}${filler}`.slice(0, 6);
+    }
+    if (!base) {
+      base = ulid().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
     }
 
-    let suffix = 2;
-    while (await tx.organization.findUnique({ where: { slug: candidate } })) {
-      candidate = this.buildSlugCandidate(baseCandidate, suffix);
-      suffix += 1;
+    let candidate = base;
+    if (
+      !isReservedOrgSlug(candidate) &&
+      !(await tx.organization.findUnique({ where: { slug: candidate } }))
+    ) {
+      return candidate;
     }
-    return candidate;
+
+    for (let suffix = 1; suffix <= 99; suffix += 1) {
+      candidate = this.buildSlugCandidate(base, suffix);
+      if (
+        !isReservedOrgSlug(candidate) &&
+        !(await tx.organization.findUnique({ where: { slug: candidate } }))
+      ) {
+        return candidate;
+      }
+    }
+
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+      const randomBase = ulid().toLowerCase().replace(/[^a-z0-9]/g, '').slice(0, 6);
+      if (!randomBase) continue;
+      candidate = randomBase;
+      if (
+        !isReservedOrgSlug(candidate) &&
+        !(await tx.organization.findUnique({ where: { slug: candidate } }))
+      ) {
+        return candidate;
+      }
+      for (let suffix = 1; suffix <= 99; suffix += 1) {
+        candidate = this.buildSlugCandidate(randomBase, suffix);
+        if (
+          !isReservedOrgSlug(candidate) &&
+          !(await tx.organization.findUnique({ where: { slug: candidate } }))
+        ) {
+          return candidate;
+        }
+      }
+    }
+
+    throw new ConflictException('Unable to generate org slug');
   }
 
   private normalizeEmail(email: string): string {

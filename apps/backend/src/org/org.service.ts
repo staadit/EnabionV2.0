@@ -11,6 +11,7 @@ import { UserRole } from '../auth/auth.types';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { isReservedOrgSlug } from './org-slug';
 
 type CreateMemberInput = {
   orgId: string;
@@ -322,12 +323,15 @@ export class OrgService {
     if (!slug) {
       throw new BadRequestException('Slug is required');
     }
-    if (slug.length < 3 || slug.length > 40) {
-      throw new BadRequestException('Slug must be 3-40 characters');
+    if (slug.length < 3 || slug.length > 9) {
+      throw new BadRequestException('Slug must be 3-6 characters with optional 2-char suffix');
     }
-    const valid = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slug);
+    const valid = /^[a-z0-9]{3,6}(?:-[0-9]{1,2})?$/.test(slug);
     if (!valid) {
       throw new BadRequestException('Slug format is invalid');
+    }
+    if (isReservedOrgSlug(slug)) {
+      throw new BadRequestException('Slug is reserved');
     }
     return slug;
   }
