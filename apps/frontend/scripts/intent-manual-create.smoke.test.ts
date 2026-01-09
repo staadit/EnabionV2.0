@@ -7,6 +7,7 @@ function assert(condition: any, message: string) {
 async function run() {
   process.env.BACKEND_URL = 'http://backend.test';
   const handler = (await import('../pages/api/intents/index')).default;
+  const patchHandler = (await import('../pages/api/intents/[id]/index')).default;
   const coachHandler = (await import('../pages/api/intents/[id]/coach/run')).default;
 
   const originalFetch = globalThis.fetch;
@@ -92,6 +93,30 @@ async function run() {
     assert(
       capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
       'Coach proxy must forward cookie',
+    );
+
+    capturedUrl = '';
+    capturedOptions = null;
+    const reqPatch = {
+      method: 'PATCH',
+      query: { id: 'intent-1' },
+      headers: { cookie: 'enabion_session=tokenA' },
+      body: { pipelineStage: 'MATCH' },
+    } as any;
+
+    await patchHandler(reqPatch, res);
+    assert(
+      capturedUrl.includes('/intents/intent-1'),
+      'Patch proxy must call /intents/:id',
+    );
+    assert(capturedOptions?.method === 'PATCH', 'Patch proxy must PATCH backend');
+    assert(
+      capturedOptions?.headers?.['content-type'] === 'application/json',
+      'Patch proxy must set content-type',
+    );
+    assert(
+      capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
+      'Patch proxy must forward cookie',
     );
   } finally {
     if (originalFetch) {

@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -29,6 +30,11 @@ const createIntentSchema = z.object({
   kpi: z.string().optional().nullable(),
   risks: z.string().optional().nullable(),
   deadlineAt: z.string().optional().nullable(),
+});
+
+const updateStageSchema = z.object({
+  pipelineStage: z.string().optional(),
+  stage: z.string().optional(),
 });
 
 const MAX_SOURCE_TEXT_LENGTH = 100000;
@@ -86,6 +92,28 @@ export class IntentController {
     });
   }
 
+  @Patch(':intentId')
+  @Roles('Owner', 'BD_AM')
+  async updateIntentStage(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(updateStageSchema, body);
+    const stageInput = parsed.pipelineStage ?? parsed.stage;
+    const nextStage = this.parseStageValue(stageInput);
+
+    const intent = await this.intentService.updatePipelineStage({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      intentId,
+      pipelineStage: nextStage,
+    });
+
+    return { intent };
+  }
+
   @Get()
   async listIntents(
     @Req() req: AuthenticatedRequest,
@@ -93,7 +121,12 @@ export class IntentController {
   ) {
     const user = this.requireUser(req);
     const params = query ?? {};
-    const statusParam = params.status ?? params['status[]'] ?? params.stage;
+    const statusParam =
+      params.status ??
+      params['status[]'] ??
+      params.pipelineStage ??
+      params['pipelineStage[]'] ??
+      params.stage;
     const parsedStatuses = this.parseStatusList(statusParam);
     const parsedLimit = this.parseLimit(params.limit);
     const parsedOwnerId = this.parseOptionalString(params.ownerId);
@@ -155,6 +188,17 @@ export class IntentController {
       throw new BadRequestException(`Invalid status: ${invalid.join(', ')}`);
     }
     return normalized as IntentStage[];
+  }
+
+  private parseStageValue(value: unknown): IntentStage {
+    const normalized = this.parseOptionalString(value)?.toUpperCase();
+    if (!normalized) {
+      throw new BadRequestException('pipelineStage is required');
+    }
+    if (!INTENT_STAGES.includes(normalized as IntentStage)) {
+      throw new BadRequestException(`Invalid pipelineStage: ${normalized}`);
+    }
+    return normalized as IntentStage;
   }
 
   private parseLanguage(value: unknown): string | undefined {

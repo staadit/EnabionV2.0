@@ -70,6 +70,17 @@ function matchesWhere(intent: any, where: any): boolean {
   return true;
 }
 
+function applySelect(record: any, select: any) {
+  if (!select) return record;
+  const output: Record<string, any> = {};
+  for (const [key, value] of Object.entries(select)) {
+    if (value === true) {
+      output[key] = record[key];
+    }
+  }
+  return output;
+}
+
 class MockPrismaService {
   intents: any[] = [];
   events: any[] = [];
@@ -94,6 +105,16 @@ class MockPrismaService {
       };
       this.intents.push(record);
       return record;
+    },
+    findFirst: async (args: any) => {
+      const match = this.intents.find((intent) => matchesWhere(intent, args?.where));
+      if (!match) return null;
+      return applySelect(match, args?.select);
+    },
+    findUnique: async (args: any) => {
+      const match = this.intents.find((intent) => intent.id === args?.where?.id);
+      if (!match) return null;
+      return applySelect(match, args?.select);
     },
     findMany: async (args: any) => {
       let results = this.intents.filter((intent) => matchesWhere(intent, args?.where));
@@ -125,6 +146,21 @@ class MockPrismaService {
         });
       }
       return results;
+    },
+    update: async (args: any) => {
+      let updatedRecord: any = null;
+      this.intents = this.intents.map((intent) => {
+        if (intent.id !== args?.where?.id) {
+          return intent;
+        }
+        updatedRecord = {
+          ...intent,
+          ...args?.data,
+          updatedAt: new Date(),
+        };
+        return updatedRecord;
+      });
+      return updatedRecord;
     },
     updateMany: async (args: any) => {
       let updated = 0;
@@ -404,6 +440,101 @@ async function testRolesGuard() {
     }
   }
   assert(threw, 'Viewer should be forbidden by RolesGuard');
+
+  const updateContext = {
+    getHandler: () => IntentController.prototype.updateIntentStage,
+    getClass: () => IntentController,
+    switchToHttp: () => ({
+      getRequest: () => ({
+        user: {
+          id: 'user-2',
+          email: 'viewer@example.com',
+          orgId: 'org-1',
+          role: 'Viewer',
+        },
+      }),
+    }),
+  } as any;
+
+  threw = false;
+  try {
+    guard.canActivate(updateContext);
+  } catch (err) {
+    if (err instanceof ForbiddenException) {
+      threw = true;
+    }
+  }
+  assert(threw, 'Viewer should be forbidden from updating pipeline stage');
+}
+
+async function testStageUpdate() {
+  const prisma = new MockPrismaService();
+  const events = new EventService(prisma as any);
+  const service = new IntentService(prisma as any, events);
+
+  prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
+
+  const intent = await service.createIntent({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    goal: 'Pipeline update',
+  });
+
+  const before = prisma.intents.find((row) => row.id === intent.id)!.lastActivityAt;
+
+  const updated = await service.updatePipelineStage({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    intentId: intent.id,
+    pipelineStage: 'MATCH',
+  });
+
+  assert(updated.stage === 'MATCH', 'Pipeline stage should update to MATCH');
+  assert(prisma.events.length === 2, 'INTENT_UPDATED event should be emitted');
+
+  const updateEvent = prisma.events[1];
+  assert(
+    updateEvent.type === EVENT_TYPES.INTENT_UPDATED,
+    'Update event type should be INTENT_UPDATED',
+  );
+  assert(
+    updateEvent.pipelineStage === 'MATCH',
+    'Update event pipelineStage should be MATCH',
+  );
+  assert(
+    updateEvent.lifecycleStep === 'MATCH_ALIGN',
+    'Lifecycle step should map to MATCH_ALIGN',
+  );
+  const payload = updateEvent.payload as any;
+  assert(
+    payload.changedFields?.includes('pipelineStage'),
+    'Update payload should include pipelineStage in changedFields',
+  );
+  assert(
+    payload.changeSummary?.includes('Pipeline stage changed'),
+    'Update payload should include changeSummary',
+  );
+
+  const after = prisma.intents.find((row) => row.id === intent.id)!.lastActivityAt;
+  assert(
+    after.getTime() >= before.getTime(),
+    'Stage update should advance lastActivityAt',
+  );
+
+  let threw = false;
+  try {
+    await service.updatePipelineStage({
+      orgId: 'org-2',
+      actorUserId: 'user-1',
+      intentId: intent.id,
+      pipelineStage: 'COMMIT',
+    });
+  } catch (err) {
+    if (err instanceof BadRequestException || err instanceof Error) {
+      threw = true;
+    }
+  }
+  assert(threw, 'Cross-tenant stage update should be rejected');
 }
 
 async function run() {
@@ -411,6 +542,7 @@ async function run() {
   await testPasteCreate();
   await testValidation();
   await testListFilters();
+  await testStageUpdate();
   await testRolesGuard();
   // eslint-disable-next-line no-console
   console.log('Intent create tests passed.');

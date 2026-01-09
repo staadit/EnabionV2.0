@@ -42,6 +42,13 @@ export type RunIntentCoachInput = {
   intentId: string;
 };
 
+export type UpdatePipelineStageInput = {
+  orgId: string;
+  actorUserId: string;
+  intentId: string;
+  pipelineStage: IntentStage;
+};
+
 @Injectable()
 export class IntentService {
   constructor(
@@ -250,6 +257,59 @@ export class IntentService {
     };
   }
 
+  async updatePipelineStage(input: UpdatePipelineStageInput) {
+    const intent = await this.prisma.intent.findFirst({
+      where: { id: input.intentId, orgId: input.orgId },
+      select: { id: true, stage: true },
+    });
+    if (!intent) {
+      throw new NotFoundException('Intent not found');
+    }
+
+    const fromStage = intent.stage as IntentStage;
+    const toStage = input.pipelineStage;
+    if (fromStage === toStage) {
+      const existing = await this.prisma.intent.findUnique({
+        where: { id: intent.id },
+      });
+      if (!existing) {
+        throw new NotFoundException('Intent not found');
+      }
+      return existing;
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.intent.update({
+      where: { id: intent.id },
+      data: {
+        stage: toStage,
+        lastActivityAt: now,
+      },
+    });
+
+    await this.events.emitEvent({
+      type: EVENT_TYPES.INTENT_UPDATED,
+      occurredAt: now,
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.orgId,
+      subjectType: 'INTENT',
+      subjectId: intent.id,
+      lifecycleStep: this.mapLifecycleStep(toStage),
+      pipelineStage: toStage,
+      channel: 'ui',
+      correlationId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        intentId: intent.id,
+        changedFields: ['pipelineStage'],
+        changeSummary: `Pipeline stage changed from ${fromStage} to ${toStage}`,
+      },
+    });
+
+    return updated;
+  }
+
   private encodeCursor(
     intent: { id: string; lastActivityAt: Date; createdAt: Date },
     sort: 'lastActivityAt' | 'createdAt',
@@ -303,5 +363,15 @@ export class IntentService {
       return firstLine.length > 80 ? `${firstLine.slice(0, 80)}` : firstLine;
     }
     return 'Intent (pasted email)';
+  }
+
+  private mapLifecycleStep(stage: IntentStage): 'CLARIFY' | 'MATCH_ALIGN' | 'COMMIT_ASSURE' {
+    if (stage === 'MATCH') {
+      return 'MATCH_ALIGN';
+    }
+    if (stage === 'COMMIT' || stage === 'WON' || stage === 'LOST') {
+      return 'COMMIT_ASSURE';
+    }
+    return 'CLARIFY';
   }
 }

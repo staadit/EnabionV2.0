@@ -1,6 +1,10 @@
 # Vimexx VPS Runbook (R1.0, Model 1 – Standard)
 
 Status: active (dev stack on `dev` branch, Traefik edge)
+NOTE: This file uses legacy naming. Current ops naming is:
+- dev stack = `infra/docker-compose.prod.yml` (dev.enabion.com)
+- prod (pilot) stack = `infra/docker-compose.prod.pilot.yml` (enabion.com, compose project `enabion_pilot`)
+See `docs/R1.0/R1.0_Pilot_Operations_Runbook_v1.1.md` for the canonical runbook.
 
 ## 1) Base provisioning (CEO)
 - Location: EU (NL), Ubuntu 22.04 LTS, min 2 vCPU / 4 GB RAM / 100 GB SSD, IPv4.

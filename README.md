@@ -18,6 +18,11 @@ Repository for Enabion R1.0/R1.1 delivery. This monorepo keeps product/architect
 - `apps/frontend/` - frontend app (Next.js) skeleton.
 - `infra/` - shared infrastructure assets (docker-compose, runbooks).
 
+## Environments (naming)
+- **dev**: `dev.enabion.com` / `api.dev.enabion.com` using the `infra/docker-compose.prod.yml` stack (legacy filename, but dev usage).
+- **prod (pilot)**: `enabion.com` / `api.enabion.com` using `infra/docker-compose.prod.pilot.yml` (compose project `enabion_pilot`).
+- Env paths on VPS: dev uses `/srv/enabion/dev/env`, prod uses `/srv/enabion/prod/env`.
+
 ## Dev Quickstart
 ```
 docker compose -f infra/docker-compose.dev.yml up -d

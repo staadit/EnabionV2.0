@@ -159,7 +159,7 @@ Central entity in R1.0 ??" structured representation of a business need.
 | `confidentialityLevel`   | enum     | yes      | `L1`, `L2`, `L3` (L1/L2 used in R1.0; L3 is placeholder).   |
 | `ndaLayerRequired`       | enum     | yes      | `LAYER_0`, `LAYER_1`, `LAYER_2`, `LAYER_3` (R1.0: `LAYER_0`, `LAYER_1` only).   |
 | `lifecycleStep`          | enum     | yes      | One of: `CLARIFY`, `MATCH_ALIGN`, `COMMIT_ASSURE`, `DELIVER`, `EXPAND`. R1.0 uses first three functionally. |
-| `pipelineStage`          | enum     | yes      | `NEW`, `IN_CLARIFY`, `IN_MATCH`, `IN_COMMIT`, `CLOSED_WON`, `CLOSED_LOST`, `CANCELLED`. |
+| `pipelineStage`          | enum     | yes      | `NEW`, `CLARIFY`, `MATCH`, `COMMIT`, `LOST`, `WON`. |
 | `ownerUserId`            | ULID     | yes      | Primary BD/AM responsible for the Intent. |
 | `primaryContactId`       | ULID     | no       | FK to main `Contact` on the client side. |
 | `avatarQualityScore`     | number   | no       | Internal metric of Avatar fit/completeness (0??"100). |
@@ -355,7 +355,7 @@ Mapping of R1.0 events to the 5??'Step Partnership Lifecycle and CONNECT??"POWER
 | `NDA_ACCEPTED`               | COMMIT & ASSURE  | POWER         |
 | `COMMIT_DECISION_TAKEN`      | COMMIT & ASSURE  | POWER         |
 
-Deliver and Expand steps are **not** driven by events in R1.0; they exist only as Intent pipeline statuses (`CLOSED_WON` and future delivery placeholders).
+Deliver and Expand steps are **not** driven by events in R1.0; they exist only as Intent pipeline statuses (`WON`/`LOST`).
 
 #### 16.5.4 Event payload schemas (key fields)
 
@@ -385,17 +385,8 @@ Below are minimal payload shapes for key R1.0 events. Real implementations may a
 ```jsonc
 {
   "intentId": "intent_01J0...",
-  "changes": {
-    "goal": {
-      "old": "Modernise webshop",
-      "new": "Launch new AI-assisted webshop for DE market"
-    },
-    "budgetMin": {
-      "old": null,
-      "new": 50000
-    }
-  },
-  "reason": "clarified_after_avatar_suggestions"
+  "changedFields": ["pipelineStage"],
+  "changeSummary": "Pipeline stage changed from CLARIFY to MATCH"
 }
 ```
 
