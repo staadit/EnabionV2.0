@@ -165,6 +165,7 @@ model Attachment {
 
   @@index([orgId])
   @@index([intentId])
+  @@index([orgId, intentId, createdAt])
 }
 
 model Intent {

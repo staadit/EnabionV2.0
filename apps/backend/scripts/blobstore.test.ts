@@ -51,18 +51,39 @@ function testAesGcmRoundtrip() {
 
 function testPolicyNdaGate() {
   const policy = new AttachmentAccessPolicy();
+  policy.assertCanDownload({
+    requestOrgId: 'org-1',
+    resourceOrgId: 'org-1',
+    confidentiality: 'L2',
+    ndaAccepted: false,
+  });
+
   let threw = false;
   try {
     policy.assertCanDownload({
       requestOrgId: 'org-1',
-      resourceOrgId: 'org-1',
+      resourceOrgId: 'org-2',
       confidentiality: 'L2',
       ndaAccepted: false,
     });
   } catch (err) {
     if (err instanceof ForbiddenException) threw = true;
   }
-  assert(threw, 'L2 without NDA should be forbidden');
+  assert(threw, 'Cross-tenant L2 without NDA should be forbidden');
+
+  policy.assertCanDownload({
+    requestOrgId: 'org-1',
+    resourceOrgId: 'org-2',
+    confidentiality: 'L2',
+    ndaAccepted: true,
+  });
+
+  policy.assertCanDownload({
+    requestOrgId: 'org-1',
+    resourceOrgId: 'org-2',
+    confidentiality: 'L1',
+    ndaAccepted: false,
+  });
 }
 
 class MemoryPrisma {

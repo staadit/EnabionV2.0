@@ -157,6 +157,7 @@ async function requestBytes(url: string, headers: Record<string, string>) {
 }
 
 async function run() {
+  process.env.BLOB_ENC_MASTER_KEY = Buffer.alloc(32, 3).toString('base64');
   const prisma = new MockPrismaService();
   const blobStore = new MemoryBlobStore();
   const authService = {
@@ -210,7 +211,7 @@ async function run() {
     intentId: 'intent-a',
     filename: 'a.txt',
     contentType: 'text/plain',
-    confidentiality: 'L1',
+    confidentiality: 'L2',
     buffer: blobA,
     createdByUserId: 'user-a',
   });
@@ -219,7 +220,7 @@ async function run() {
     intentId: 'intent-b',
     filename: 'b.txt',
     contentType: 'text/plain',
-    confidentiality: 'L1',
+    confidentiality: 'L2',
     buffer: blobB,
     createdByUserId: 'user-b',
   });

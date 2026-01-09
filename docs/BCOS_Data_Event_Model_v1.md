@@ -327,6 +327,8 @@ R1.0 requires the following event types:
 | `AVATAR_SUGGESTION_ACCEPTED`    | `INTENT`       | User accepted Avatar suggestion (fully or partially). |
 | `AVATAR_SUGGESTION_REJECTED`    | `INTENT`       | User rejected Avatar suggestion. |
 | `MATCH_LIST_CREATED`            | `INTENT`       | Matching engine produced/updated candidate Y list. |
+| `ATTACHMENT_UPLOADED`           | `ATTACHMENT`   | Attachment uploaded for an Intent. |
+| `ATTACHMENT_DOWNLOADED`         | `ATTACHMENT`   | Attachment downloaded (audit trail). |
 | `NDA_ACCEPTED`                  | `NDA`/`INTENT` | Parties accepted an NDA relevant for this Intent/Engagement. |
 | `COMMIT_DECISION_TAKEN`         | `ENGAGEMENT`   | X made a GO/NO??'GO decision for a given X??"Y Engagement. |
 
@@ -348,6 +350,8 @@ Mapping of R1.0 events to the 5??'Step Partnership Lifecycle and CONNECT??"POWER
 | `AVATAR_SUGGESTION_ACCEPTED` | CLARIFY          | CONNECT       |
 | `AVATAR_SUGGESTION_REJECTED` | CLARIFY          | CONNECT       |
 | `MATCH_LIST_CREATED`         | MATCH & ALIGN    | CONNECT       |
+| `ATTACHMENT_UPLOADED`        | CLARIFY          | CONNECT       |
+| `ATTACHMENT_DOWNLOADED`      | CLARIFY          | CONNECT       |
 | `NDA_ACCEPTED`               | COMMIT & ASSURE  | POWER         |
 | `COMMIT_DECISION_TAKEN`      | COMMIT & ASSURE  | POWER         |
 
@@ -452,6 +456,27 @@ Below are minimal payload shapes for key R1.0 events. Real implementations may a
       "reasons": ["Good fit by tech stack", "Nearshore, same time zone"]
     }
   ]
+}
+```
+
+**ATTACHMENT_UPLOADED**
+
+```jsonc
+{
+  "intentId": "intent_01J0...",
+  "attachmentId": "att_01J0...",
+  "filename": "proposal.pdf",
+  "sizeBytes": 482991
+}
+```
+
+**ATTACHMENT_DOWNLOADED**
+
+```jsonc
+{
+  "intentId": "intent_01J0...",
+  "attachmentId": "att_01J0...",
+  "via": "owner" // or "share_link", "system"
 }
 ```
 

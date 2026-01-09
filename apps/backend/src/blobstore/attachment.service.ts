@@ -1,5 +1,6 @@
 import * as crypto from 'node:crypto';
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { BlobService } from './blob.service';
 import { EventService } from '../events/event.service';
@@ -16,6 +17,18 @@ export interface UploadAttachmentInput {
   buffer: Buffer;
   createdByUserId?: string;
 }
+
+type AttachmentWithBlob = Prisma.AttachmentGetPayload<{ include: { blob: true } }>;
+
+export type AttachmentListItem = AttachmentWithBlob & {
+  uploadedBy: { id: string; email: string } | null;
+};
+
+export type IntentMeta = {
+  id: string;
+  orgId: string;
+  confidentialityLevel: ConfidentialityLevel;
+};
 
 @Injectable()
 export class AttachmentService {
@@ -49,8 +62,40 @@ export class AttachmentService {
     await this.emitUploadedEvent({
       attachment,
       actorUserId: input.createdByUserId,
+      actorOrgId: input.orgId,
     });
     return attachment;
+  }
+
+  async findIntent(intentId: string): Promise<IntentMeta | null> {
+    return this.prisma.intent.findUnique({
+      where: { id: intentId },
+      select: { id: true, orgId: true, confidentialityLevel: true },
+    }) as Promise<IntentMeta | null>;
+  }
+
+  async listIntentAttachments(input: { intentId: string; orgId: string }): Promise<AttachmentListItem[]> {
+    const attachments = await this.prisma.attachment.findMany({
+      where: { intentId: input.intentId, orgId: input.orgId },
+      include: { blob: true },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const userIds = attachments
+      .map((attachment) => attachment.createdByUserId)
+      .filter((id): id is string => Boolean(id));
+    const users = userIds.length
+      ? await this.prisma.user.findMany({
+          where: { id: { in: userIds }, orgId: input.orgId },
+          select: { id: true, email: true },
+        })
+      : [];
+    const userMap = new Map(users.map((user) => [user.id, user]));
+
+    return attachments.map((attachment) => ({
+      ...attachment,
+      uploadedBy: attachment.createdByUserId ? userMap.get(attachment.createdByUserId) ?? null : null,
+    }));
   }
 
   async findByIdWithBlob(id: string) {
@@ -67,13 +112,14 @@ export class AttachmentService {
   async emitDownloadedEvent(input: {
     attachment: any;
     actorUserId?: string;
+    actorOrgId?: string;
     via?: 'owner' | 'share_link' | 'system';
   }) {
     const intentId = input.attachment.intentId || 'unknown';
     await this.events.emitEvent({
       orgId: input.attachment.orgId,
       actorUserId: input.actorUserId,
-      actorOrgId: input.attachment.orgId,
+      actorOrgId: input.actorOrgId ?? input.attachment.orgId,
       subjectType: 'ATTACHMENT',
       subjectId: input.attachment.id,
       lifecycleStep: 'CLARIFY',
@@ -91,12 +137,16 @@ export class AttachmentService {
     });
   }
 
-  private async emitUploadedEvent(input: { attachment: any; actorUserId?: string }) {
+  private async emitUploadedEvent(input: {
+    attachment: any;
+    actorUserId?: string;
+    actorOrgId?: string;
+  }) {
     const intentId = input.attachment.intentId || 'unknown';
     await this.events.emitEvent({
       orgId: input.attachment.orgId,
       actorUserId: input.actorUserId,
-      actorOrgId: input.attachment.orgId,
+      actorOrgId: input.actorOrgId ?? input.attachment.orgId,
       subjectType: 'ATTACHMENT',
       subjectId: input.attachment.id,
       lifecycleStep: 'CLARIFY',
