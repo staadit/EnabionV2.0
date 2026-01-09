@@ -5,7 +5,7 @@ import type { NdaCurrent, NdaStatus } from '../lib/org-nda';
 type NdaAcceptancePanelProps = {
   current: NdaCurrent;
   status?: NdaStatus | null;
-  defaultLanguage: string;
+  defaultLanguage?: string;
 };
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'];
