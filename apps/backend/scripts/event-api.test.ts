@@ -17,6 +17,10 @@ class MockPrismaService {
       return [];
     },
   };
+
+  intent = {
+    updateMany: async () => ({ count: 0 }),
+  };
 }
 
 function assert(cond: any, msg: string) {
