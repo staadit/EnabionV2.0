@@ -7,15 +7,6 @@ import { IntentRedactionService } from './intent-redaction.service';
 export class IntentRedactionController {
   constructor(private readonly redaction: IntentRedactionService) {}
 
-  @Get('share/:token')
-  async getShareIntent(@Param('token') token: string) {
-    const normalized = token?.trim();
-    if (!normalized) {
-      throw new BadRequestException('Share token is required');
-    }
-    return this.redaction.getShareView(normalized);
-  }
-
   @UseGuards(AuthGuard)
   @Get('incoming-intents/:intentId')
   async getIncomingIntent(
