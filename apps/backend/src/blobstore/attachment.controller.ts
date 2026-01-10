@@ -232,12 +232,14 @@ export class AttachmentController {
           confidentiality,
           ndaAccepted: ndaOk,
         });
+        const isExternal = requestOrgId !== attachment.orgId;
+        const redactMeta = isExternal && confidentiality === 'L2' && !ndaOk;
         return {
           id: attachment.id,
-          originalName: attachment.filename,
+          originalName: redactMeta ? 'Locked attachment' : attachment.filename,
           mimeType: attachment.blob?.contentType ?? 'application/octet-stream',
-          sizeBytes: attachment.blob?.sizeBytes ?? 0,
-          sha256Hex: attachment.blob?.sha256 ?? '',
+          sizeBytes: redactMeta ? 0 : attachment.blob?.sizeBytes ?? 0,
+          sha256Hex: redactMeta ? '' : attachment.blob?.sha256 ?? '',
           confidentialityLevel: confidentiality,
           createdAt: attachment.createdAt.toISOString(),
           uploadedBy: attachment.uploadedBy

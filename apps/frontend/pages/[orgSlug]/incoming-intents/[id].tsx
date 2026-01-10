@@ -3,20 +3,26 @@ import type { GetServerSideProps } from 'next';
 import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
-import { fetchIntentAttachments, type IntentAttachment } from '../../../lib/org-attachments';
 import { formatDateTime } from '../../../lib/date-format';
+import {
+  fetchIncomingIntent,
+  type AttachmentRedactionView,
+  type IntentRedactionView,
+} from '../../../lib/intent-redaction';
 
 type IncomingIntentDetailProps = {
   user: OrgUser;
   org: OrgInfo;
   intentId: string;
-  attachments: IntentAttachment[];
+  intent: IntentRedactionView | null;
+  attachments: AttachmentRedactionView[];
 };
 
 export default function IncomingIntentDetail({
   user,
   org,
   intentId,
+  intent,
   attachments,
 }: IncomingIntentDetailProps) {
   return (
@@ -32,58 +38,105 @@ export default function IncomingIntentDetail({
         <title>{org.name} - Incoming Intent {intentId}</title>
       </Head>
       <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
-        <p style={{ margin: 0 }}>
-          This page will show the intent summary, NDA gate, and response actions.
-        </p>
-      </div>
-
-      <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Attachments</h3>
-        {attachments.length ? (
-          <div style={tableCardStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Size</th>
-                  <th style={thStyle}>Level</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attachments.map((attachment) => (
-                  <tr key={attachment.id}>
-                    <td style={tdStyle}>{attachment.originalName}</td>
-                    <td style={tdStyle}>{formatBytes(attachment.sizeBytes)}</td>
-                    <td style={tdStyle}>
-                      <span style={badgeStyle}>{attachment.confidentialityLevel}</span>
-                    </td>
-                    <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
-                    <td style={tdStyle}>
-                      {attachment.canDownload ? (
-                        <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
-                          Download
-                        </a>
-                      ) : (
-                        <a
-                          href={`/${org.slug}/incoming-intents/${intentId}/nda`}
-                          style={lockedStyle}
-                        >
-                          Locked (Accept NDA)
-                        </a>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {!intent ? (
+          <p style={{ margin: 0, color: '#b42318' }}>Unable to load intent details.</p>
         ) : (
-          <p style={mutedStyle}>No attachments shared yet.</p>
+          <>
+            <div style={detailGridStyle}>
+              <div>
+                <div style={labelStyle}>Title</div>
+                <div style={valueStyle}>{intent.title ?? '-'}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Client</div>
+                <div style={valueStyle}>{intent.client ?? '-'}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Stage</div>
+                <div style={valueStyle}>{intent.stage}</div>
+              </div>
+              <div>
+                <div style={labelStyle}>Last activity</div>
+                <div style={valueStyle}>{formatDateTime(intent.lastActivityAt)}</div>
+              </div>
+            </div>
+            <div style={summaryStyle}>
+              <div style={labelStyle}>Summary</div>
+              <div style={summaryTextStyle}>{intent.goal || '-'}</div>
+            </div>
+            {intent.l2Redacted ? (
+              <div style={lockedCardStyle}>
+                <strong>L2 details locked</strong>
+                <p style={lockedTextStyle}>
+                  Mutual NDA acceptance is required to view the source text and L2 attachments.
+                </p>
+                <a
+                  href={`/${org.slug}/incoming-intents/${intentId}/nda`}
+                  style={linkStyle}
+                >
+                  Accept NDA
+                </a>
+              </div>
+            ) : intent.sourceTextRaw ? (
+              <div style={l2BlockStyle}>
+                <div style={labelStyle}>Source text</div>
+                <pre style={sourceTextStyle}>{intent.sourceTextRaw}</pre>
+              </div>
+            ) : null}
+          </>
         )}
       </div>
+
+      {intent ? (
+        <div style={sectionStyle}>
+          <h3 style={sectionTitleStyle}>Attachments</h3>
+          {attachments.length ? (
+            <div style={tableCardStyle}>
+              <table style={tableStyle}>
+                <thead>
+                  <tr>
+                    <th style={thStyle}>Name</th>
+                    <th style={thStyle}>Size</th>
+                    <th style={thStyle}>Level</th>
+                    <th style={thStyle}>Date</th>
+                    <th style={thStyle}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attachments.map((attachment) => (
+                    <tr key={attachment.id}>
+                      <td style={tdStyle}>{attachment.originalName}</td>
+                      <td style={tdStyle}>
+                        {attachment.sizeBytes ? formatBytes(attachment.sizeBytes) : '-'}
+                      </td>
+                      <td style={tdStyle}>
+                        <span style={badgeStyle}>{attachment.confidentialityLevel}</span>
+                      </td>
+                      <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
+                      <td style={tdStyle}>
+                        {attachment.canDownload ? (
+                          <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
+                            Download
+                          </a>
+                        ) : (
+                          <a
+                            href={`/${org.slug}/incoming-intents/${intentId}/nda`}
+                            style={lockedStyle}
+                          >
+                            Locked (Accept NDA)
+                          </a>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={mutedStyle}>No attachments shared yet.</p>
+          )}
+        </div>
+      ) : null}
     </OrgShell>
   );
 }
@@ -93,6 +146,62 @@ const cardStyle = {
   borderRadius: '12px',
   border: '1px dashed rgba(15, 37, 54, 0.2)',
   background: 'rgba(15, 37, 54, 0.04)',
+};
+
+const detailGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  gap: '1rem',
+};
+
+const labelStyle = {
+  fontSize: '0.7rem',
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase' as const,
+  color: '#6b7785',
+};
+
+const valueStyle = {
+  marginTop: '0.35rem',
+  fontWeight: 600,
+};
+
+const summaryStyle = {
+  marginTop: '1.25rem',
+};
+
+const summaryTextStyle = {
+  marginTop: '0.5rem',
+  fontSize: '0.95rem',
+  color: '#1b1d1f',
+};
+
+const lockedCardStyle = {
+  marginTop: '1.25rem',
+  padding: '1rem 1.25rem',
+  borderRadius: '12px',
+  border: '1px solid rgba(180, 35, 24, 0.3)',
+  background: 'rgba(180, 35, 24, 0.08)',
+};
+
+const lockedTextStyle = {
+  margin: '0.4rem 0 0.6rem',
+  color: '#7a271a',
+};
+
+const l2BlockStyle = {
+  marginTop: '1.25rem',
+};
+
+const sourceTextStyle = {
+  marginTop: '0.5rem',
+  padding: '0.75rem 1rem',
+  borderRadius: '10px',
+  border: '1px solid rgba(15, 37, 54, 0.12)',
+  background: '#fff',
+  whiteSpace: 'pre-wrap' as const,
+  fontFamily: '"IBM Plex Mono", "Fira Code", monospace',
+  fontSize: '0.85rem',
 };
 
 const sectionStyle = {
@@ -170,13 +279,14 @@ export const getServerSideProps: GetServerSideProps<IncomingIntentDetailProps> =
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
-  const attachments = await fetchIntentAttachments(ctx.req.headers.cookie, intentId);
+  const payload = await fetchIncomingIntent(result.context!.cookie, intentId);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
       intentId,
-      attachments,
+      intent: payload?.intent ?? null,
+      attachments: payload?.attachments ?? [],
     },
   };
 };
