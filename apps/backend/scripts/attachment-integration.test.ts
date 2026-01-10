@@ -370,6 +370,30 @@ async function run() {
     createdAt: new Date(),
   });
 
+  threw = false;
+  try {
+    await controller.downloadAttachment(otherOrgReq, uploadL2.attachmentId, undefined, undefined);
+  } catch (err) {
+    if (err instanceof ForbiddenException) threw = true;
+  }
+  assert(threw, 'cross-tenant L2 without mutual NDA should be forbidden');
+
+  prisma.ndaAcceptances.push({
+    id: crypto.randomUUID(),
+    orgId: 'org-1',
+    counterpartyOrgId: 'other-org',
+    ndaType: 'MUTUAL',
+    ndaVersion: currentDoc.ndaVersion,
+    enHashSha256: currentDoc.enHashSha256,
+    acceptedByUserId: 'user-1',
+    acceptedAt: new Date(),
+    language: 'EN',
+    channel: 'ui',
+    typedName: 'Owner User',
+    typedRole: 'Owner',
+    createdAt: new Date(),
+  });
+
   const okDownload: any = await controller.downloadAttachment(
     otherOrgReq,
     uploadL2.attachmentId,
@@ -380,7 +404,7 @@ async function run() {
   assert(l2CrossBuffer.toString() === 'top-secret', 'cross-tenant L2 decrypt mismatch');
 
   const listOtherL2Ok: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2', undefined);
-  assert(listOtherL2Ok.items[0].canDownload === true, 'NDA should unlock L2 download');
+  assert(listOtherL2Ok.items[0].canDownload === true, 'mutual NDA should unlock L2 download');
   const downloadEvents = eventService.emitted.filter(
     (e) => e.type === EVENT_TYPES.ATTACHMENT_DOWNLOADED,
   );

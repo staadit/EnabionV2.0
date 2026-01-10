@@ -73,8 +73,8 @@ async function run() {
     assert(!parsed.searchParams.has('role'), 'proxy must not forward role');
     assert(!parsed.searchParams.has('userId'), 'proxy must not forward userId');
     assert(
-      parsed.searchParams.get('ndaAccepted') === 'true',
-      'proxy must forward ndaAccepted',
+      !parsed.searchParams.has('ndaAccepted'),
+      'proxy must not forward ndaAccepted',
     );
     assert(
       parsed.searchParams.get('asInline') === 'true',

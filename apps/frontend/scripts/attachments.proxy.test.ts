@@ -44,8 +44,8 @@ async function run() {
       'Proxy must call /v1/intents/:id/attachments',
     );
     assert(
-      capturedUrl.includes('ndaAccepted=true'),
-      'Proxy must forward ndaAccepted parameter',
+      !capturedUrl.includes('ndaAccepted='),
+      'Proxy must not forward ndaAccepted parameter',
     );
     assert(!capturedUrl.includes('orgId='), 'Proxy must not forward orgId');
     assert(

@@ -242,6 +242,27 @@ export class NdaService {
     return Boolean(accepted);
   }
 
+  async hasMutualAcceptance(input: {
+    ownerOrgId: string;
+    viewerOrgId: string;
+  }): Promise<boolean> {
+    if (input.ownerOrgId === input.viewerOrgId) {
+      return true;
+    }
+    const ownerAccepted = await this.getAcceptanceStatus({
+      orgId: input.ownerOrgId,
+      counterpartyOrgId: input.viewerOrgId,
+    });
+    if (!ownerAccepted) {
+      return false;
+    }
+    const viewerAccepted = await this.getAcceptanceStatus({
+      orgId: input.viewerOrgId,
+      counterpartyOrgId: input.ownerOrgId,
+    });
+    return Boolean(viewerAccepted);
+  }
+
   async acceptMutualNda(input: {
     orgId: string;
     userId: string;

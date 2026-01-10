@@ -18,10 +18,6 @@ function toJson(text: string) {
 
 function buildBackendUrl(intentId: string, req: NextApiRequest) {
   const params = new URLSearchParams();
-  const ndaAccepted = req.query.ndaAccepted;
-  if (typeof ndaAccepted === 'string' && ndaAccepted.trim()) {
-    params.set('ndaAccepted', ndaAccepted);
-  }
   const suffix = params.toString() ? `?${params}` : '';
   return `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/attachments${suffix}`;
 }

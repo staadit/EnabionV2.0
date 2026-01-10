@@ -96,7 +96,6 @@ export class AttachmentController {
   async listIntentAttachments(
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
   ) {
     const user = this.requireUser(req);
     const intent = await this.attachmentService.findIntent(intentId);
@@ -118,7 +117,6 @@ export class AttachmentController {
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
     @Param('attachmentId') attachmentId: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(attachmentId);
@@ -133,7 +131,6 @@ export class AttachmentController {
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(id);
