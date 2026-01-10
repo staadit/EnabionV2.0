@@ -10,10 +10,11 @@ import {
 type ShareProps = {
   intent: IntentRedactionView | null;
   attachments: AttachmentRedactionView[];
+  expiresAt?: string | null;
   error?: string | null;
 };
 
-export default function ShareIntent({ intent, attachments, error }: ShareProps) {
+export default function ShareIntent({ intent, attachments, expiresAt, error }: ShareProps) {
   return (
     <main style={pageStyle}>
       <Head>
@@ -44,6 +45,12 @@ export default function ShareIntent({ intent, attachments, error }: ShareProps) 
                 <div style={labelStyle}>Last activity</div>
                 <div style={valueStyle}>{formatDateTime(intent.lastActivityAt)}</div>
               </div>
+              {expiresAt ? (
+                <div>
+                  <div style={labelStyle}>Expires</div>
+                  <div style={valueStyle}>{formatDateTime(expiresAt)}</div>
+                </div>
+              ) : null}
             </div>
             <div style={summaryStyle}>
               <div style={labelStyle}>Summary</div>
@@ -253,6 +260,7 @@ export const getServerSideProps: GetServerSideProps<ShareProps> = async (ctx) =>
     props: {
       intent: payload?.intent ?? null,
       attachments: payload?.attachments ?? [],
+      expiresAt: (payload as any)?.share?.expiresAt ?? null,
       error: payload ? null : 'Unable to load shared intent.',
     },
   };

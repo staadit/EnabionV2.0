@@ -43,7 +43,7 @@ async function readJson<T>(res: Response): Promise<T | null> {
 
 export async function fetchShareIntent(token: string): Promise<ShareIntentPayload | null> {
   if (!token) return null;
-  const url = `${BACKEND_BASE}/v1/share/${encodeURIComponent(token)}`;
+  const url = `${BACKEND_BASE}/share/intent/${encodeURIComponent(token)}`;
   try {
     const res = await fetch(url);
     if (!res.ok) return null;

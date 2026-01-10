@@ -23,6 +23,7 @@ model Organization {
   blobs     Blob[]
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
+  shareLinks IntentShareLink[]
   createdAt DateTime @default(now())
 }
 
@@ -41,6 +42,8 @@ model User {
   createdIntents Intent[] @relation("IntentCreatedBy")
   ownedIntents Intent[] @relation("IntentOwner")
   ndaAcceptances NdaAcceptance[] @relation("NdaAcceptanceByUser")
+  createdShareLinks IntentShareLink[] @relation("ShareLinkCreatedBy")
+  revokedShareLinks IntentShareLink[] @relation("ShareLinkRevokedBy")
   createdAt DateTime @default(now())
 }
 
@@ -245,6 +248,7 @@ model Intent {
   org            Organization @relation(fields: [orgId], references: [id])
   createdByUser  User         @relation("IntentCreatedBy", fields: [createdByUserId], references: [id])
   owner          User?        @relation("IntentOwner", fields: [ownerUserId], references: [id])
+  shareLinks     IntentShareLink[]
 
   @@index([orgId])
   @@index([orgId, stage])
@@ -253,4 +257,28 @@ model Intent {
   @@index([orgId, language])
   @@index([orgId, stage, lastActivityAt])
   @@index([createdByUserId])
+}
+
+model IntentShareLink {
+  id              String   @id @default(cuid())
+  orgId           String
+  intentId        String
+  createdByUserId String
+  tokenHashSha256 String   @db.Char(64)
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  revokedByUserId String?
+  lastAccessAt    DateTime?
+  accessCount     Int      @default(0)
+
+  org      Organization @relation(fields: [orgId], references: [id])
+  intent   Intent       @relation(fields: [intentId], references: [id])
+  createdBy User        @relation("ShareLinkCreatedBy", fields: [createdByUserId], references: [id])
+  revokedBy User?       @relation("ShareLinkRevokedBy", fields: [revokedByUserId], references: [id])
+
+  @@index([orgId, intentId])
+  @@unique([tokenHashSha256])
+  @@index([expiresAt])
+  @@index([revokedAt])
 }

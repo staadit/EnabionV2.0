@@ -45,12 +45,11 @@ export class IntentRedactionService {
     private readonly ndaService: NdaService,
   ) {}
 
-  async getShareView(token: string): Promise<{
+  async getShareViewByIntentId(intentId: string): Promise<{
     intent: IntentRedactionView;
     attachments: AttachmentRedactionView[];
   }> {
-    // Share tokens are mapped to intent IDs until share links are implemented.
-    const intent = await this.loadIntent(token);
+    const intent = await this.loadIntent(intentId);
     const attachments = await this.loadAttachments(intent);
     const hasL2 = this.computeHasL2(intent, attachments);
     const view = this.buildIntentView(intent, {
