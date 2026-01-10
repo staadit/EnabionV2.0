@@ -17,11 +17,25 @@ export class AttachmentAccessPolicy {
   }
 
   assertCanDownload(ctx: AccessContext) {
-    if (ctx.requestOrgId !== ctx.resourceOrgId) {
-      throw new ForbiddenException('Cross-tenant download not allowed');
+    if (this.canDownload(ctx)) {
+      return;
     }
-    if (ctx.confidentiality !== 'L1' && ctx.ndaAccepted !== true) {
-      throw new ForbiddenException('NDA acceptance required for L2 attachments');
+    if (ctx.requestOrgId !== ctx.resourceOrgId && ctx.confidentiality !== 'L1') {
+      throw new ForbiddenException({
+        code: 'NDA_REQUIRED',
+        message: 'NDA acceptance required for L2 attachments',
+      });
     }
+    throw new ForbiddenException('Cross-tenant download not allowed');
+  }
+
+  canDownload(ctx: AccessContext): boolean {
+    if (ctx.requestOrgId === ctx.resourceOrgId) {
+      return true;
+    }
+    if (ctx.confidentiality === 'L1') {
+      return true;
+    }
+    return ctx.ndaAccepted === true;
   }
 }

@@ -159,7 +159,7 @@ Central entity in R1.0 ??" structured representation of a business need.
 | `confidentialityLevel`   | enum     | yes      | `L1`, `L2`, `L3` (L1/L2 used in R1.0; L3 is placeholder).   |
 | `ndaLayerRequired`       | enum     | yes      | `LAYER_0`, `LAYER_1`, `LAYER_2`, `LAYER_3` (R1.0: `LAYER_0`, `LAYER_1` only).   |
 | `lifecycleStep`          | enum     | yes      | One of: `CLARIFY`, `MATCH_ALIGN`, `COMMIT_ASSURE`, `DELIVER`, `EXPAND`. R1.0 uses first three functionally. |
-| `pipelineStage`          | enum     | yes      | `NEW`, `IN_CLARIFY`, `IN_MATCH`, `IN_COMMIT`, `CLOSED_WON`, `CLOSED_LOST`, `CANCELLED`. |
+| `pipelineStage`          | enum     | yes      | `NEW`, `CLARIFY`, `MATCH`, `COMMIT`, `LOST`, `WON`. |
 | `ownerUserId`            | ULID     | yes      | Primary BD/AM responsible for the Intent. |
 | `primaryContactId`       | ULID     | no       | FK to main `Contact` on the client side. |
 | `avatarQualityScore`     | number   | no       | Internal metric of Avatar fit/completeness (0??"100). |
@@ -327,6 +327,8 @@ R1.0 requires the following event types:
 | `AVATAR_SUGGESTION_ACCEPTED`    | `INTENT`       | User accepted Avatar suggestion (fully or partially). |
 | `AVATAR_SUGGESTION_REJECTED`    | `INTENT`       | User rejected Avatar suggestion. |
 | `MATCH_LIST_CREATED`            | `INTENT`       | Matching engine produced/updated candidate Y list. |
+| `ATTACHMENT_UPLOADED`           | `ATTACHMENT`   | Attachment uploaded for an Intent. |
+| `ATTACHMENT_DOWNLOADED`         | `ATTACHMENT`   | Attachment downloaded (audit trail). |
 | `NDA_ACCEPTED`                  | `NDA`/`INTENT` | Parties accepted an NDA relevant for this Intent/Engagement. |
 | `COMMIT_DECISION_TAKEN`         | `ENGAGEMENT`   | X made a GO/NO??'GO decision for a given X??"Y Engagement. |
 
@@ -348,10 +350,12 @@ Mapping of R1.0 events to the 5??'Step Partnership Lifecycle and CONNECT??"POWER
 | `AVATAR_SUGGESTION_ACCEPTED` | CLARIFY          | CONNECT       |
 | `AVATAR_SUGGESTION_REJECTED` | CLARIFY          | CONNECT       |
 | `MATCH_LIST_CREATED`         | MATCH & ALIGN    | CONNECT       |
+| `ATTACHMENT_UPLOADED`        | CLARIFY          | CONNECT       |
+| `ATTACHMENT_DOWNLOADED`      | CLARIFY          | CONNECT       |
 | `NDA_ACCEPTED`               | COMMIT & ASSURE  | POWER         |
 | `COMMIT_DECISION_TAKEN`      | COMMIT & ASSURE  | POWER         |
 
-Deliver and Expand steps are **not** driven by events in R1.0; they exist only as Intent pipeline statuses (`CLOSED_WON` and future delivery placeholders).
+Deliver and Expand steps are **not** driven by events in R1.0; they exist only as Intent pipeline statuses (`WON`/`LOST`).
 
 #### 16.5.4 Event payload schemas (key fields)
 
@@ -381,17 +385,8 @@ Below are minimal payload shapes for key R1.0 events. Real implementations may a
 ```jsonc
 {
   "intentId": "intent_01J0...",
-  "changes": {
-    "goal": {
-      "old": "Modernise webshop",
-      "new": "Launch new AI-assisted webshop for DE market"
-    },
-    "budgetMin": {
-      "old": null,
-      "new": 50000
-    }
-  },
-  "reason": "clarified_after_avatar_suggestions"
+  "changedFields": ["pipelineStage"],
+  "changeSummary": "Pipeline stage changed from CLARIFY to MATCH"
 }
 ```
 
@@ -452,6 +447,27 @@ Below are minimal payload shapes for key R1.0 events. Real implementations may a
       "reasons": ["Good fit by tech stack", "Nearshore, same time zone"]
     }
   ]
+}
+```
+
+**ATTACHMENT_UPLOADED**
+
+```jsonc
+{
+  "intentId": "intent_01J0...",
+  "attachmentId": "att_01J0...",
+  "filename": "proposal.pdf",
+  "sizeBytes": 482991
+}
+```
+
+**ATTACHMENT_DOWNLOADED**
+
+```jsonc
+{
+  "intentId": "intent_01J0...",
+  "attachmentId": "att_01J0...",
+  "via": "owner" // or "share_link", "system"
 }
 ```
 
@@ -673,4 +689,4 @@ This completes the scope of **Issue #2 ??" [M0] BCOS Data & Event Model v1 (MVP)
 This document is a standalone version of section 16 from Phase1_MVP-Spec. If there is any discrepancy, Phase1_MVP-Spec remains the source of truth for R1.0.
 
 
-Reference: NDA legal text lives in docs/legal/enabion_mutual_nda_layer1_legal_R1.0.md; UX copy for L0/L1 in docs/legal/enabion_mutual_nda_layer1_L0-L1_product_copy_R1.0.md. Logging/retention rules follow docs/Security_Privacy_Model1_MVP.md (R1.0).
+Reference: NDA legal text lives in docs/R1.0/legal/nda/mutual_nda_v0.1_en.md; UX summaries in docs/R1.0/legal/nda/mutual_nda_v0.1_summary_*.md. Logging/retention rules follow docs/Security_Privacy_Model1_MVP.md (R1.0).

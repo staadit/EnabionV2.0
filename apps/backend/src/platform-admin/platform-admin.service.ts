@@ -5,6 +5,7 @@ import { AuthUser } from '../auth/auth.types';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES, EVENT_TYPE_LIST } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { NdaService } from '../nda/nda.service';
 
 const REDACT_KEYS = new Set([
   'body',
@@ -49,6 +50,7 @@ export class PlatformAdminService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
+    private readonly nda: NdaService,
   ) {}
 
   async listTenants(actor: AuthUser, query: { q?: unknown; limit?: unknown; cursor?: unknown }) {
@@ -330,6 +332,80 @@ export class PlatformAdminService {
     return { events: items };
   }
 
+  async listNdaDocuments(actor: AuthUser) {
+    const documents = await this.nda.listDocuments();
+    await this.emitAudit(actor, {
+      action: 'NDA_LIST',
+      targetType: 'NDA',
+      resultCount: documents.length,
+    });
+    return { documents };
+  }
+
+  async createNdaDocument(
+    actor: AuthUser,
+    input: {
+      ndaVersion: string;
+      enMarkdown: string;
+      summaryPl?: string | null;
+      summaryDe?: string | null;
+      summaryNl?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    const document = await this.nda.createDocument({
+      ndaVersion: input.ndaVersion.trim(),
+      enMarkdown: input.enMarkdown,
+      summaryPl: input.summaryPl ?? null,
+      summaryDe: input.summaryDe ?? null,
+      summaryNl: input.summaryNl ?? null,
+      isActive: input.isActive ?? false,
+    });
+    await this.emitAudit(actor, {
+      action: 'NDA_CREATE',
+      targetType: 'NDA',
+      targetId: document.id,
+    });
+    return { document };
+  }
+
+  async updateNdaDocument(
+    actor: AuthUser,
+    id: string,
+    input: {
+      ndaVersion?: string;
+      enMarkdown?: string;
+      summaryPl?: string | null;
+      summaryDe?: string | null;
+      summaryNl?: string | null;
+      isActive?: boolean;
+    },
+  ) {
+    const document = await this.nda.updateDocument(id, {
+      ndaVersion: input.ndaVersion?.trim(),
+      enMarkdown: input.enMarkdown,
+      summaryPl: input.summaryPl === undefined ? undefined : input.summaryPl,
+      summaryDe: input.summaryDe === undefined ? undefined : input.summaryDe,
+      summaryNl: input.summaryNl === undefined ? undefined : input.summaryNl,
+      isActive: input.isActive,
+    });
+    await this.emitAudit(actor, {
+      action: 'NDA_UPDATE',
+      targetType: 'NDA',
+      targetId: document.id,
+    });
+    return { document };
+  }
+
+  async deleteNdaDocument(actor: AuthUser, id: string) {
+    await this.nda.deleteDocument(id);
+    await this.emitAudit(actor, {
+      action: 'NDA_DELETE',
+      targetType: 'NDA',
+      targetId: id,
+    });
+  }
+
   private parseLimit(value: unknown): number {
     const raw = typeof value === 'string' ? Number(value) : undefined;
     if (!raw || Number.isNaN(raw)) {
@@ -353,7 +429,7 @@ export class PlatformAdminService {
     actor: AuthUser,
     input: {
       action: string;
-      targetType: 'TENANT' | 'USER' | 'EVENTS' | 'EMAIL_INGEST';
+      targetType: 'TENANT' | 'USER' | 'EVENTS' | 'EMAIL_INGEST' | 'NDA';
       targetOrgId?: string;
       targetUserId?: string;
       targetId?: string;

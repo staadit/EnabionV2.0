@@ -23,12 +23,33 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
 
   if (req.method === 'GET') {
     const params = new URLSearchParams();
-    if (typeof req.query.stage === 'string') {
-      params.set('stage', req.query.stage);
-    }
-    if (typeof req.query.limit === 'string') {
-      params.set('limit', req.query.limit);
-    }
+    const addParam = (key: string, value: string | string[] | undefined) => {
+      if (!value) return;
+      if (Array.isArray(value)) {
+        value.forEach((item) => {
+          if (typeof item === 'string' && item.trim()) {
+            params.append(key, item);
+          }
+        });
+        return;
+      }
+      if (typeof value === 'string' && value.trim()) {
+        params.append(key, value);
+      }
+    };
+
+    addParam('stage', typeof req.query.stage === 'string' ? req.query.stage : undefined);
+    addParam('status', req.query.status as string | string[] | undefined);
+    addParam('status', req.query['status[]'] as string | string[] | undefined);
+    addParam('ownerId', typeof req.query.ownerId === 'string' ? req.query.ownerId : undefined);
+    addParam('language', typeof req.query.language === 'string' ? req.query.language : undefined);
+    addParam('from', typeof req.query.from === 'string' ? req.query.from : undefined);
+    addParam('to', typeof req.query.to === 'string' ? req.query.to : undefined);
+    addParam('q', typeof req.query.q === 'string' ? req.query.q : undefined);
+    addParam('sort', typeof req.query.sort === 'string' ? req.query.sort : undefined);
+    addParam('order', typeof req.query.order === 'string' ? req.query.order : undefined);
+    addParam('cursor', typeof req.query.cursor === 'string' ? req.query.cursor : undefined);
+    addParam('limit', typeof req.query.limit === 'string' ? req.query.limit : undefined);
     url = params.toString() ? `${url}?${params}` : url;
   } else {
     headers['content-type'] = 'application/json';

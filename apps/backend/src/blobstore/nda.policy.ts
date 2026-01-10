@@ -1,21 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { ConfidentialityLevel } from './types';
+import { NdaService } from '../nda/nda.service';
 
 export interface NdaAccessRequest {
-  orgId: string;
+  requestOrgId: string;
+  resourceOrgId: string;
   userId?: string;
   intentId?: string;
   confidentiality: ConfidentialityLevel;
-  assumedAccepted?: boolean;
 }
 
 @Injectable()
 export class NdaPolicy {
+  constructor(private readonly ndaService: NdaService) {}
+
   async canAccess(input: NdaAccessRequest): Promise<boolean> {
     if (input.confidentiality === 'L1') {
       return true;
     }
-    // For L2+ we currently allow only when explicitly marked accepted (future: real NDA records).
-    return input.assumedAccepted === true;
+    if (input.requestOrgId === input.resourceOrgId) {
+      return true;
+    }
+    return this.ndaService.hasAccepted({
+      orgId: input.requestOrgId,
+      counterpartyOrgId: input.resourceOrgId,
+    });
   }
 }

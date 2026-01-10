@@ -4,6 +4,7 @@ import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
 import { fetchOrgEvents, type OrgEvent } from '../../../lib/org-events';
+import { formatDateTime } from '../../../lib/date-format';
 
 type IncomingIntentsProps = {
   user: OrgUser;
@@ -36,13 +37,13 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
         {events.length ? (
           <ul style={listStyle}>
             {events.map((event) => (
-              <li key={event.id} style={listItemStyle}>
-                <span style={{ fontWeight: 600 }}>{event.type}</span>
-                <span style={metaStyle}>
-                  {event.subjectId ? ` - ${event.subjectId}` : ''} {event.occurredAt}
-                </span>
-              </li>
-            ))}
+                <li key={event.id} style={listItemStyle}>
+                  <span style={{ fontWeight: 600 }}>{event.type}</span>
+                  <span style={metaStyle}>
+                    {event.subjectId ? ` - ${event.subjectId}` : ''} {formatDateTime(event.occurredAt)}
+                  </span>
+                </li>
+              ))}
           </ul>
         ) : (
           <p style={{ margin: 0, color: '#4b4f54' }}>No events yet.</p>

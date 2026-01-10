@@ -7,9 +7,18 @@ import { AuthModule } from './auth/auth.module';
 import { IntentModule } from './intents/intent.module';
 import { OrgModule } from './org/org.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
+import { NdaModule } from './nda/nda.module';
 
 @Module({
-  imports: [EventModule, BlobModule, AuthModule, IntentModule, OrgModule, PlatformAdminModule],
+  imports: [
+    EventModule,
+    BlobModule,
+    AuthModule,
+    IntentModule,
+    OrgModule,
+    PlatformAdminModule,
+    NdaModule,
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

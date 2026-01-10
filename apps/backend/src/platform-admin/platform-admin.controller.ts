@@ -1,15 +1,38 @@
 import {
   BadRequestException,
+  Body,
   Controller,
+  Delete,
   Get,
   Param,
+  Patch,
+  Post,
   Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
+import { z } from 'zod';
 import { PlatformAdminGuard } from '../auth/platform-admin.guard';
 import { AuthenticatedRequest } from '../auth/auth.types';
 import { PlatformAdminService } from './platform-admin.service';
+
+const createNdaSchema = z.object({
+  ndaVersion: z.string().min(1),
+  enMarkdown: z.string().min(1),
+  summaryPl: z.string().optional().nullable(),
+  summaryDe: z.string().optional().nullable(),
+  summaryNl: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
+
+const updateNdaSchema = z.object({
+  ndaVersion: z.string().min(1).optional(),
+  enMarkdown: z.string().min(1).optional(),
+  summaryPl: z.string().optional().nullable(),
+  summaryDe: z.string().optional().nullable(),
+  summaryNl: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
+});
 
 @UseGuards(PlatformAdminGuard)
 @Controller('platform-admin')
@@ -66,10 +89,50 @@ export class PlatformAdminController {
     });
   }
 
+  @Get('nda')
+  async listNda(@Req() req: AuthenticatedRequest) {
+    const user = this.requireUser(req);
+    return this.platformAdmin.listNdaDocuments(user);
+  }
+
+  @Post('nda')
+  async createNda(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(createNdaSchema, body);
+    return this.platformAdmin.createNdaDocument(user, parsed);
+  }
+
+  @Patch('nda/:id')
+  async updateNda(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(updateNdaSchema, body);
+    return this.platformAdmin.updateNdaDocument(user, id, parsed);
+  }
+
+  @Delete('nda/:id')
+  async deleteNda(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    const user = this.requireUser(req);
+    await this.platformAdmin.deleteNdaDocument(user, id);
+    return { ok: true };
+  }
+
   private requireUser(req: AuthenticatedRequest) {
     if (!req.user) {
       throw new BadRequestException('Missing session');
     }
     return req.user;
+  }
+
+  private parseBody<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
+    const result = schema.safeParse(body);
+    if (result.success) {
+      return result.data;
+    }
+    const message = result.error.issues.map((issue) => issue.message).join('; ');
+    throw new BadRequestException(message || 'Invalid request');
   }
 }

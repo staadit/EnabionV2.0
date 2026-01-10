@@ -5,6 +5,7 @@ import {
   Get,
   HttpCode,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -18,6 +19,8 @@ import { RolesGuard } from '../auth/roles.guard';
 import { IntentService } from './intent.service';
 import { INTENT_STAGES, IntentStage } from './intent.types';
 
+const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+
 const createIntentSchema = z.object({
   goal: z.string().optional().nullable(),
   title: z.string().optional().nullable(),
@@ -27,6 +30,11 @@ const createIntentSchema = z.object({
   kpi: z.string().optional().nullable(),
   risks: z.string().optional().nullable(),
   deadlineAt: z.string().optional().nullable(),
+});
+
+const updateStageSchema = z.object({
+  pipelineStage: z.string().optional(),
+  stage: z.string().optional(),
 });
 
 const MAX_SOURCE_TEXT_LENGTH = 100000;
@@ -84,23 +92,67 @@ export class IntentController {
     });
   }
 
+  @Patch(':intentId')
+  @Roles('Owner', 'BD_AM')
+  async updateIntentStage(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(updateStageSchema, body);
+    const stageInput = parsed.pipelineStage ?? parsed.stage;
+    const nextStage = this.parseStageValue(stageInput);
+
+    const intent = await this.intentService.updatePipelineStage({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      intentId,
+      pipelineStage: nextStage,
+    });
+
+    return { intent };
+  }
+
   @Get()
   async listIntents(
     @Req() req: AuthenticatedRequest,
-    @Query('stage') stage?: string,
-    @Query('limit') limit?: string,
+    @Query() query?: Record<string, unknown>,
   ) {
     const user = this.requireUser(req);
-    const parsedStage = this.parseStage(stage);
-    const parsedLimit = this.parseLimit(limit);
+    const params = query ?? {};
+    const statusParam =
+      params.status ??
+      params['status[]'] ??
+      params.pipelineStage ??
+      params['pipelineStage[]'] ??
+      params.stage;
+    const parsedStatuses = this.parseStatusList(statusParam);
+    const parsedLimit = this.parseLimit(params.limit);
+    const parsedOwnerId = this.parseOptionalString(params.ownerId);
+    const parsedLanguage = this.parseLanguage(params.language);
+    const parsedQuery = this.parseSearchQuery(params.q);
+    const parsedFrom = this.parseDate(params.from, 'from');
+    const parsedTo = this.parseDate(params.to, 'to');
+    const parsedSort = this.parseSort(params.sort);
+    const parsedOrder = this.parseOrder(params.order);
+    const parsedCursor = this.parseOptionalString(params.cursor);
 
-    const intents = await this.intentService.listIntents({
+    const result = await this.intentService.listIntents({
       orgId: user.orgId,
-      stage: parsedStage,
+      statuses: parsedStatuses,
+      ownerId: parsedOwnerId,
+      language: parsedLanguage,
+      q: parsedQuery,
+      from: parsedFrom,
+      to: parsedTo,
+      sort: parsedSort,
+      order: parsedOrder,
       limit: parsedLimit,
+      cursor: parsedCursor,
     });
 
-    return { intents };
+    return { items: result.items, nextCursor: result.nextCursor, intents: result.items };
   }
 
   private requireUser(req: AuthenticatedRequest) {
@@ -127,23 +179,111 @@ export class IntentController {
     return parsed;
   }
 
-  private parseStage(value: string | undefined): IntentStage | undefined {
-    if (!value) return undefined;
-    const normalized = value.trim().toUpperCase();
-    if (!normalized) return undefined;
+  private parseStatusList(value: unknown): IntentStage[] | undefined {
+    const raw = this.parseStringArray(value);
+    if (!raw.length) return undefined;
+    const normalized = raw.map((item) => item.trim().toUpperCase()).filter(Boolean);
+    const invalid = normalized.filter((item) => !INTENT_STAGES.includes(item as IntentStage));
+    if (invalid.length > 0) {
+      throw new BadRequestException(`Invalid status: ${invalid.join(', ')}`);
+    }
+    return normalized as IntentStage[];
+  }
+
+  private parseStageValue(value: unknown): IntentStage {
+    const normalized = this.parseOptionalString(value)?.toUpperCase();
+    if (!normalized) {
+      throw new BadRequestException('pipelineStage is required');
+    }
     if (!INTENT_STAGES.includes(normalized as IntentStage)) {
-      throw new BadRequestException('Invalid stage');
+      throw new BadRequestException(`Invalid pipelineStage: ${normalized}`);
     }
     return normalized as IntentStage;
   }
 
-  private parseLimit(value: string | undefined): number | undefined {
-    if (!value) return undefined;
-    const parsed = Number(value);
+  private parseLanguage(value: unknown): string | undefined {
+    const normalized = this.parseOptionalString(value)?.toUpperCase();
+    if (!normalized) return undefined;
+    if (!LANGUAGE_OPTIONS.includes(normalized as (typeof LANGUAGE_OPTIONS)[number])) {
+      throw new BadRequestException('Invalid language');
+    }
+    return normalized;
+  }
+
+  private parseSearchQuery(value: unknown): string | undefined {
+    const normalized = this.parseOptionalString(value);
+    return normalized && normalized.length > 1 ? normalized : undefined;
+  }
+
+  private parseDate(value: unknown, label: string): Date | undefined {
+    const normalized = this.parseOptionalString(value);
+    if (!normalized) return undefined;
+    const parsed = this.parseDateValue(normalized, label === 'to');
+    if (Number.isNaN(parsed.getTime())) {
+      throw new BadRequestException(`Invalid ${label} date`);
+    }
+    return parsed;
+  }
+
+  private parseSort(value: unknown): 'lastActivityAt' | 'createdAt' | undefined {
+    const normalized = this.parseOptionalString(value);
+    if (!normalized) return undefined;
+    if (normalized !== 'lastActivityAt' && normalized !== 'createdAt') {
+      throw new BadRequestException('Invalid sort');
+    }
+    return normalized;
+  }
+
+  private parseOrder(value: unknown): 'asc' | 'desc' | undefined {
+    const normalized = this.parseOptionalString(value)?.toLowerCase();
+    if (!normalized) return undefined;
+    if (normalized !== 'asc' && normalized !== 'desc') {
+      throw new BadRequestException('Invalid order');
+    }
+    return normalized as 'asc' | 'desc';
+  }
+
+  private parseDateValue(value: string, isEndOfDay: boolean) {
+    if (!isEndOfDay) {
+      return new Date(value);
+    }
+    if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      date.setUTCDate(date.getUTCDate() + 1);
+      date.setUTCMilliseconds(date.getUTCMilliseconds() - 1);
+      return date;
+    }
+    return new Date(value);
+  }
+
+  private parseLimit(value: unknown): number | undefined {
+    const normalized = this.parseOptionalString(value);
+    if (!normalized) return undefined;
+    const parsed = Number(normalized);
     if (!Number.isFinite(parsed) || parsed <= 0) {
       throw new BadRequestException('Invalid limit');
     }
-    return Math.min(Math.floor(parsed), 200);
+    return Math.min(Math.floor(parsed), 100);
+  }
+
+  private parseStringArray(value: unknown): string[] {
+    if (!value) return [];
+    if (Array.isArray(value)) {
+      return value.flatMap((item) => this.parseStringArray(item));
+    }
+    if (typeof value === 'string') {
+      return value
+        .split(',')
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
+    return [];
+  }
+
+  private parseOptionalString(value: unknown): string | undefined {
+    if (typeof value !== 'string') return undefined;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : undefined;
   }
 
   private parseBody<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {

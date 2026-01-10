@@ -2,22 +2,24 @@ import {
   BadRequestException,
   Body,
   Controller,
+  ForbiddenException,
   Get,
+  NotFoundException,
   Param,
   Post,
   Query,
   Req,
+  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
-  StreamableFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { AuthenticatedRequest } from '../auth/auth.types';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
-import { AttachmentService } from './attachment.service';
+import { AttachmentService, type AttachmentListItem } from './attachment.service';
 import { AttachmentAccessPolicy } from './attachment.policy';
 import { BlobService } from './blob.service';
 import { NdaPolicy } from './nda.policy';
@@ -54,13 +56,23 @@ export class AttachmentController {
     if (!file) {
       throw new BadRequestException('file is required');
     }
+    const intent = await this.attachmentService.findIntent(intentId);
+    if (!intent) {
+      throw new NotFoundException('Intent not found');
+    }
+    if (intent.orgId !== orgId) {
+      throw new ForbiddenException('Cross-tenant upload not allowed');
+    }
     this.policy.assertCanUpload({
       requestOrgId: orgId,
-      resourceOrgId: orgId,
+      resourceOrgId: intent.orgId,
     });
 
     const buffer = await this.toBuffer(file);
-    const confidentialityLevel: ConfidentialityLevel = this.parseConfidentiality(confidentiality);
+    const confidentialityLevel: ConfidentialityLevel = this.parseConfidentiality(
+      confidentiality,
+      intent.confidentialityLevel,
+    );
 
     const attachment = await this.attachmentService.uploadAttachment({
       orgId,
@@ -79,36 +91,95 @@ export class AttachmentController {
     };
   }
 
+  @Get('intents/:intentId/attachments')
+  @Roles('Owner', 'BD_AM', 'Viewer')
+  async listIntentAttachments(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
+  ) {
+    const user = this.requireUser(req);
+    const intent = await this.attachmentService.findIntent(intentId);
+    if (!intent) {
+      throw new NotFoundException('Intent not found');
+    }
+    const attachments = await this.attachmentService.listIntentAttachments({
+      intentId,
+      orgId: intent.orgId,
+    });
+
+    const items = await this.mapAttachmentList(attachments, user.orgId, user.id);
+    return { items };
+  }
+
+  @Get('intents/:intentId/attachments/:attachmentId/download')
+  @Roles('Owner', 'BD_AM', 'Viewer')
+  async downloadIntentAttachment(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Param('attachmentId') attachmentId: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
+    @Query('asInline') asInline?: string,
+  ) {
+    const attachment = await this.attachmentService.findByIdWithBlob(attachmentId);
+    if (attachment.intentId !== intentId) {
+      throw new NotFoundException('Attachment not found');
+    }
+    return this.handleDownload(req, attachment, asInline);
+  }
+
   @Get('attachments/:id')
   @Roles('Owner', 'BD_AM', 'Viewer')
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Query('ndaAccepted') ndaAccepted?: string,
+    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
+  ) {
+    const attachment = await this.attachmentService.findByIdWithBlob(id);
+    return this.handleDownload(req, attachment, asInline);
+  }
+
+  private parseBool(value?: string): boolean {
+    if (!value) return false;
+    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+  }
+
+  private parseConfidentiality(
+    value: string | undefined,
+    fallback: ConfidentialityLevel,
+  ): ConfidentialityLevel {
+    if (value === 'L1' || value === 'L2' || value === 'L3') return value;
+    return fallback;
+  }
+
+  private async handleDownload(
+    req: AuthenticatedRequest,
+    attachment: any,
+    asInline?: string,
   ) {
     const user = this.requireUser(req);
     const orgId = user.orgId;
-
-    const attachment = await this.attachmentService.findByIdWithBlob(id);
-    const ndaOk = await this.ndaPolicy.canAccess({
-      orgId,
+    const confidentiality = attachment.blob.confidentiality as ConfidentialityLevel;
+    const ndaOk = await this.resolveNdaAccepted({
+      requestOrgId: orgId,
+      resourceOrgId: attachment.orgId,
       userId: user.id,
       intentId: attachment.intentId || undefined,
-      confidentiality: attachment.blob.confidentiality as ConfidentialityLevel,
-      assumedAccepted: this.parseBool(ndaAccepted),
+      confidentiality,
     });
     this.policy.assertCanDownload({
       requestOrgId: orgId,
       resourceOrgId: attachment.orgId,
-      confidentiality: attachment.blob.confidentiality as ConfidentialityLevel,
+      confidentiality,
       ndaAccepted: ndaOk,
     });
 
-    const download = await this.blobService.getBlobStream(attachment.blobId, orgId);
+    const download = await this.blobService.getBlobStream(attachment.blobId, attachment.orgId);
     await this.attachmentService.emitDownloadedEvent({
       attachment,
       actorUserId: user.id,
+      actorOrgId: user.orgId,
       via: 'owner',
     });
 
@@ -127,14 +198,63 @@ export class AttachmentController {
     });
   }
 
-  private parseBool(value?: string): boolean {
-    if (!value) return false;
-    return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+  private async resolveNdaAccepted(input: {
+    requestOrgId: string;
+    resourceOrgId: string;
+    userId: string;
+    intentId?: string;
+    confidentiality: ConfidentialityLevel;
+  }): Promise<boolean> {
+    return this.ndaPolicy.canAccess({
+      requestOrgId: input.requestOrgId,
+      resourceOrgId: input.resourceOrgId,
+      userId: input.userId,
+      intentId: input.intentId,
+      confidentiality: input.confidentiality,
+    });
   }
 
-  private parseConfidentiality(value?: string): ConfidentialityLevel {
-    if (value === 'L2' || value === 'L3') return value;
-    return 'L1';
+  private async mapAttachmentList(
+    attachments: AttachmentListItem[],
+    requestOrgId: string,
+    userId: string,
+  ) {
+    const mapped = await Promise.all(
+      attachments.map(async (attachment) => {
+        const confidentiality = attachment.blob.confidentiality as ConfidentialityLevel;
+        const ndaOk = await this.resolveNdaAccepted({
+          requestOrgId,
+          resourceOrgId: attachment.orgId,
+          userId,
+          intentId: attachment.intentId || undefined,
+          confidentiality,
+        });
+        const canDownload = this.policy.canDownload({
+          requestOrgId,
+          resourceOrgId: attachment.orgId,
+          confidentiality,
+          ndaAccepted: ndaOk,
+        });
+        return {
+          id: attachment.id,
+          originalName: attachment.filename,
+          mimeType: attachment.blob?.contentType ?? 'application/octet-stream',
+          sizeBytes: attachment.blob?.sizeBytes ?? 0,
+          sha256Hex: attachment.blob?.sha256 ?? '',
+          confidentialityLevel: confidentiality,
+          createdAt: attachment.createdAt.toISOString(),
+          uploadedBy: attachment.uploadedBy
+            ? {
+                id: attachment.uploadedBy.id,
+                email: attachment.uploadedBy.email,
+                name: null,
+              }
+            : null,
+          canDownload,
+        };
+      }),
+    );
+    return mapped;
   }
 
   private async toBuffer(file: UploadedFileType): Promise<Buffer> {

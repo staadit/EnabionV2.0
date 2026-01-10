@@ -13,9 +13,78 @@ function assert(condition: any, message: string) {
   }
 }
 
+function includesText(value: string | null | undefined, search: string) {
+  if (!value) return false;
+  return value.toLowerCase().includes(search.toLowerCase());
+}
+
+function asArray(value: any) {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+}
+
+function matchesWhere(intent: any, where: any): boolean {
+  if (!where) return true;
+  const andFilters = asArray(where.AND);
+  for (const clause of andFilters) {
+    if (!matchesWhere(intent, clause)) return false;
+  }
+  if (where.OR) {
+    const orFilters = asArray(where.OR);
+    if (!orFilters.some((clause) => matchesWhere(intent, clause))) {
+      return false;
+    }
+  }
+  if (where.id) {
+    if (typeof where.id === 'string') {
+      if (intent.id !== where.id) return false;
+    } else {
+      if (where.id.lt && !(intent.id < where.id.lt)) return false;
+      if (where.id.gt && !(intent.id > where.id.gt)) return false;
+    }
+  }
+  if (where.orgId && intent.orgId !== where.orgId) return false;
+  if (where.ownerUserId && intent.ownerUserId !== where.ownerUserId) return false;
+  if (where.language && intent.language !== where.language) return false;
+  if (where.stage) {
+    if (where.stage.in && !where.stage.in.includes(intent.stage)) return false;
+    if (typeof where.stage === 'string' && intent.stage !== where.stage) return false;
+  }
+  if (where.lastActivityAt) {
+    const value = intent.lastActivityAt as Date;
+    if (where.lastActivityAt instanceof Date) {
+      if (value.getTime() !== where.lastActivityAt.getTime()) return false;
+    } else {
+      if (where.lastActivityAt.gte && value < where.lastActivityAt.gte) return false;
+      if (where.lastActivityAt.lte && value > where.lastActivityAt.lte) return false;
+      if (where.lastActivityAt.lt && value >= where.lastActivityAt.lt) return false;
+      if (where.lastActivityAt.gt && value <= where.lastActivityAt.gt) return false;
+    }
+  }
+  if (where.title?.contains) {
+    if (!includesText(intent.title, where.title.contains)) return false;
+  }
+  if (where.client?.contains) {
+    if (!includesText(intent.client, where.client.contains)) return false;
+  }
+  return true;
+}
+
+function applySelect(record: any, select: any) {
+  if (!select) return record;
+  const output: Record<string, any> = {};
+  for (const [key, value] of Object.entries(select)) {
+    if (value === true) {
+      output[key] = record[key];
+    }
+  }
+  return output;
+}
+
 class MockPrismaService {
   intents: any[] = [];
   events: any[] = [];
+  users: any[] = [];
 
   organization = {
     findUnique: async (args: any) => {
@@ -30,20 +99,82 @@ class MockPrismaService {
         id: randomUUID(),
         createdAt: new Date(),
         updatedAt: new Date(),
+        lastActivityAt: args.data.lastActivityAt ?? new Date(),
+        language: args.data.language ?? 'EN',
         ...args.data,
       };
       this.intents.push(record);
       return record;
     },
+    findFirst: async (args: any) => {
+      const match = this.intents.find((intent) => matchesWhere(intent, args?.where));
+      if (!match) return null;
+      return applySelect(match, args?.select);
+    },
+    findUnique: async (args: any) => {
+      const match = this.intents.find((intent) => intent.id === args?.where?.id);
+      if (!match) return null;
+      return applySelect(match, args?.select);
+    },
     findMany: async (args: any) => {
-      const where = args?.where || {};
-      const stage = where.stage;
-      const orgId = where.orgId;
-      let results = this.intents.filter((intent) => intent.orgId === orgId);
-      if (stage) {
-        results = results.filter((intent) => intent.stage === stage);
+      let results = this.intents.filter((intent) => matchesWhere(intent, args?.where));
+      const orderBy = asArray(args?.orderBy);
+      if (orderBy.length) {
+        results = results.sort((a, b) => {
+          for (const clause of orderBy) {
+            const [field, direction] = Object.entries(clause || {})[0] ?? [];
+            if (!field || !direction) continue;
+            const left = a[field];
+            const right = b[field];
+            if (left === right) continue;
+            const desc = direction === 'desc';
+            return left < right ? (desc ? 1 : -1) : desc ? -1 : 1;
+          }
+          return 0;
+        });
       }
-      return results.slice(0, args?.take ?? results.length);
+      if (args?.take) {
+        results = results.slice(0, args.take);
+      }
+      if (args?.select?.owner) {
+        return results.map((intent) => {
+          const owner = this.users.find((user) => user.id === intent.ownerUserId);
+          return {
+            ...intent,
+            owner: owner ? { id: owner.id, email: owner.email } : null,
+          };
+        });
+      }
+      return results;
+    },
+    update: async (args: any) => {
+      let updatedRecord: any = null;
+      this.intents = this.intents.map((intent) => {
+        if (intent.id !== args?.where?.id) {
+          return intent;
+        }
+        updatedRecord = {
+          ...intent,
+          ...args?.data,
+          updatedAt: new Date(),
+        };
+        return updatedRecord;
+      });
+      return updatedRecord;
+    },
+    updateMany: async (args: any) => {
+      let updated = 0;
+      this.intents = this.intents.map((intent) => {
+        if (!matchesWhere(intent, args?.where)) {
+          return intent;
+        }
+        updated += 1;
+        return {
+          ...intent,
+          ...args?.data,
+        };
+      });
+      return { count: updated };
     },
   };
 
@@ -60,6 +191,8 @@ async function testCreate() {
   const events = new EventService(prisma as any);
   const service = new IntentService(prisma as any, events);
 
+  prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
+
   const intent = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-1',
@@ -74,6 +207,9 @@ async function testCreate() {
   assert(intent.stage === 'NEW', 'Intent stage should default to NEW');
   assert(intent.orgId === 'org-1', 'Intent orgId should come from auth context');
   assert(intent.title === intent.goal, 'Manual intent title should match goal');
+  assert(intent.ownerUserId === 'user-1', 'Intent owner should default to creator');
+  assert(intent.language === 'EN', 'Intent language should default to org language');
+  assert(intent.lastActivityAt instanceof Date, 'Intent lastActivityAt should be set');
   assert(prisma.events.length === 1, 'INTENT_CREATED event should be emitted');
 
   const event = prisma.events[0];
@@ -93,6 +229,8 @@ async function testPasteCreate() {
   const events = new EventService(prisma as any);
   const service = new IntentService(prisma as any, events);
 
+  prisma.users = [{ id: 'user-2', email: 'owner2@example.com' }];
+
   const raw = 'Subject: RFP\\nWe need a vendor for pilot.';
   const sha = createHash('sha256').update(raw).digest('hex');
 
@@ -107,6 +245,8 @@ async function testPasteCreate() {
   assert(intent.sourceTextRaw === raw, 'Intent should store raw source text');
   assert(intent.sourceTextSha256 === sha, 'Intent should store source text hash');
   assert(intent.sourceTextLength === raw.length, 'Intent should store source text length');
+  assert(intent.ownerUserId === 'user-2', 'Paste intent owner should default to creator');
+  assert(intent.language === 'EN', 'Paste intent language should default to org language');
   assert(prisma.events.length === 1, 'INTENT_CREATED event should be emitted');
 
   const payload = prisma.events[0].payload as any;
@@ -154,6 +294,125 @@ async function testValidation() {
   assert(threw, 'Oversized sourceTextRaw should throw BadRequestException');
 }
 
+async function testListFilters() {
+  const prisma = new MockPrismaService();
+  prisma.users = [
+    { id: 'user-1', email: 'owner1@example.com' },
+    { id: 'user-2', email: 'owner2@example.com' },
+  ];
+  const events = new EventService(prisma as any);
+  const service = new IntentService(prisma as any, events);
+
+  const intentA = await service.createIntent({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    goal: 'Alpha launch',
+    client: 'Acme',
+    language: 'EN',
+  });
+  const intentB = await service.createIntent({
+    orgId: 'org-1',
+    actorUserId: 'user-2',
+    goal: 'Beta release',
+    client: 'Bravo',
+    language: 'PL',
+  });
+  const intentC = await service.createIntent({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    goal: 'Gamma rollout',
+    client: 'Contoso',
+    language: 'EN',
+  });
+
+  const recordA = prisma.intents.find((row) => row.id === intentA.id)!;
+  const recordB = prisma.intents.find((row) => row.id === intentB.id)!;
+  const recordC = prisma.intents.find((row) => row.id === intentC.id)!;
+
+  recordA.stage = 'NEW';
+  recordB.stage = 'MATCH';
+  recordC.stage = 'CLARIFY';
+
+  recordA.lastActivityAt = new Date('2026-01-01T00:00:00.000Z');
+  recordB.lastActivityAt = new Date('2026-01-05T00:00:00.000Z');
+  recordC.lastActivityAt = new Date('2026-01-03T00:00:00.000Z');
+
+  let result = await service.listIntents({
+    orgId: 'org-1',
+    statuses: ['MATCH'],
+  });
+  assert(result.items.length === 1, 'Status filter should return one intent');
+  assert(result.items[0].id === intentB.id, 'Status filter should return MATCH intent');
+
+  result = await service.listIntents({
+    orgId: 'org-1',
+    ownerId: 'user-1',
+  });
+  assert(result.items.length === 2, 'Owner filter should return two intents');
+
+  result = await service.listIntents({
+    orgId: 'org-1',
+    language: 'PL',
+  });
+  assert(result.items.length === 1, 'Language filter should return one intent');
+  assert(result.items[0].id === intentB.id, 'Language filter should return PL intent');
+
+  result = await service.listIntents({
+    orgId: 'org-1',
+    from: new Date('2026-01-02T00:00:00.000Z'),
+    to: new Date('2026-01-04T23:59:59.000Z'),
+  });
+  assert(result.items.length === 1, 'Date range filter should return one intent');
+  assert(result.items[0].id === intentC.id, 'Date range should match intentC');
+
+  result = await service.listIntents({
+    orgId: 'org-1',
+    q: 'acme',
+  });
+  assert(result.items.length === 1, 'Search filter should return one intent');
+  assert(result.items[0].id === intentA.id, 'Search should match client name');
+
+  result = await service.listIntents({ orgId: 'org-1' });
+  assert(result.items[0].id === intentB.id, 'Default sort should be lastActivityAt desc');
+
+  const page1 = await service.listIntents({ orgId: 'org-1', limit: 1 });
+  assert(page1.items.length === 1, 'Pagination should return one item');
+  assert(page1.nextCursor, 'Pagination should return nextCursor');
+
+  const page2 = await service.listIntents({
+    orgId: 'org-1',
+    limit: 1,
+    cursor: page1.nextCursor!,
+  });
+  assert(page2.items.length === 1, 'Second page should return one item');
+
+  const touchDate = new Date('2026-01-06T00:00:00.000Z');
+  await events.emitEvent({
+    type: EVENT_TYPES.INTENT_UPDATED,
+    occurredAt: touchDate,
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    actorOrgId: 'org-1',
+    subjectType: 'INTENT',
+    subjectId: intentA.id,
+    lifecycleStep: 'CLARIFY',
+    pipelineStage: 'NEW',
+    channel: 'ui',
+    correlationId: 'test',
+    payload: {
+      payloadVersion: 1,
+      intentId: intentA.id,
+      changedFields: ['title'],
+      changeSummary: 'Test update',
+    },
+  });
+  const updatedA = prisma.intents.find((row) => row.id === intentA.id)!;
+  assert(
+    updatedA.lastActivityAt.getTime() === touchDate.getTime(),
+    'Event emission should update lastActivityAt',
+  );
+}
+
 async function testRolesGuard() {
   const reflector = new Reflector();
   const guard = new RolesGuard(reflector);
@@ -181,12 +440,109 @@ async function testRolesGuard() {
     }
   }
   assert(threw, 'Viewer should be forbidden by RolesGuard');
+
+  const updateContext = {
+    getHandler: () => IntentController.prototype.updateIntentStage,
+    getClass: () => IntentController,
+    switchToHttp: () => ({
+      getRequest: () => ({
+        user: {
+          id: 'user-2',
+          email: 'viewer@example.com',
+          orgId: 'org-1',
+          role: 'Viewer',
+        },
+      }),
+    }),
+  } as any;
+
+  threw = false;
+  try {
+    guard.canActivate(updateContext);
+  } catch (err) {
+    if (err instanceof ForbiddenException) {
+      threw = true;
+    }
+  }
+  assert(threw, 'Viewer should be forbidden from updating pipeline stage');
+}
+
+async function testStageUpdate() {
+  const prisma = new MockPrismaService();
+  const events = new EventService(prisma as any);
+  const service = new IntentService(prisma as any, events);
+
+  prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
+
+  const intent = await service.createIntent({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    goal: 'Pipeline update',
+  });
+
+  const before = prisma.intents.find((row) => row.id === intent.id)!.lastActivityAt;
+
+  const updated = await service.updatePipelineStage({
+    orgId: 'org-1',
+    actorUserId: 'user-1',
+    intentId: intent.id,
+    pipelineStage: 'MATCH',
+  });
+
+  assert(updated.stage === 'MATCH', 'Pipeline stage should update to MATCH');
+  assert(prisma.events.length === 2, 'INTENT_UPDATED event should be emitted');
+
+  const updateEvent = prisma.events[1];
+  assert(
+    updateEvent.type === EVENT_TYPES.INTENT_UPDATED,
+    'Update event type should be INTENT_UPDATED',
+  );
+  assert(
+    updateEvent.pipelineStage === 'MATCH',
+    'Update event pipelineStage should be MATCH',
+  );
+  assert(
+    updateEvent.lifecycleStep === 'MATCH_ALIGN',
+    'Lifecycle step should map to MATCH_ALIGN',
+  );
+  const payload = updateEvent.payload as any;
+  assert(
+    payload.changedFields?.includes('pipelineStage'),
+    'Update payload should include pipelineStage in changedFields',
+  );
+  assert(
+    payload.changeSummary?.includes('Pipeline stage changed'),
+    'Update payload should include changeSummary',
+  );
+
+  const after = prisma.intents.find((row) => row.id === intent.id)!.lastActivityAt;
+  assert(
+    after.getTime() >= before.getTime(),
+    'Stage update should advance lastActivityAt',
+  );
+
+  let threw = false;
+  try {
+    await service.updatePipelineStage({
+      orgId: 'org-2',
+      actorUserId: 'user-1',
+      intentId: intent.id,
+      pipelineStage: 'COMMIT',
+    });
+  } catch (err) {
+    if (err instanceof BadRequestException || err instanceof Error) {
+      threw = true;
+    }
+  }
+  assert(threw, 'Cross-tenant stage update should be rejected');
 }
 
 async function run() {
   await testCreate();
   await testPasteCreate();
   await testValidation();
+  await testListFilters();
+  await testStageUpdate();
   await testRolesGuard();
   // eslint-disable-next-line no-console
   console.log('Intent create tests passed.');

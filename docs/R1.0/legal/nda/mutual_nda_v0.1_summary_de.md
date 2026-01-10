@@ -1,9 +1,9 @@
-# Enabion Mutual NDA — Summary (DE) — v0.1 (UI copy)
+# Enabion Mutual NDA - Summary (DE) - v0.1 (UI copy)
 
-> **Hinweis:** Dies ist eine Zusammenfassung (UI-Text). Der rechtlich maßgebliche Text ist die EN-Version: `enabion_mutual_nda_v0.1_en`.
+> **Hinweis:** Dies ist eine Zusammenfassung (UI-Text). Der rechtlich maßgebliche Text ist die EN-Version: `Enabion_mutual_nda_v0.1_en`.
 
 ## Worum geht es?
-Eine gegenseitige Vertraulichkeitsvereinbarung zwischen Enabion und der Gegenpartei (Partner X↔Y), um **L2 (NDA‑Required)** Informationen im Pre‑Sales‑Prozess auszutauschen.
+Eine gegenseitige Vertraulichkeitsvereinbarung zwischen Enabion und der Gegenpartei (Partner X<->Y), um **L2 (NDA-Required)** Informationen im Pre-Sales-Prozess auszutauschen.
 
 ## Was wird geschützt?
 - Geschäfts- und technische Informationen,
@@ -13,7 +13,7 @@ Eine gegenseitige Vertraulichkeitsvereinbarung zwischen Enabion und der Gegenpar
 - abgeleitete Notizen/Analysen.
 
 ## Kernpflichten
-- Nutzung nur für den „Purpose“ (Evaluierung/Kooperation),
+- Nutzung nur für den "Purpose" (Evaluierung/Kooperation),
 - keine Weitergabe an Dritte (außer autorisierte Personen),
 - angemessene Schutzmaßnahmen,
 - auf Anfrage Rückgabe/Löschung.

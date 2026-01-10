@@ -3,6 +3,7 @@ import type { GetServerSideProps } from 'next';
 import Link from 'next/link';
 import PlatformAdminLayout from '../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../lib/require-platform-admin';
+import { RESERVED_ORG_SLUGS } from '../../lib/reserved-slugs';
 
 type PlatformAdminHomeProps = {
   user: PlatformAdminUser;
@@ -29,10 +30,28 @@ export default function PlatformAdminHome({ user }: PlatformAdminHomeProps) {
           <h3 style={cardTitleStyle}>Events</h3>
           <p style={cardBodyStyle}>Cross-tenant event explorer with redaction.</p>
         </Link>
+        <Link href="/platform-admin/nda" style={cardStyle}>
+          <h3 style={cardTitleStyle}>NDA</h3>
+          <p style={cardBodyStyle}>Manage mutual NDA versions and summaries.</p>
+        </Link>
         <Link href="/platform-admin/email-ingest" style={cardStyle}>
           <h3 style={cardTitleStyle}>Email ingest</h3>
           <p style={cardBodyStyle}>Monitor inbound pipeline status.</p>
         </Link>
+      </div>
+
+      <div style={reservedStyle}>
+        <h3 style={{ marginTop: 0 }}>Reserved org slugs</h3>
+        <p style={cardBodyStyle}>
+          These slugs are blocked to avoid route conflicts.
+        </p>
+        <div style={pillRowStyle}>
+          {RESERVED_ORG_SLUGS.map((slug) => (
+            <span key={slug} style={pillStyle}>
+              {slug}
+            </span>
+          ))}
+        </div>
       </div>
     </PlatformAdminLayout>
   );
@@ -70,4 +89,28 @@ const cardTitleStyle = {
 const cardBodyStyle = {
   margin: 0,
   color: '#4b4f54',
+};
+
+const reservedStyle = {
+  marginTop: '2rem',
+  padding: '1.2rem',
+  borderRadius: '14px',
+  border: '1px solid rgba(15, 37, 54, 0.12)',
+  background: 'rgba(245, 245, 245, 0.6)',
+};
+
+const pillRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.5rem',
+  marginTop: '0.75rem',
+};
+
+const pillStyle = {
+  padding: '0.35rem 0.6rem',
+  borderRadius: '999px',
+  background: '#0f3a4b',
+  color: '#fff',
+  fontSize: '0.75rem',
+  letterSpacing: '0.04em',
 };

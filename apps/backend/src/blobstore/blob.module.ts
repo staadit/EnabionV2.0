@@ -10,9 +10,10 @@ import { S3BlobStore } from './s3-blobstore';
 import { NdaPolicy } from './nda.policy';
 import { EventModule } from '../events/event.module';
 import { AuthModule } from '../auth/auth.module';
+import { NdaModule } from '../nda/nda.module';
 
 @Module({
-  imports: [EventModule, forwardRef(() => AuthModule)],
+  imports: [EventModule, forwardRef(() => AuthModule), NdaModule],
   controllers: [AttachmentController],
   providers: [
     PrismaService,

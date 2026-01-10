@@ -2,16 +2,26 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
 import OrgShell from '../../../../components/OrgShell';
+import NdaAcceptancePanel from '../../../../components/NdaAcceptancePanel';
 import { getYNavItems } from '../../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../../lib/org-context';
+import { fetchNdaCurrent, fetchNdaStatus, type NdaCurrent, type NdaStatus } from '../../../../lib/org-nda';
 
 type IncomingTabProps = {
   user: OrgUser;
   org: OrgInfo;
   intentId: string;
+  ndaCurrent: NdaCurrent | null;
+  ndaStatus: NdaStatus | null;
 };
 
-export default function IncomingNda({ user, org, intentId }: IncomingTabProps) {
+export default function IncomingNda({
+  user,
+  org,
+  intentId,
+  ndaCurrent,
+  ndaStatus,
+}: IncomingTabProps) {
   return (
     <OrgShell
       user={user}
@@ -24,19 +34,24 @@ export default function IncomingNda({ user, org, intentId }: IncomingTabProps) {
       <Head>
         <title>{org.name} - NDA</title>
       </Head>
-      <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>NDA placeholder</p>
-        <p style={{ margin: 0 }}>Intent ID: {intentId}</p>
-      </div>
+      <p style={metaStyle}>Intent ID: {intentId}</p>
+      {ndaCurrent ? (
+        <NdaAcceptancePanel
+          current={ndaCurrent}
+          status={ndaStatus ?? undefined}
+          defaultLanguage={org.defaultLanguage}
+        />
+      ) : (
+        <p style={{ color: '#b42318' }}>Unable to load NDA content.</p>
+      )}
     </OrgShell>
   );
 }
 
-const cardStyle = {
-  padding: '1rem 1.25rem',
-  borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+const metaStyle = {
+  marginTop: 0,
+  marginBottom: '1rem',
+  color: '#6b7785',
 };
 
 export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (ctx) => {
@@ -45,11 +60,16 @@ export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (c
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
+  const cookie = result.context!.cookie;
+  const ndaCurrent = await fetchNdaCurrent(cookie, result.context!.org.defaultLanguage);
+  const ndaStatus = await fetchNdaStatus(cookie);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
       intentId,
+      ndaCurrent,
+      ndaStatus,
     },
   };
 };

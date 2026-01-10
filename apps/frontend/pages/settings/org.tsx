@@ -4,6 +4,7 @@ import type { GetServerSideProps } from 'next';
 import SettingsLayout from '../../components/SettingsLayout';
 import { getAdminLabels } from '../../lib/admin-i18n';
 import { getOwnerContext, type AdminOrg, type AdminUser } from '../../lib/admin-server';
+import { isReservedOrgSlug } from '../../lib/reserved-slugs';
 
 type OrgSettingsProps = {
   user: AdminUser;
@@ -27,10 +28,13 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
 
   const labels = getAdminLabels(currentOrg.defaultLanguage);
   const slugValue = slug.trim().toLowerCase();
+  const slugChanged = slugValue !== currentOrg.slug;
   const slugValid =
-    slugValue.length >= 3 &&
-    slugValue.length <= 40 &&
-    /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(slugValue);
+    !slugChanged ||
+    (slugValue.length >= 3 &&
+      slugValue.length <= 9 &&
+      /^[a-z0-9]{3,6}(?:-[0-9]{1,2})?$/.test(slugValue) &&
+      !isReservedOrgSlug(slugValue));
 
   const onSave = async () => {
     setSaving(true);
@@ -38,13 +42,14 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
     setSuccess(false);
 
     try {
+      const payload: { name: string; slug?: string } = { name: name.trim() };
+      if (slugChanged) {
+        payload.slug = slugValue;
+      }
       const res = await fetch('/api/org/me', {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          name: name.trim(),
-          slug: slugValue,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -86,7 +91,8 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
             value={slug}
             onChange={(event) => setSlug(event.target.value.toLowerCase())}
             style={inputStyle}
-            placeholder="enabion"
+            placeholder="ab1234"
+            maxLength={9}
           />
           <span style={hintStyle}>{labels.orgSlugHint}</span>
         </label>

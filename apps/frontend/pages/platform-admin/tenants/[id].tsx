@@ -3,6 +3,7 @@ import Link from 'next/link';
 import type { GetServerSideProps } from 'next';
 import PlatformAdminLayout from '../../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../../lib/require-platform-admin';
+import { formatDateTime } from '../../../lib/date-format';
 
 type TenantUser = {
   id: string;
@@ -52,7 +53,7 @@ export default function TenantDetailPage({ user, org, counts, members }: TenantD
         </div>
         <div style={metaCardStyle}>
           <p style={metaLabelStyle}>Created</p>
-          <p style={metaValueStyle}>{new Date(org.createdAt).toISOString()}</p>
+            <p style={metaValueStyle}>{formatDateTime(org.createdAt)}</p>
         </div>
         <div style={metaCardStyle}>
           <p style={metaLabelStyle}>Users</p>
@@ -95,8 +96,8 @@ export default function TenantDetailPage({ user, org, counts, members }: TenantD
                 </td>
                 <td style={tdStyle}>{member.role}</td>
                 <td style={tdStyle}>{member.deactivatedAt ? 'Deactivated' : 'Active'}</td>
-                <td style={tdStyle}>{member.lastLoginAt ? new Date(member.lastLoginAt).toISOString() : '-'}</td>
-                <td style={tdStyle}>{new Date(member.createdAt).toISOString()}</td>
+                <td style={tdStyle}>{formatDateTime(member.lastLoginAt)}</td>
+                <td style={tdStyle}>{formatDateTime(member.createdAt)}</td>
               </tr>
             ))}
             {!members.length ? (

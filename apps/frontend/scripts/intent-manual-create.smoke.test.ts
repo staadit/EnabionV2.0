@@ -7,6 +7,7 @@ function assert(condition: any, message: string) {
 async function run() {
   process.env.BACKEND_URL = 'http://backend.test';
   const handler = (await import('../pages/api/intents/index')).default;
+  const patchHandler = (await import('../pages/api/intents/[id]/index')).default;
   const coachHandler = (await import('../pages/api/intents/[id]/coach/run')).default;
 
   const originalFetch = globalThis.fetch;
@@ -36,13 +37,26 @@ async function run() {
   try {
     const reqGet = {
       method: 'GET',
-      query: { stage: 'NEW', orgId: 'evil', limit: '5' },
+      query: {
+        stage: 'NEW',
+        status: ['NEW', 'CLARIFY'],
+        ownerId: 'user-1',
+        language: 'EN',
+        from: '2026-01-01',
+        to: '2026-01-07',
+        q: 'test',
+        orgId: 'evil',
+        limit: '5',
+      },
       headers: { cookie: 'enabion_session=tokenA' },
     } as any;
 
     await handler(reqGet, res);
     assert(capturedUrl.includes('/intents'), 'Proxy must call /intents');
     assert(capturedUrl.includes('stage=NEW'), 'Proxy must forward stage filter');
+    assert(capturedUrl.includes('status=NEW'), 'Proxy must forward status filter');
+    assert(capturedUrl.includes('ownerId=user-1'), 'Proxy must forward owner filter');
+    assert(capturedUrl.includes('language=EN'), 'Proxy must forward language filter');
     assert(!capturedUrl.includes('orgId='), 'Proxy must not forward orgId');
     assert(
       capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
@@ -79,6 +93,30 @@ async function run() {
     assert(
       capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
       'Coach proxy must forward cookie',
+    );
+
+    capturedUrl = '';
+    capturedOptions = null;
+    const reqPatch = {
+      method: 'PATCH',
+      query: { id: 'intent-1' },
+      headers: { cookie: 'enabion_session=tokenA' },
+      body: { pipelineStage: 'MATCH' },
+    } as any;
+
+    await patchHandler(reqPatch, res);
+    assert(
+      capturedUrl.includes('/intents/intent-1'),
+      'Patch proxy must call /intents/:id',
+    );
+    assert(capturedOptions?.method === 'PATCH', 'Patch proxy must PATCH backend');
+    assert(
+      capturedOptions?.headers?.['content-type'] === 'application/json',
+      'Patch proxy must set content-type',
+    );
+    assert(
+      capturedOptions?.headers?.cookie === 'enabion_session=tokenA',
+      'Patch proxy must forward cookie',
     );
   } finally {
     if (originalFetch) {
