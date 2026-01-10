@@ -333,6 +333,7 @@ export class PlatformAdminService {
   }
 
   async listNdaDocuments(actor: AuthUser) {
+    await this.nda.ensureSeedDocument();
     const documents = await this.nda.listDocuments();
     await this.emitAudit(actor, {
       action: 'NDA_LIST',

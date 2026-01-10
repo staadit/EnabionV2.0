@@ -73,6 +73,30 @@ export class NdaService {
     }));
   }
 
+  async ensureSeedDocument(): Promise<void> {
+    const existing = await this.prisma.ndaDocument.findFirst({
+      where: { ndaType: NDA_TYPE_MUTUAL },
+      select: { id: true },
+    });
+    if (existing) {
+      return;
+    }
+
+    const enMarkdown = await this.readContentFile(NDA_FILES.en, true);
+    const summaryPl = await this.readContentFile(NDA_FILES.summary.PL, false);
+    const summaryDe = await this.readContentFile(NDA_FILES.summary.DE, false);
+    const summaryNl = await this.readContentFile(NDA_FILES.summary.NL, false);
+
+    await this.createDocument({
+      ndaVersion: NDA_VERSION,
+      enMarkdown,
+      summaryPl,
+      summaryDe,
+      summaryNl,
+      isActive: true,
+    });
+  }
+
   async getDocumentById(id: string): Promise<NdaDocumentPayload> {
     const doc = await this.prisma.ndaDocument.findUnique({ where: { id } });
     if (!doc) {
