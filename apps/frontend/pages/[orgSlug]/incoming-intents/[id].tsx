@@ -25,6 +25,8 @@ export default function IncomingIntentDetail({
   intent,
   attachments,
 }: IncomingIntentDetailProps) {
+  const isLocked = Boolean(intent?.l2Redacted || intent?.ndaRequired);
+
   return (
     <OrgShell
       user={user}
@@ -64,7 +66,7 @@ export default function IncomingIntentDetail({
               <div style={labelStyle}>Summary</div>
               <div style={summaryTextStyle}>{intent.goal || '-'}</div>
             </div>
-            {intent.l2Redacted ? (
+            {isLocked ? (
               <div style={lockedCardStyle}>
                 <strong>L2 details locked</strong>
                 <p style={lockedTextStyle}>
@@ -112,23 +114,23 @@ export default function IncomingIntentDetail({
                       <td style={tdStyle}>
                         <span style={badgeStyle}>{attachment.confidentialityLevel}</span>
                       </td>
-                      <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
-                      <td style={tdStyle}>
-                        {attachment.canDownload ? (
-                          <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
-                            Download
-                          </a>
-                        ) : (
-                          <a
-                            href={`/${org.slug}/incoming-intents/${intentId}/nda`}
-                            style={lockedStyle}
-                          >
-                            Locked (Accept NDA)
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                    <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
+                    <td style={tdStyle}>
+                      {attachment.canDownload ? (
+                        <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
+                          Download
+                        </a>
+                      ) : (
+                        <a
+                          href={`/${org.slug}/incoming-intents/${intentId}/nda`}
+                          style={lockedStyle}
+                        >
+                          Locked (Accept NDA)
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
                 </tbody>
               </table>
             </div>
