@@ -5,7 +5,7 @@ const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 function buildBackendUrl(id: string, req: NextApiRequest) {
   const params = new URLSearchParams();
-  ['ndaAccepted', 'asInline'].forEach((key) => {
+  ['asInline'].forEach((key) => {
     const value = req.query[key];
     if (typeof value === 'string') {
       params.append(key, value);

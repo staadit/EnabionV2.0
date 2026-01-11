@@ -43,6 +43,19 @@ class MockPrismaService {
   public attachments: AttachmentRecord[] = [];
   public events: any[] = [];
   public lastEventFindManyArgs: any;
+  private readonly ndaDoc = {
+    id: 'nda-doc-1',
+    ndaType: 'MUTUAL',
+    ndaVersion: 'Enabion_mutual_nda_v0.1_en',
+    enMarkdown: 'NDA',
+    summaryPl: null,
+    summaryDe: null,
+    summaryNl: null,
+    enHashSha256: '0'.repeat(64),
+    isActive: true,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 
   blob = {
     create: async (args: any) => {
@@ -87,6 +100,14 @@ class MockPrismaService {
       this.lastEventFindManyArgs = args;
       return this.events.filter((evt) => evt.orgId === args.where?.orgId);
     },
+  };
+
+  ndaDocument = {
+    findFirst: async () => this.ndaDoc,
+  };
+
+  ndaAcceptance = {
+    findFirst: async () => null,
   };
 }
 

@@ -295,11 +295,11 @@ async function run() {
     'upload event should be emitted',
   );
 
-  const listOwner: any = await controller.listIntentAttachments(ownerReq, 'intent-1', undefined);
+  const listOwner: any = await controller.listIntentAttachments(ownerReq, 'intent-1');
   assert(listOwner.items?.length === 1, 'list should return attachment');
   assert(listOwner.items[0].canDownload === true, 'owner can download L1');
 
-  const listOther: any = await controller.listIntentAttachments(otherOrgReq, 'intent-1', undefined);
+  const listOther: any = await controller.listIntentAttachments(otherOrgReq, 'intent-1');
   assert(listOther.items?.length === 1, 'cross-tenant list should return attachment');
   assert(listOther.items[0].canDownload === true, 'cross-tenant L1 should be downloadable');
 
@@ -307,8 +307,6 @@ async function run() {
   const downloadRes: any = await controller.downloadAttachment(
     viewerReq,
     uploadRes.attachmentId,
-    undefined,
-    undefined,
   );
   const roundtrip = await streamToBuffer(downloadRes.getStream());
   assert(roundtrip.toString() === 'hello-world', 'roundtrip mismatch');
@@ -317,8 +315,6 @@ async function run() {
   const crossDownload: any = await controller.downloadAttachment(
     otherOrgReq,
     uploadRes.attachmentId,
-    undefined,
-    undefined,
   );
   const crossBuffer = await streamToBuffer(crossDownload.getStream());
   assert(crossBuffer.toString() === 'hello-world', 'cross-tenant L1 mismatch');
@@ -337,18 +333,17 @@ async function run() {
   const okDownloadSameOrg: any = await controller.downloadAttachment(
     viewerReq,
     uploadL2.attachmentId,
-    undefined,
   );
   const l2Buffer = await streamToBuffer(okDownloadSameOrg.getStream());
   assert(l2Buffer.toString() === 'top-secret', 'L2 decrypt mismatch');
 
-  const listOtherL2: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2', undefined);
+  const listOtherL2: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2');
   assert(listOtherL2.items?.length === 1, 'cross-tenant list should include L2');
   assert(listOtherL2.items[0].canDownload === false, 'cross-tenant L2 should be locked');
 
   let threw = false;
   try {
-    await controller.downloadAttachment(otherOrgReq, uploadL2.attachmentId, undefined, undefined);
+    await controller.downloadAttachment(otherOrgReq, uploadL2.attachmentId);
   } catch (err) {
     if (err instanceof ForbiddenException) threw = true;
   }
@@ -370,17 +365,39 @@ async function run() {
     createdAt: new Date(),
   });
 
+  threw = false;
+  try {
+    await controller.downloadAttachment(otherOrgReq, uploadL2.attachmentId);
+  } catch (err) {
+    if (err instanceof ForbiddenException) threw = true;
+  }
+  assert(threw, 'cross-tenant L2 without mutual NDA should be forbidden');
+
+  prisma.ndaAcceptances.push({
+    id: crypto.randomUUID(),
+    orgId: 'org-1',
+    counterpartyOrgId: 'other-org',
+    ndaType: 'MUTUAL',
+    ndaVersion: currentDoc.ndaVersion,
+    enHashSha256: currentDoc.enHashSha256,
+    acceptedByUserId: 'user-1',
+    acceptedAt: new Date(),
+    language: 'EN',
+    channel: 'ui',
+    typedName: 'Owner User',
+    typedRole: 'Owner',
+    createdAt: new Date(),
+  });
+
   const okDownload: any = await controller.downloadAttachment(
     otherOrgReq,
     uploadL2.attachmentId,
-    undefined,
-    undefined,
   );
   const l2CrossBuffer = await streamToBuffer(okDownload.getStream());
   assert(l2CrossBuffer.toString() === 'top-secret', 'cross-tenant L2 decrypt mismatch');
 
-  const listOtherL2Ok: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2', undefined);
-  assert(listOtherL2Ok.items[0].canDownload === true, 'NDA should unlock L2 download');
+  const listOtherL2Ok: any = await controller.listIntentAttachments(otherOrgReq, 'intent-2');
+  assert(listOtherL2Ok.items[0].canDownload === true, 'mutual NDA should unlock L2 download');
   const downloadEvents = eventService.emitted.filter(
     (e) => e.type === EVENT_TYPES.ATTACHMENT_DOWNLOADED,
   );

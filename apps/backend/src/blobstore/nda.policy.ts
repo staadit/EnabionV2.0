@@ -21,9 +21,9 @@ export class NdaPolicy {
     if (input.requestOrgId === input.resourceOrgId) {
       return true;
     }
-    return this.ndaService.hasAccepted({
-      orgId: input.requestOrgId,
-      counterpartyOrgId: input.resourceOrgId,
+    return this.ndaService.hasMutualAcceptance({
+      ownerOrgId: input.resourceOrgId,
+      viewerOrgId: input.requestOrgId,
     });
   }
 }

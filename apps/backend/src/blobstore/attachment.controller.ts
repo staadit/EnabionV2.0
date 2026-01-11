@@ -96,7 +96,6 @@ export class AttachmentController {
   async listIntentAttachments(
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
   ) {
     const user = this.requireUser(req);
     const intent = await this.attachmentService.findIntent(intentId);
@@ -118,7 +117,6 @@ export class AttachmentController {
     @Req() req: AuthenticatedRequest,
     @Param('intentId') intentId: string,
     @Param('attachmentId') attachmentId: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(attachmentId);
@@ -133,7 +131,6 @@ export class AttachmentController {
   async downloadAttachment(
     @Req() req: AuthenticatedRequest,
     @Param('id') id: string,
-    @Query('ndaAccepted') _ndaAccepted?: string,
     @Query('asInline') asInline?: string,
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(id);
@@ -235,12 +232,14 @@ export class AttachmentController {
           confidentiality,
           ndaAccepted: ndaOk,
         });
+        const isExternal = requestOrgId !== attachment.orgId;
+        const redactMeta = isExternal && confidentiality === 'L2' && !ndaOk;
         return {
           id: attachment.id,
-          originalName: attachment.filename,
+          originalName: redactMeta ? 'Locked attachment' : attachment.filename,
           mimeType: attachment.blob?.contentType ?? 'application/octet-stream',
-          sizeBytes: attachment.blob?.sizeBytes ?? 0,
-          sha256Hex: attachment.blob?.sha256 ?? '',
+          sizeBytes: redactMeta ? 0 : attachment.blob?.sizeBytes ?? 0,
+          sha256Hex: redactMeta ? '' : attachment.blob?.sha256 ?? '',
           confidentialityLevel: confidentiality,
           createdAt: attachment.createdAt.toISOString(),
           uploadedBy: attachment.uploadedBy

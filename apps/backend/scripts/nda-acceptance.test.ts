@@ -1,3 +1,4 @@
+import { NdaChannel } from '@prisma/client';
 import { NdaService } from '../src/nda/nda.service';
 import { EVENT_TYPES } from '../src/events/event-registry';
 import { NDA_VERSION, NDA_V0_1_EN_HASH } from '../src/nda/nda.constants';
@@ -56,7 +57,7 @@ async function run() {
     typedName: 'Jane Doe',
     typedRole: 'Owner',
     language: 'EN',
-    channel: 'ui',
+    channel: NdaChannel.ui,
   });
 
   assert(acceptance.ndaVersion === NDA_VERSION, 'ndaVersion mismatch');
@@ -72,7 +73,7 @@ async function run() {
     typedName: 'Jane Doe',
     typedRole: 'Owner',
     language: 'EN',
-    channel: 'ui',
+    channel: NdaChannel.ui,
   });
 
   assert(second.id === acceptance.id, 'idempotency failed');
