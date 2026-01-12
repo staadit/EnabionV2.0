@@ -49,7 +49,7 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
       user={user}
       org={org}
       title={`Intent ${intentId}`}
-      subtitle="Detail view with overview, coach, matches, and NDA."
+      subtitle="Detail view with overview, coach, matches, actions, attachments, and NDA."
       navItems={getXNavItems(org.slug, 'intents')}
     >
       <Head>
@@ -58,17 +58,19 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
       <div style={headerRowStyle}>
         <div>
           <h2 style={headerTitleStyle}>Intent {intentId}</h2>
-          <p style={{ margin: 0 }}>Detail view with attachments and actions.</p>
+          <p style={{ margin: 0 }}>Detail view with overview, coach, matches, actions, attachments, and NDA.</p>
         </div>
-        <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
-          Export
-        </a>
-        <a href={`/${org.slug}/intents/${intentId}/share`} style={ghostButtonStyle}>
-          Share link
-        </a>
-        <a href={`/${org.slug}/intents/${intentId}/nda`} style={ghostButtonStyle}>
-          NDA
-        </a>
+        <div style={actionRowRight}>
+          <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
+            Export
+          </a>
+          <a href={`/${org.slug}/intents/${intentId}/share`} style={primaryButtonStyle}>
+            Share link
+          </a>
+          <a href={`/${org.slug}/intents/${intentId}/nda`} style={primaryButtonStyle}>
+            NDA
+          </a>
+        </div>
       </div>
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
@@ -209,6 +211,7 @@ const primaryButtonStyle = {
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
+  textDecoration: 'none',
 };
 
 const headerRowStyle = {
@@ -223,6 +226,12 @@ const headerRowStyle = {
 const headerTitleStyle = {
   margin: 0,
   fontSize: '1.4rem',
+};
+
+const actionRowRight = {
+  display: 'flex',
+  gap: '0.5rem',
+  alignItems: 'center',
 };
 
 const errorStyle = {

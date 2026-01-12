@@ -23,15 +23,8 @@ type IntentTabProps = {
 export default function Share({ user, org, intentId, links: initialLinks }: IntentTabProps) {
   const [links, setLinks] = useState(initialLinks);
   const [creating, setCreating] = useState(false);
-  const [lastToken, setLastToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    const stored = window.localStorage.getItem(`share:lastToken:${intentId}`);
-    if (stored) {
-      setLastToken(stored);
-    }
-  }, [intentId]);
+  const [shareUrl, setShareUrl] = useState<string | null>(null);
 
   const handleCreate = async () => {
     setCreating(true);
@@ -43,8 +36,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
         return;
       }
       const shareUrl = `${window.location.origin}/share/intent/${res.token}`;
-      window.localStorage.setItem(`share:lastToken:${intentId}`, shareUrl);
-      setLastToken(shareUrl);
+      setShareUrl(shareUrl);
       const refreshed = await listShareLinks(undefined, intentId);
       setLinks(refreshed);
     } catch {
@@ -77,12 +69,6 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
         <title>{org.name} - Share</title>
       </Head>
       <div style={cardStyle}>
-        {lastToken ? (
-          <div style={tokenBox}>
-            <div style={labelStyle}>Last generated link</div>
-            <code style={tokenValue}>{lastToken}</code>
-          </div>
-        ) : null}
         <p style={{ marginTop: 0, fontWeight: 600 }}>Generate share link (L1-only)</p>
         <p style={{ margin: '0 0 1rem', color: '#4b5c6b' }}>
           Default TTL: 14 days. Creating a new link revokes the previous one.
@@ -91,10 +77,10 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
           {creating ? 'Generating...' : 'Generate share link'}
         </button>
         {error ? <p style={errorStyle}>{error}</p> : null}
-        {lastToken ? (
+        {shareUrl ? (
           <div style={tokenBox}>
             <div style={labelStyle}>Share URL</div>
-            <code style={tokenValue}>{lastToken}</code>
+            <code style={tokenValue}>{shareUrl}</code>
           </div>
         ) : null}
       </div>
