@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { ThemeSwitcher } from '../components/theme/ThemeSwitcher';
+import { setTheme } from '../lib/theme';
 
 const defaultEmail = `Subject: Mobile App MVP — Retail Loyalty (DE)
 
@@ -19,6 +20,15 @@ export default function LandingPage() {
 
   useEffect(() => {
     setYear(new Date().getFullYear());
+    // Default landing to light if no preference is set.
+    try {
+      const stored = localStorage.getItem('enabion_theme');
+      if (!stored) {
+        setTheme('light');
+      }
+    } catch {
+      /* ignore */
+    }
   }, []);
 
   return (
@@ -40,7 +50,7 @@ export default function LandingPage() {
             </div>
           </div>
 
-          <nav style={navLinks} aria-label="Primary">
+          <nav className="navLinks" style={navLinks} aria-label="Primary">
             <a href="#product">Product</a>
             <a href="#how">How it works</a>
             <a href="#trust">Trust &amp; Security</a>
@@ -60,7 +70,7 @@ export default function LandingPage() {
         </header>
 
         <section style={hero} id="product" aria-label="Hero">
-          <div style={heroGrid}>
+          <div className="heroGrid" style={heroGrid}>
             <div>
               <div style={pill}>
                 <span style={{ ...dot, ...dotOcean }} />
@@ -163,7 +173,7 @@ export default function LandingPage() {
         </section>
 
         <Section id="problem" title="Why Enabion" desc="Less chaos, faster decisions, better trust.">
-          <div style={grid3}>
+          <div className="grid3" style={grid3}>
             <Card title="Collaboration chaos">
               Emails, docs, chats, spreadsheets. No single source of truth for what the client actually wants.
             </Card>
@@ -177,7 +187,7 @@ export default function LandingPage() {
         </Section>
 
         <Section id="how" title="How it works (R1.0)" desc="A narrow, sharp MVP: Intent → Clarify → Match → Commit.">
-          <div style={steps}>
+          <div className="steps" style={steps}>
             <Step n="Step 1" t="Paste → Intent" d="Turn a raw email/RFP into a structured Intent: goal, context, scope, KPIs, risks." />
             <Step n="Step 2" t="Clarify" d="Avatar highlights missing information and drafts precise questions to remove ambiguity." />
             <Step n="Step 3" t="Match (beta)" d="Rule-based matching by industry, tech, region, language and budget range — transparent rationale." />
@@ -200,7 +210,7 @@ export default function LandingPage() {
         </Section>
 
         <Section id="trust" title="Trust & Confidentiality" desc="Simple language: L1/L2/L3 + NDA layers.">
-          <div style={trustRow}>
+          <div className="trustRow" style={trustRow}>
             <div style={card}>
               <h3 style={cardTitle}>Confidentiality levels</h3>
               <ul style={list}>
@@ -239,7 +249,7 @@ export default function LandingPage() {
         </Section>
 
         <Section title="What you get in the MVP" desc="Built for daily BD/AM execution — not a one-off marketplace.">
-          <div style={grid3}>
+          <div className="grid3" style={grid3}>
             <Card title="Intent Coach">Structured brief generation with missing fields & risk prompts. Suggestions are logged and traceable.</Card>
             <Card title="Pre-sales Pipeline">Move deals through a shared workflow and keep ownership, deadlines and next steps visible.</Card>
             <Card title="Share L1 safely">Send view-only links (L1) to clients and partners without exposing confidential information.</Card>
@@ -250,7 +260,7 @@ export default function LandingPage() {
         </Section>
 
         <Section id="pricing" title="Pricing" desc="Simple seat-based plans for early customers (details in demo).">
-          <div style={grid3}>
+          <div className="grid3" style={grid3}>
             <Card title="Beta">For early adopters validating the workflow. Includes core Intent + pipeline + exports.</Card>
             <Card title="Team">Multi-seat collaboration (R1.1). Shared ownership, dashboard, and basic analytics.</Card>
             <Card title="Enterprise (later)">Shielded/Sovereign data models and compliance options for regulated environments (R4+).</Card>
@@ -294,6 +304,7 @@ export default function LandingPage() {
             <Link href="/contact">Contact</Link>
           </div>
         </footer>
+        <GlobalMediaStyles />
       </div>
     </>
   );
@@ -586,20 +597,18 @@ const muted2: React.CSSProperties = { color: 'var(--muted2)' };
 const mono: React.CSSProperties = { fontFamily: 'var(--mono)' };
 
 // Responsive tweaks
-const media = `
+const mediaStyles = `
 @media (min-width: 860px) {
   .grid3 { grid-template-columns: repeat(3, 1fr); }
   .steps { grid-template-columns: repeat(4, 1fr); }
   .trustRow { grid-template-columns: 1.2fr .8fr; }
 }
 @media (min-width: 980px) {
-  .navLinks { display: flex; }
+  .navLinks { display: flex !important; }
   .heroGrid { grid-template-columns: 1.15fr .85fr; }
 }
 `;
 
-if (typeof document !== 'undefined') {
-  const style = document.createElement('style');
-  style.textContent = media;
-  document.head.appendChild(style);
+export function GlobalMediaStyles() {
+  return <style jsx global>{mediaStyles}</style>;
 }
