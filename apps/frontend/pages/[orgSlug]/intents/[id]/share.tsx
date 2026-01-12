@@ -90,9 +90,9 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
             <div style={labelStyle}>Share URL</div>
             <code style={tokenValue}>{shareUrl}</code>
           </div>
-        ) : (
+        ) : links.length === 0 ? (
           <p style={mutedStyle}>Share URL was not created yet.</p>
-        )}
+        ) : null}
       </div>
 
       <div style={sectionStyle}>
