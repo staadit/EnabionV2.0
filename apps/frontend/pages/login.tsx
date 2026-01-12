@@ -83,7 +83,7 @@ export default function Login() {
       </Head>
 
       <main style={{ ...cardStyle, animation: 'panelIn 480ms ease' }}>
-        <div style={badgeStyle}>Enabion R1.0</div> 
+        <div style={badgeStyle}> Enabion R1.0</div> 
         <a style={linkStyle} href="/"> Home </a>
         <h1 style={titleStyle}>Welcome back</h1>
         <p style={subtitleStyle}>Sign in with your org email to continue.</p>
