@@ -55,22 +55,16 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
       <Head>
         <title>{org.name} - Intent {intentId}</title>
       </Head>
-      <div style={headerRowStyle}>
-        <div>
-          <h2 style={headerTitleStyle}>Intent {intentId}</h2>
-          <p style={{ margin: 0 }}>Detail view with overview, coach, matches, actions, attachments, and NDA.</p>
-        </div>
-        <div style={actionRowRight}>
-          <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
-            Export
-          </a>
-          <a href={`/${org.slug}/intents/${intentId}/share`} style={primaryButtonStyle}>
-            Share link
-          </a>
-          <a href={`/${org.slug}/intents/${intentId}/nda`} style={primaryButtonStyle}>
-            NDA
-          </a>
-        </div>
+      <div style={actionBarStyle}>
+        <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
+          Export
+        </a>
+        <a href={`/${org.slug}/intents/${intentId}/share`} style={primaryButtonStyle}>
+          Share link
+        </a>
+        <a href={`/${org.slug}/intents/${intentId}/nda`} style={primaryButtonStyle}>
+          NDA
+        </a>
       </div>
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
@@ -214,25 +208,13 @@ const primaryButtonStyle = {
   textDecoration: 'none',
 };
 
-const headerRowStyle = {
+const actionBarStyle = {
   display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: '0.75rem',
-  flexWrap: 'wrap' as const,
-  marginBottom: '1rem',
-};
-
-const headerTitleStyle = {
-  margin: 0,
-  fontSize: '1.2rem',
-  fontWeight: 700,
-};
-
-const actionRowRight = {
-  display: 'flex',
+  justifyContent: 'flex-end',
   gap: '0.5rem',
   alignItems: 'center',
+  flexWrap: 'wrap' as const,
+  marginBottom: '1rem',
 };
 
 const errorStyle = {
