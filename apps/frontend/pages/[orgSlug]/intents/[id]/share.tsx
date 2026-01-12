@@ -10,7 +10,7 @@ import {
   revokeShareLink,
   type ShareLink,
 } from '../../../../lib/share-links';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { formatDateTime } from '../../../../lib/date-format';
 
 type IntentTabProps = {
@@ -26,6 +26,13 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
   const [lastToken, setLastToken] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem(`share:lastToken:${intentId}`);
+    if (stored) {
+      setLastToken(stored);
+    }
+  }, [intentId]);
+
   const handleCreate = async () => {
     setCreating(true);
     setError(null);
@@ -36,6 +43,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
         return;
       }
       const shareUrl = `${window.location.origin}/share/intent/${res.token}`;
+      window.localStorage.setItem(`share:lastToken:${intentId}`, shareUrl);
       setLastToken(shareUrl);
       const refreshed = await listShareLinks(undefined, intentId);
       setLinks(refreshed);
@@ -69,6 +77,12 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
         <title>{org.name} - Share</title>
       </Head>
       <div style={cardStyle}>
+        {lastToken ? (
+          <div style={tokenBox}>
+            <div style={labelStyle}>Last generated link</div>
+            <code style={tokenValue}>{lastToken}</code>
+          </div>
+        ) : null}
         <p style={{ marginTop: 0, fontWeight: 600 }}>Generate share link (L1-only)</p>
         <p style={{ margin: '0 0 1rem', color: '#4b5c6b' }}>
           Default TTL: 14 days. Creating a new link revokes the previous one.

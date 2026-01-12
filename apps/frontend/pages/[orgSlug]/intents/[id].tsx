@@ -55,15 +55,13 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
       <Head>
         <title>{org.name} - Intent {intentId}</title>
       </Head>
-      <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
-        <p style={{ margin: 0 }}>
-          Tabs, activity timeline, and matching UI will be added here.
-        </p>
-      </div>
-      <div style={actionRowStyle}>
+      <div style={headerRowStyle}>
+        <div>
+          <h2 style={headerTitleStyle}>Intent {intentId}</h2>
+          <p style={{ margin: 0 }}>Detail view with attachments and actions.</p>
+        </div>
         <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
-          Export (L1)
+          Export
         </a>
         <a href={`/${org.slug}/intents/${intentId}/share`} style={ghostButtonStyle}>
           Share link
@@ -71,6 +69,12 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
         <a href={`/${org.slug}/intents/${intentId}/nda`} style={ghostButtonStyle}>
           NDA
         </a>
+      </div>
+      <div style={cardStyle}>
+        <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
+        <p style={{ margin: 0 }}>
+          Tabs, activity timeline, and matching UI will be added here.
+        </p>
       </div>
 
       <div style={sectionStyle}>
@@ -205,6 +209,20 @@ const primaryButtonStyle = {
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
+};
+
+const headerRowStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.75rem',
+  flexWrap: 'wrap' as const,
+  marginBottom: '1rem',
+};
+
+const headerTitleStyle = {
+  margin: 0,
+  fontSize: '1.4rem',
 };
 
 const errorStyle = {
