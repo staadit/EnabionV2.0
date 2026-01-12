@@ -125,39 +125,42 @@ const labelStyle = {
   flexDirection: 'column' as const,
   gap: '0.6rem',
   fontWeight: 600,
-  color: '#1f2933',
+  color: 'var(--text)',
 };
 
 const inputStyle = {
   borderRadius: '12px',
   padding: '0.85rem 1rem',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
   fontSize: '1rem',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
 const hintStyle = {
   fontSize: '0.85rem',
-  color: '#6a6f76',
+  color: 'var(--muted)',
 };
 
 const buttonStyle = {
   marginTop: '0.5rem',
   padding: '0.9rem 1.1rem',
   borderRadius: '12px',
-  border: 'none',
-  background: '#e4572e',
+  border: '1px solid rgba(255,255,255,0.16)',
+  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   margin: 0,
 };
 
 const successStyle = {
-  color: '#157f3b',
+  color: 'var(--green)',
   margin: 0,
 };
 
@@ -165,8 +168,10 @@ const pillStyle = {
   display: 'inline-flex',
   padding: '0.5rem 0.75rem',
   borderRadius: '999px',
-  background: 'rgba(15, 37, 54, 0.08)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
   fontWeight: 600,
+  color: 'var(--text)',
 };
 
 export const getServerSideProps: GetServerSideProps<OrgSettingsProps> = async (ctx) => {

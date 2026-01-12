@@ -25,6 +25,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
   const [creating, setCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
+  const [loadingList, setLoadingList] = useState(false);
 
   useEffect(() => {
     const stored = window.localStorage.getItem(`share:url:${intentId}`);
@@ -32,7 +33,10 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
       setShareUrl(stored);
     }
     // Always refresh list client-side to ensure we show history with session cookie.
-    listShareLinks(undefined, intentId).then((items) => setLinks(items));
+    setLoadingList(true);
+    listShareLinks(undefined, intentId)
+      .then((items) => setLinks(items))
+      .finally(() => setLoadingList(false));
   }, [intentId]);
 
   const handleCreate = async () => {
@@ -80,7 +84,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
       </Head>
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>Generate share link (L1-only)</p>
-        <p style={{ margin: '0 0 1rem', color: '#4b5c6b' }}>
+        <p style={{ margin: '0 0 1rem', color: 'var(--muted)' }}>
           Default TTL: 14 days. Creating a new link revokes the previous one.
         </p>
         <button style={primaryButton} onClick={handleCreate} disabled={creating}>
@@ -92,7 +96,8 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
             <div style={labelStyle}>Share URL</div>
             <code style={tokenValue}>{shareUrl}</code>
           </div>
-        ) : links.length === 0 ? (
+        ) : null}
+        {!shareUrl && links.length === 0 && !loadingList ? (
           <p style={mutedStyle}>Share URL was not created yet.</p>
         ) : null}
       </div>
@@ -150,24 +155,26 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
+  boxShadow: 'var(--shadow)',
 };
 
 const primaryButton = {
   borderRadius: '999px',
   border: 'none',
   padding: '0.55rem 1.1rem',
-  background: '#0f2536',
+  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const textButton = {
   border: 'none',
   background: 'none',
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -176,8 +183,8 @@ const tokenBox = {
   marginTop: '1rem',
   padding: '0.75rem 0.9rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   wordBreak: 'break-all' as const,
 };
 
@@ -188,7 +195,7 @@ const tokenValue = {
 
 const errorStyle = {
   marginTop: '0.75rem',
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
 };
 
@@ -199,13 +206,15 @@ const sectionStyle = {
 const sectionTitleStyle = {
   margin: '0 0 1rem',
   fontSize: '1.1rem',
+  color: 'var(--text)',
 };
 
 const tableCardStyle = {
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   overflow: 'hidden',
+  boxShadow: 'var(--shadow)',
 };
 
 const tableStyle = {
@@ -217,26 +226,27 @@ const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem 1rem',
   fontSize: '0.85rem',
-  color: '#6b7785',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  color: 'var(--muted)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
   fontSize: '0.95rem',
+  color: 'var(--text)',
 };
 
 const labelStyle = {
   fontSize: '0.7rem',
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-  color: '#6b7785',
+  color: 'var(--muted)',
 };
 
 const mutedStyle = {
   margin: 0,
-  color: '#6b7785',
+  color: 'var(--muted)',
 };
 
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {
