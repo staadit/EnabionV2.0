@@ -26,6 +26,13 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
 
+  useEffect(() => {
+    const stored = window.localStorage.getItem(`share:url:${intentId}`);
+    if (stored) {
+      setShareUrl(stored);
+    }
+  }, [intentId]);
+
   const handleCreate = async () => {
     setCreating(true);
     setError(null);
@@ -37,6 +44,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
       }
       const shareUrl = `${window.location.origin}/share/intent/${res.token}`;
       setShareUrl(shareUrl);
+      window.localStorage.setItem(`share:url:${intentId}`, shareUrl);
       const refreshed = await listShareLinks(undefined, intentId);
       setLinks(refreshed);
     } catch {
@@ -82,7 +90,9 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
             <div style={labelStyle}>Share URL</div>
             <code style={tokenValue}>{shareUrl}</code>
           </div>
-        ) : null}
+        ) : (
+          <p style={mutedStyle}>Share URL was not created yet.</p>
+        )}
       </div>
 
       <div style={sectionStyle}>
@@ -128,7 +138,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
             </table>
           </div>
         ) : (
-          <p style={mutedStyle}>No share links yet.</p>
+          <p style={mutedStyle}>Share URL was not created yet.</p>
         )}
       </div>
     </OrgShell>

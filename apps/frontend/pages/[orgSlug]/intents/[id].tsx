@@ -56,6 +56,10 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
         <title>{org.name} - Intent {intentId}</title>
       </Head>
       <div style={headerRowStyle}>
+        <div>
+          <h2 style={headerTitleStyle}>Intent {intentId}</h2>
+          <p style={{ margin: 0 }}>Detail view with overview, coach, matches, actions, attachments, and NDA.</p>
+        </div>
         <div style={actionRowRight}>
           <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
             Export
@@ -217,6 +221,12 @@ const headerRowStyle = {
   gap: '0.75rem',
   flexWrap: 'wrap' as const,
   marginBottom: '1rem',
+};
+
+const headerTitleStyle = {
+  margin: 0,
+  fontSize: '1.2rem',
+  fontWeight: 700,
 };
 
 const actionRowRight = {
