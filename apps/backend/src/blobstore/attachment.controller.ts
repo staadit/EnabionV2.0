@@ -77,8 +77,9 @@ export class AttachmentController {
       confidentiality,
       intent.confidentialityLevel,
     );
-    const correlationId = (req.headers['x-request-id'] as string) ?? ulid();
-    const lifecycleStep = this.mapLifecycleStep(intent.stage);
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
+    const pipelineStage = ((intent.stage as any) || 'NEW') as any;
+    const lifecycleStep = this.mapLifecycleStep(pipelineStage);
 
     const attachment = await this.attachmentService.uploadAttachment({
       orgId,
@@ -88,7 +89,7 @@ export class AttachmentController {
       confidentiality: confidentialityLevel,
       buffer,
       createdByUserId: user.id,
-      pipelineStage: intent.stage,
+      pipelineStage,
       lifecycleStep,
       correlationId,
       channel: 'ui',
@@ -112,8 +113,9 @@ export class AttachmentController {
     if (!intent) {
       throw new NotFoundException('Intent not found');
     }
-    const correlationId = (req.headers['x-request-id'] as string) ?? ulid();
-    const lifecycleStep = this.mapLifecycleStep(intent.stage);
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
+    const pipelineStage = (intent.stage as string) || 'NEW';
+    const lifecycleStep = this.mapLifecycleStep(pipelineStage);
     await this.events.emitEvent({
       orgId: intent.orgId,
       actorUserId: user.id,
@@ -121,7 +123,7 @@ export class AttachmentController {
       subjectType: 'INTENT',
       subjectId: intentId,
       lifecycleStep,
-      pipelineStage: (intent.stage as any) || 'NEW',
+      pipelineStage: pipelineStage as any,
       channel: 'ui',
       correlationId,
       occurredAt: new Date(),
@@ -207,7 +209,7 @@ export class AttachmentController {
     });
 
     const download = await this.blobService.getBlobStream(attachment.blobId, attachment.orgId);
-    const correlationId = (req.headers['x-request-id'] as string) ?? ulid();
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
     await this.attachmentService.emitDownloadedEvent({
       attachment,
       actorUserId: user.id,
