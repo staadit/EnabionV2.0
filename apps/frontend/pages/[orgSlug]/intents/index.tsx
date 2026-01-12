@@ -10,6 +10,17 @@ import { fetchOrgIntents, type OrgIntent } from '../../../lib/org-intents';
 import { fetchOrgMembers, type OrgMemberOption } from '../../../lib/org-members';
 import { formatDateTime } from '../../../lib/date-format';
 
+const colors = {
+  surface: 'var(--surface)',
+  surface2: 'var(--surface-2)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  muted: 'var(--muted)',
+  muted2: 'var(--muted-2)',
+  ocean: 'var(--ocean)',
+  green: 'var(--green)',
+};
+
 type IntentFilters = {
   q: string;
   status: string[];
@@ -315,21 +326,23 @@ const headerStyle = {
 const titleStyle = {
   margin: 0,
   fontSize: '1.6rem',
+  color: colors.text,
 };
 
 const subtitleStyle = {
   margin: '0.35rem 0 0',
-  color: '#4b4f54',
+  color: colors.muted,
 };
 
 const filtersCardStyle = {
   marginTop: '1.5rem',
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: `1px solid ${colors.border}`,
+  background: colors.surface2,
   display: 'grid',
   gap: '1rem',
+  boxShadow: 'var(--shadow)',
 };
 
 const filtersGridStyle = {
@@ -342,14 +355,16 @@ const fieldStyle = {
   display: 'grid',
   gap: '0.45rem',
   fontWeight: 600,
-  color: '#1f2933',
+  color: colors.text,
 };
 
 const inputStyle = {
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: `1px solid ${colors.border}`,
   padding: '0.55rem 0.7rem',
   fontSize: '0.9rem',
+  background: colors.surface,
+  color: colors.text,
 };
 
 const filterActionsStyle = {
@@ -366,18 +381,19 @@ const primaryButtonStyle = {
   borderRadius: '10px',
   textDecoration: 'none',
   fontWeight: 600,
-  border: 'none',
-  background: '#0f3a4b',
+  border: '1px solid rgba(255,255,255,0.16)',
+  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
   color: '#fff',
   cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const ghostButtonStyle = {
   padding: '0.6rem 1.1rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  background: '#fff',
-  color: '#0f3a4b',
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  color: colors.text,
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -385,9 +401,10 @@ const ghostButtonStyle = {
 const tableCardStyle = {
   marginTop: '1.5rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
+  border: `1px solid ${colors.border}`,
   overflow: 'hidden',
-  background: '#fff',
+  background: colors.surface2,
+  boxShadow: 'var(--shadow)',
 };
 
 const tableStyle = {
@@ -398,8 +415,8 @@ const tableStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
-  color: '#4b4f54',
+  borderBottom: `1px solid ${colors.border}`,
+  color: colors.muted,
   fontSize: '0.85rem',
   textTransform: 'uppercase' as const,
   letterSpacing: '0.04em',
@@ -407,8 +424,9 @@ const thStyle = {
 
 const tdStyle = {
   padding: '0.9rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: `1px solid ${colors.border}`,
   fontSize: '0.95rem',
+  color: colors.text,
 };
 
 const rowStyle = {
@@ -421,7 +439,7 @@ const titleCellStyle = {
 };
 
 const metaTextStyle = {
-  color: '#687179',
+  color: colors.muted2,
   fontSize: '0.75rem',
 };
 
@@ -429,10 +447,11 @@ const emptyStateStyle = {
   marginTop: '1.5rem',
   padding: '1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: `1px dashed ${colors.border}`,
+  background: colors.surface,
   display: 'grid',
   gap: '0.5rem',
+  color: colors.text,
 };
 
 const formatDate = (value?: string | null) => formatDateTime(value);

@@ -8,6 +8,15 @@ import { requireOrgContext, type OrgInfo, type OrgUser } from '../../lib/org-con
 import { fetchOrgIntents, type OrgIntent } from '../../lib/org-intents';
 import { formatDateTime } from '../../lib/date-format';
 
+const colors = {
+  surface: 'var(--surface)',
+  surface2: 'var(--surface-2)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  muted: 'var(--muted)',
+  muted2: 'var(--muted-2)',
+};
+
 type PipelineProps = {
   user: OrgUser;
   org: OrgInfo;
@@ -195,12 +204,13 @@ const boardStyle = {
 };
 
 const columnStyle = {
-  background: 'rgba(255, 255, 255, 0.7)',
+  background: colors.surface,
   borderRadius: '16px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
+  border: `1px solid ${colors.border}`,
   display: 'flex',
   flexDirection: 'column' as const,
   minHeight: '320px',
+  boxShadow: 'var(--shadow)',
 };
 
 const columnHeaderStyle = {
@@ -208,20 +218,22 @@ const columnHeaderStyle = {
   justifyContent: 'space-between',
   alignItems: 'center',
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.1)',
+  borderBottom: `1px solid ${colors.border}`,
 };
 
 const columnTitleStyle = {
   fontWeight: 700,
   fontSize: '0.95rem',
+  color: colors.text,
 };
 
 const columnCountStyle = {
-  background: '#0f3a4b',
+  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
   color: '#fff',
   fontSize: '0.75rem',
   padding: '0.2rem 0.5rem',
   borderRadius: '999px',
+  boxShadow: 'var(--shadow)',
 };
 
 const columnBodyStyle = {
@@ -233,15 +245,16 @@ const columnBodyStyle = {
 };
 
 const cardStyle = {
-  background: '#fff',
+  background: colors.surface2,
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
+  border: `1px solid ${colors.border}`,
   padding: '0.75rem 0.85rem',
   cursor: 'pointer',
   display: 'grid',
   gap: '0.35rem',
-  boxShadow: '0 12px 24px rgba(15, 37, 54, 0.08)',
+  boxShadow: 'var(--shadow)',
   transition: 'transform 0.15s ease',
+  color: colors.text,
 };
 
 const viewerCardStyle = {
@@ -256,10 +269,11 @@ const draggingStyle = {
 const cardTitleStyle = {
   fontWeight: 600,
   fontSize: '0.95rem',
+  color: colors.text,
 };
 
 const cardMetaStyle = {
-  color: '#5b636a',
+  color: colors.muted,
   fontSize: '0.8rem',
 };
 
@@ -267,7 +281,7 @@ const cardFooterStyle = {
   display: 'flex',
   flexDirection: 'column' as const,
   gap: '0.2rem',
-  color: '#4b4f54',
+  color: colors.muted2,
   fontSize: '0.75rem',
 };
 
@@ -275,26 +289,27 @@ const activityLabelStyle = {
   fontSize: '0.65rem',
   textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
-  color: '#7b8288',
+  color: colors.muted2,
 };
 
 const activityValueStyle = {
-  color: '#4b4f54',
+  color: colors.text,
 };
 
 const emptyColumnStyle = {
-  color: '#6a6f76',
+  color: colors.muted,
   fontSize: '0.85rem',
   padding: '0.5rem',
   borderRadius: '10px',
-  border: '1px dashed rgba(15, 37, 54, 0.15)',
+  border: `1px dashed ${colors.border}`,
   textAlign: 'center' as const,
+  background: colors.surface2,
 };
 
 const errorBannerStyle = {
-  background: '#fff4f2',
-  color: '#8a2713',
-  border: '1px solid rgba(138, 39, 19, 0.25)',
+  background: 'var(--surface-2)',
+  color: colors.text,
+  border: `1px solid ${colors.border}`,
   borderRadius: '12px',
   padding: '0.75rem 1rem',
   marginBottom: '1rem',
@@ -307,14 +322,14 @@ const errorBannerStyle = {
 const errorDismissStyle = {
   background: 'transparent',
   border: 'none',
-  color: '#8a2713',
+  color: colors.text,
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const savingBadgeStyle = {
   fontSize: '0.7rem',
-  color: '#0f3a4b',
+  color: colors.text,
   fontWeight: 600,
 };
 
