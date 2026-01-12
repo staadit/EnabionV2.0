@@ -232,7 +232,7 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
   }),
   [EVENT_TYPES.INTENT_VIEWED]: basePayload.extend({
     intentId: z.string().min(1),
-    viewContext: z.enum(['owner', 'share_link', 'auditor']).optional(),
+    viewContext: z.enum(['owner', 'share_link', 'auditor', 'y_portal']).optional(),
   }),
   [EVENT_TYPES.INTENT_SHARED_LINK_VIEWED]: basePayload.extend({
     intentId: z.string().min(1),
@@ -241,7 +241,7 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
   [EVENT_TYPES.EXPORT_GENERATED]: basePayload.extend({
     intentId: z.string().min(1),
     exportId: z.string().min(1),
-    format: z.enum(['markdown', 'pdf']),
+    format: z.enum(['markdown', 'pdf', 'docx']),
   }),
   [EVENT_TYPES.ATTACHMENT_UPLOADED]: basePayload.extend({
     intentId: z.string().min(1),
