@@ -77,6 +77,9 @@ export class AttachmentService {
   }
 
   async findIntent(intentId: string): Promise<IntentMeta | null> {
+    if (!this.prisma.intent?.findUnique) {
+      return null;
+    }
     return this.prisma.intent.findUnique({
       where: { id: intentId },
       select: { id: true, orgId: true, confidentialityLevel: true, stage: true },
