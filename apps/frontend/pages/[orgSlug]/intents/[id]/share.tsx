@@ -31,6 +31,8 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
     if (stored) {
       setShareUrl(stored);
     }
+    // Always refresh list client-side to ensure we show history with session cookie.
+    listShareLinks(undefined, intentId).then((items) => setLinks(items));
   }, [intentId]);
 
   const handleCreate = async () => {
