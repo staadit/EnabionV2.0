@@ -25,6 +25,8 @@ export type IntentExportModelL1 = {
   ndaRequired: boolean;
 };
 
+const DEFAULT_TIME_ZONE = 'Europe/Warsaw';
+
 @Injectable()
 export class IntentExportService {
   constructor(
@@ -87,9 +89,41 @@ export class IntentExportService {
     };
   }
 
+  private formatDate(value: Date | string | null, timeZone = DEFAULT_TIME_ZONE): string {
+    if (!value) return '-';
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) return String(value);
+
+    try {
+      const formatter = new Intl.DateTimeFormat('pl-PL', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false,
+        hourCycle: 'h23',
+      });
+      const parts = formatter.formatToParts(date);
+      const lookup: Record<string, string> = {};
+      for (const part of parts) {
+        if (part.type !== 'literal') lookup[part.type] = part.value;
+      }
+      const { year, month, day, hour, minute, second } = lookup;
+      if (year && month && day && hour && minute && second) {
+        return `${day}-${month}-${year}, ${hour}:${minute}:${second}`;
+      }
+    } catch {
+      // fall back
+    }
+    return date.toISOString();
+  }
+
   renderMarkdown(model: IntentExportModelL1): string {
     this.assertNoForbiddenFields(model);
-    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
+    const exportedAt = this.formatDate(model.exportedAt);
     const lines = [
       '# Intent export (L1-only)',
       '',
@@ -102,7 +136,7 @@ export class IntentExportService {
       `**Client:** ${model.clientName ?? '-'}`,
       `**Stage:** ${model.pipelineStage}`,
       `**Deadline:** ${model.deadlineAt ?? '-'}`,
-      `**Exported at:** ${exportedAt.toISOString()}`,
+      `**Exported at:** ${exportedAt}`,
       '',
       '## Goal',
       model.goal ?? '-',
@@ -128,7 +162,7 @@ export class IntentExportService {
 
   async renderPdf(model: IntentExportModelL1): Promise<Buffer> {
     this.assertNoForbiddenFields(model);
-    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
+    const exportedAt = this.formatDate(model.exportedAt);
     const doc = new PDFDocument({ compress: false });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -149,8 +183,8 @@ export class IntentExportService {
     add('Owner', model.ownerName ?? '-');
     add('Client', model.clientName ?? '-');
     add('Stage', model.pipelineStage);
-    add('Deadline', model.deadlineAt ?? '-');
-    add('Exported at', exportedAt.toISOString());
+    add('Deadline', this.formatDate(model.deadlineAt));
+    add('Exported at', exportedAt);
     doc.moveDown();
     doc.fontSize(14).text('Goal');
     doc.fontSize(12).text(model.goal ?? '-', { align: 'left' });
@@ -179,7 +213,7 @@ export class IntentExportService {
 
   async renderDocx(model: IntentExportModelL1): Promise<Buffer> {
     this.assertNoForbiddenFields(model);
-    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
+    const exportedAt = this.formatDate(model.exportedAt);
     const para = (label: string, value: string | null) =>
       new Paragraph({
         spacing: { after: 120 },
@@ -207,8 +241,8 @@ export class IntentExportService {
             para('Owner', model.ownerName ?? '-'),
             para('Client', model.clientName ?? '-'),
             para('Stage', model.pipelineStage),
-            para('Deadline', model.deadlineAt ?? '-'),
-            para('Exported at', exportedAt.toISOString()),
+            para('Deadline', this.formatDate(model.deadlineAt)),
+            para('Exported at', exportedAt),
             new Paragraph({ text: 'Goal', heading: HeadingLevel.HEADING_2 }),
             new Paragraph({ text: model.goal ?? '-' }),
             new Paragraph({ text: 'Context', heading: HeadingLevel.HEADING_2 }),
