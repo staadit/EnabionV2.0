@@ -23,9 +23,16 @@ export async function listShareLinks(
   intentId: string,
 ): Promise<ShareLink[]> {
   try {
+    const headers: Record<string, string> = {};
+    const fetchInit: RequestInit = {};
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
       `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
-      { headers: { cookie: cookie ?? '' } },
+      { headers, ...fetchInit },
     );
     if (!res.ok) return [];
     const data = await readJson<{ items?: ShareLink[] }>(res);
@@ -40,13 +47,16 @@ export async function createShareLink(
   intentId: string,
 ): Promise<{ token: string; shareUrl: string; expiresAt: string } | null> {
   try {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const fetchInit: RequestInit = { method: 'POST', headers };
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
       `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
-      {
-        method: 'POST',
-        headers: { cookie: cookie ?? '', 'content-type': 'application/json' },
-        body: '{}',
-      },
+      { ...fetchInit, body: '{}' },
     );
     if (!res.ok) return null;
     return await readJson(res);
@@ -61,9 +71,16 @@ export async function revokeShareLink(
   shareLinkId: string,
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {};
+    const fetchInit: RequestInit = { method: 'POST', headers };
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
       `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
-      { method: 'POST', headers: { cookie: cookie ?? '' } },
+      fetchInit,
     );
     return res.ok;
   } catch {

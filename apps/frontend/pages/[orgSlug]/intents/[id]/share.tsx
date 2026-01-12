@@ -30,14 +30,14 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
     setCreating(true);
     setError(null);
     try {
-      const res = await createShareLink(document.cookie, intentId);
+      const res = await createShareLink(undefined, intentId);
       if (!res) {
         setError('Failed to create share link');
         return;
       }
       const shareUrl = `${window.location.origin}/share/intent/${res.token}`;
       setLastToken(shareUrl);
-      const refreshed = await listShareLinks(document.cookie, intentId);
+      const refreshed = await listShareLinks(undefined, intentId);
       setLinks(refreshed);
     } catch {
       setError('Failed to create share link');
@@ -48,12 +48,12 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
 
   const handleRevoke = async (id: string) => {
     setError(null);
-    const ok = await revokeShareLink(document.cookie, intentId, id);
+    const ok = await revokeShareLink(undefined, intentId, id);
     if (!ok) {
       setError('Failed to revoke link');
       return;
     }
-    const refreshed = await listShareLinks(document.cookie, intentId);
+    const refreshed = await listShareLinks(undefined, intentId);
     setLinks(refreshed);
   };
 
