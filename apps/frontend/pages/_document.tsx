@@ -11,10 +11,10 @@ const themeInitScript = `
       var mq = window.matchMedia('(prefers-color-scheme: dark)');
       preferred = mq.matches ? 'dark' : 'light';
     }
-    var theme = (preferred === 'light' || preferred === 'dark') ? preferred : 'dark';
+    var theme = (preferred === 'light' || preferred === 'dark') ? preferred : 'light';
     document.documentElement.setAttribute('data-theme', theme);
   } catch (e) {
-    document.documentElement.setAttribute('data-theme', 'dark');
+    document.documentElement.setAttribute('data-theme', 'light');
   }
 })();
 `;
@@ -27,7 +27,7 @@ class MyDocument extends Document {
 
   render() {
     return (
-      <Html data-theme="dark">
+      <Html data-theme="light">
         <Head />
         <body>
           <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
