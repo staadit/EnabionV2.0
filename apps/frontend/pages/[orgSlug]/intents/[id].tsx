@@ -61,6 +61,17 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
           Tabs, activity timeline, and matching UI will be added here.
         </p>
       </div>
+      <div style={actionRowStyle}>
+        <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButtonStyle}>
+          Export (L1)
+        </a>
+        <a href={`/${org.slug}/intents/${intentId}/share`} style={ghostButtonStyle}>
+          Share link
+        </a>
+        <a href={`/${org.slug}/intents/${intentId}/nda`} style={ghostButtonStyle}>
+          NDA
+        </a>
+      </div>
 
       <div style={sectionStyle}>
         <div style={sectionHeaderStyle}>
@@ -204,6 +215,23 @@ const errorStyle = {
 const mutedStyle = {
   margin: 0,
   color: '#6b7785',
+};
+
+const actionRowStyle = {
+  display: 'flex',
+  gap: '0.75rem',
+  marginTop: '1.25rem',
+  flexWrap: 'wrap' as const,
+};
+
+const ghostButtonStyle = {
+  display: 'inline-block',
+  padding: '0.5rem 1rem',
+  borderRadius: '999px',
+  background: '#eef2f6',
+  color: '#0f2536',
+  fontWeight: 600,
+  textDecoration: 'none',
 };
 
 const tableCardStyle = {
