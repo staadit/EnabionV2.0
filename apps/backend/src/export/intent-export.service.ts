@@ -19,7 +19,7 @@ export type IntentExportModelL1 = {
   scope: string | null;
   kpis: string | null;
   risks: string | null;
-  exportedAt: string;
+  exportedAt: Date | string;
   hasL2: boolean;
   l2Redacted: boolean;
   ndaRequired: boolean;
@@ -80,7 +80,7 @@ export class IntentExportService {
       scope: intent.scope ?? null,
       kpis: intent.kpi ?? null,
       risks: intent.risks ?? null,
-      exportedAt: new Date().toISOString(),
+      exportedAt: new Date(),
       hasL2: redacted.intent.hasL2,
       l2Redacted: redacted.intent.l2Redacted,
       ndaRequired: redacted.intent.ndaRequired,
@@ -89,6 +89,7 @@ export class IntentExportService {
 
   renderMarkdown(model: IntentExportModelL1): string {
     this.assertNoForbiddenFields(model);
+    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
     const lines = [
       '# Intent export (L1-only)',
       '',
@@ -101,7 +102,7 @@ export class IntentExportService {
       `**Client:** ${model.clientName ?? '-'}`,
       `**Stage:** ${model.pipelineStage}`,
       `**Deadline:** ${model.deadlineAt ?? '-'}`,
-      `**Exported at:** ${model.exportedAt}`,
+      `**Exported at:** ${exportedAt.toISOString()}`,
       '',
       '## Goal',
       model.goal ?? '-',
@@ -127,6 +128,7 @@ export class IntentExportService {
 
   async renderPdf(model: IntentExportModelL1): Promise<Buffer> {
     this.assertNoForbiddenFields(model);
+    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
     const doc = new PDFDocument({ compress: false });
     const chunks: Buffer[] = [];
     doc.on('data', (chunk: Buffer) => chunks.push(chunk));
@@ -148,7 +150,7 @@ export class IntentExportService {
     add('Client', model.clientName ?? '-');
     add('Stage', model.pipelineStage);
     add('Deadline', model.deadlineAt ?? '-');
-    add('Exported at', model.exportedAt);
+    add('Exported at', exportedAt.toISOString());
     doc.moveDown();
     doc.fontSize(14).text('Goal');
     doc.fontSize(12).text(model.goal ?? '-', { align: 'left' });
@@ -177,6 +179,7 @@ export class IntentExportService {
 
   async renderDocx(model: IntentExportModelL1): Promise<Buffer> {
     this.assertNoForbiddenFields(model);
+    const exportedAt = model.exportedAt instanceof Date ? model.exportedAt : new Date(model.exportedAt);
     const para = (label: string, value: string | null) =>
       new Paragraph({
         spacing: { after: 120 },
@@ -205,7 +208,7 @@ export class IntentExportService {
             para('Client', model.clientName ?? '-'),
             para('Stage', model.pipelineStage),
             para('Deadline', model.deadlineAt ?? '-'),
-            para('Exported at', model.exportedAt),
+            para('Exported at', exportedAt.toISOString()),
             new Paragraph({ text: 'Goal', heading: HeadingLevel.HEADING_2 }),
             new Paragraph({ text: model.goal ?? '-' }),
             new Paragraph({ text: 'Context', heading: HeadingLevel.HEADING_2 }),
