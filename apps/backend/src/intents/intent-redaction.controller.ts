@@ -18,15 +18,6 @@ export class IntentRedactionController {
   }
 
   @UseGuards(AuthGuard)
-  @Get('intents/:intentId/export')
-  async getExportIntent(
-    @Req() req: AuthenticatedRequest,
-    @Param('intentId') intentId: string,
-  ) {
-    const user = this.requireUser(req);
-    return this.redaction.getExportView(intentId, user.orgId);
-  }
-
   private requireUser(req: AuthenticatedRequest) {
     if (!req.user) {
       throw new BadRequestException('Missing session');

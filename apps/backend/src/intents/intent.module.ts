@@ -15,5 +15,6 @@ import { IntentService } from './intent.service';
   imports: [AuthModule, EventModule, NdaModule],
   controllers: [IntentController, IntentRedactionController, ShareLinkController, SharePublicController],
   providers: [IntentService, IntentRedactionService, ShareLinkService, PrismaService],
+  exports: [IntentRedactionService, IntentService],
 })
 export class IntentModule {}
