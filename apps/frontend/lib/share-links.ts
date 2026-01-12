@@ -8,7 +8,7 @@ export type ShareLink = {
   lastAccessAt?: string | null;
 };
 
-const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
+const BACKEND_BASE = '';
 
 async function readJson<T>(res: Response): Promise<T | null> {
   try {
@@ -31,7 +31,7 @@ export async function listShareLinks(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
       { headers, ...fetchInit },
     );
     if (!res.ok) return [];
@@ -55,7 +55,7 @@ export async function createShareLink(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
       { ...fetchInit, body: '{}' },
     );
     if (!res.ok) return null;
@@ -79,7 +79,7 @@ export async function revokeShareLink(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
       fetchInit,
     );
     return res.ok;

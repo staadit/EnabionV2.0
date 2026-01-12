@@ -10,13 +10,8 @@ type IntentTabProps = {
   intentId: string;
 };
 
-const BACKEND_PUBLIC =
-  process.env.NEXT_PUBLIC_BACKEND_URL ||
-  process.env.BACKEND_URL ||
-  'https://api.dev.enabion.com';
-
 export default function Export({ user, org, intentId }: IntentTabProps) {
-  const base = `${BACKEND_PUBLIC}/v1/intents/${encodeURIComponent(intentId)}/export`;
+  const base = `/api/intents/${encodeURIComponent(intentId)}/export`;
   const mkLink = (format: string) => `${base}?format=${format}`;
 
   return (
