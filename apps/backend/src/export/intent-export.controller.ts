@@ -30,6 +30,6 @@ export class IntentExportController {
       'Content-Disposition',
       `attachment; filename="intent-${intentId}-l1.${rendered.extension}"`,
     );
-    return rendered.data;
+    res.send(rendered.data);
   }
 }
