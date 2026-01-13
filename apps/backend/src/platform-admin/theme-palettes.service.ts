@@ -117,7 +117,7 @@ export class ThemePalettesService {
         data: {
           slug: input.slug ?? palette.slug,
           name: input.name ?? palette.name,
-          tokensJson: tokensChanged ? nextTokens : palette.tokensJson,
+          ...(tokensChanged && nextTokens ? { tokensJson: nextTokens } : {}),
           updatedByUserId: actorUserId,
         },
       });
