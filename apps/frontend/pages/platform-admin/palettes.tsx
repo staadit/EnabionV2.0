@@ -203,6 +203,41 @@ export default function PaletteAdminPage({ user, palettes }: PaletteAdminProps) 
         Manage brand tokens and activate the global default palette.
       </p>
 
+      <div style={infoCardStyle}>
+        <p style={infoTitleStyle}>Te wartości są edytowalne w panelu:</p>
+        <ul style={infoListStyle}>
+          <li>
+            <span style={infoLabelStyle}>Brand:</span> brand-ocean, brand-green, brand-gold,
+            brand-navy
+          </li>
+          <li>
+            <span style={infoLabelStyle}>Accents:</span> accent-1, accent-2, accent-3 (domyślnie
+            kopiują brand)
+          </li>
+          <li>
+            <span style={infoLabelStyle}>Statusy:</span> danger, success, warning, info
+          </li>
+        </ul>
+        <p style={infoTitleStyle}>Jak to się przekłada na UI (B)</p>
+        <ul style={infoListStyle}>
+          <li>
+            <span style={infoLabelStyle}>Primary button:</span> --gradient-primary (z accent-1 →
+            accent-2) + --text-on-brand
+          </li>
+          <li>
+            <span style={infoLabelStyle}>Linki:</span> --link (obecnie = --text)
+          </li>
+          <li>
+            <span style={infoLabelStyle}>Alerty:</span> --danger + --danger-bg + --danger-border
+            (liczone z palety)
+          </li>
+          <li>
+            <span style={infoLabelStyle}>Success/Info/Warning:</span> analogicznie z --success,
+            --info, --warning
+          </li>
+        </ul>
+      </div>
+
       <div style={actionRowStyle}>
         <button type="button" style={ghostButtonStyle} onClick={clearPreview}>
           Clear preview
@@ -361,6 +396,34 @@ export const getServerSideProps: GetServerSideProps<PaletteAdminProps> = async (
 const subtitleStyle = {
   marginTop: '0.4rem',
   color: 'var(--muted)',
+};
+
+const infoCardStyle = {
+  marginTop: '1rem',
+  marginBottom: '1.5rem',
+  padding: '1rem 1.25rem',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+};
+
+const infoTitleStyle = {
+  marginTop: 0,
+  marginBottom: '0.5rem',
+  fontWeight: 700,
+  color: 'var(--text)',
+};
+
+const infoListStyle = {
+  marginTop: 0,
+  marginBottom: '0.75rem',
+  paddingLeft: '1.25rem',
+  color: 'var(--muted)',
+};
+
+const infoLabelStyle = {
+  color: 'var(--text)',
+  fontWeight: 600,
 };
 
 const tableWrapStyle = {
