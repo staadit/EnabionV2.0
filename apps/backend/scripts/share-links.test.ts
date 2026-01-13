@@ -1,6 +1,7 @@
 import { randomUUID, createHash } from 'node:crypto';
 import { NotFoundException } from '@nestjs/common';
 import { ShareLinkService } from '../src/intents/share-link.service';
+import { EVENT_TYPES } from '../src/events/event-registry';
 
 function assert(condition: any, message: string) {
   if (!condition) {
@@ -43,6 +44,14 @@ class FakeRedactionService {
   }
 }
 
+class FakeEventService {
+  emitted: any[] = [];
+  async emitEvent(input: any) {
+    this.emitted.push(input);
+    return input;
+  }
+}
+
 class FakePrismaService {
   intents: Array<{ id: string; orgId: string }> = [];
   links: ShareLinkRecord[] = [];
@@ -52,6 +61,18 @@ class FakePrismaService {
   }
 
   intent = {
+    findUnique: async (args: any) => {
+      const found = this.intents.find((intent) => intent.id === args?.where?.id);
+      if (!found) return null;
+      if (args?.select) {
+        const out: any = {};
+        for (const [key, value] of Object.entries(args.select)) {
+          if (value === true) out[key] = (found as any)[key];
+        }
+        return out;
+      }
+      return found;
+    },
     findFirst: async (args: any) => {
       const found = this.intents.find(
         (intent) => intent.id === args?.where?.id && intent.orgId === args?.where?.orgId,
@@ -143,7 +164,11 @@ class FakePrismaService {
 async function testCreateAndRevoke() {
   const prisma = new FakePrismaService();
   prisma.intents = [{ id: 'intent-1', orgId: 'org-1' }];
-  const service = new ShareLinkService(prisma as any, new FakeRedactionService() as any);
+  const service = new ShareLinkService(
+    prisma as any,
+    new FakeRedactionService() as any,
+    new FakeEventService() as any,
+  );
 
   const created = await service.createShareLink({
     orgId: 'org-1',
@@ -174,7 +199,8 @@ async function testCreateAndRevoke() {
 async function testPublicViewAndExpiration() {
   const prisma = new FakePrismaService();
   prisma.intents = [{ id: 'intent-1', orgId: 'org-1' }];
-  const service = new ShareLinkService(prisma as any, new FakeRedactionService() as any);
+  const events = new FakeEventService();
+  const service = new ShareLinkService(prisma as any, new FakeRedactionService() as any, events as any);
 
   const created = await service.createShareLink({
     orgId: 'org-1',
@@ -184,6 +210,10 @@ async function testPublicViewAndExpiration() {
 
   const view = await service.resolvePublicView(created.token);
   assert(view.intent?.id === 'intent-1', 'Public view should resolve intent');
+  assert(
+    events.emitted.find((e) => e.type === EVENT_TYPES.INTENT_SHARED_LINK_VIEWED),
+    'Share view should emit audit event',
+  );
 
   const active = prisma.links.find((link) => link.tokenHashSha256 === createHash('sha256').update(created.token).digest('hex'))!;
   assert(active.accessCount === 1, 'Access count should increment on view');

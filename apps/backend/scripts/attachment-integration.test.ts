@@ -245,7 +245,13 @@ async function run() {
   const policy = new AttachmentAccessPolicy();
   const ndaService = new NdaService(prisma as any, eventService as any);
   const ndaPolicy = new NdaPolicy(ndaService);
-  const controller = new AttachmentController(attachmentService, policy, blobService, ndaPolicy);
+  const controller = new AttachmentController(
+    attachmentService,
+    policy,
+    blobService,
+    ndaPolicy,
+    eventService as any,
+  );
   const currentDoc = await ndaService.getCurrentDocument();
   const ownerReq = {
     user: {

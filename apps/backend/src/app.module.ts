@@ -8,6 +8,7 @@ import { IntentModule } from './intents/intent.module';
 import { OrgModule } from './org/org.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { NdaModule } from './nda/nda.module';
+import { ExportModule } from './export/export.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { NdaModule } from './nda/nda.module';
     OrgModule,
     PlatformAdminModule,
     NdaModule,
+    ExportModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,0 +1,58 @@
+/* Brand constants */
+:root {
+  --ocean: #126E82;
+  --green: #38A169;
+  --gold:  #FDBA45;
+  --navy:  #0B2239;
+  --danger:#F87171;
+
+  --radius: 14px;
+  --radius-2: 18px;
+  --shadow: 0 10px 30px rgba(0,0,0,0.15);
+}
+
+/* DARK (Black) — matches landing mock */
+html[data-theme="dark"] {
+  --bg: #070D16;
+  --bg-gradient-1: rgba(18,110,130,0.30);
+  --bg-gradient-2: rgba(56,161,105,0.22);
+  --bg-gradient-3: rgba(253,186,69,0.12);
+
+  --surface: rgba(255,255,255,0.06);
+  --surface-2: rgba(255,255,255,0.04);
+  --border: rgba(255,255,255,0.12);
+
+  --text: rgba(255,255,255,0.92);
+  --muted: rgba(255,255,255,0.68);
+  --muted-2: rgba(255,255,255,0.55);
+}
+
+/* LIGHT (White) — matches landing mock */
+html[data-theme="light"] {
+  --bg: #F6F8FB;
+  --bg-gradient-1: rgba(18,110,130,0.10);
+  --bg-gradient-2: rgba(56,161,105,0.10);
+  --bg-gradient-3: rgba(253,186,69,0.08);
+
+  --surface: rgba(255,255,255,0.92);
+  --surface-2: rgba(255,255,255,0.78);
+  --border: rgba(11,34,57,0.12);
+
+  --text: rgba(11,34,57,0.92);
+  --muted: rgba(11,34,57,0.70);
+  --muted-2: rgba(11,34,57,0.55);
+}
+
+/* Global background using tokens */
+body {
+  background:
+    radial-gradient(1200px 600px at 18% 0%, var(--bg-gradient-1), transparent 55%),
+    radial-gradient(900px 500px at 85% 5%, var(--bg-gradient-2), transparent 60%),
+    radial-gradient(700px 600px at 60% 100%, var(--bg-gradient-3), transparent 55%),
+    var(--bg);
+  color: var(--text);
+}
+
+a {
+  color: inherit;
+}

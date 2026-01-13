@@ -8,7 +8,7 @@ export type ShareLink = {
   lastAccessAt?: string | null;
 };
 
-const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
+const BACKEND_BASE = '';
 
 async function readJson<T>(res: Response): Promise<T | null> {
   try {
@@ -23,9 +23,16 @@ export async function listShareLinks(
   intentId: string,
 ): Promise<ShareLink[]> {
   try {
+    const headers: Record<string, string> = {};
+    const fetchInit: RequestInit = {};
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
-      { headers: { cookie: cookie ?? '' } },
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
+      { headers, ...fetchInit },
     );
     if (!res.ok) return [];
     const data = await readJson<{ items?: ShareLink[] }>(res);
@@ -40,13 +47,16 @@ export async function createShareLink(
   intentId: string,
 ): Promise<{ token: string; shareUrl: string; expiresAt: string } | null> {
   try {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const fetchInit: RequestInit = { method: 'POST', headers };
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links`,
-      {
-        method: 'POST',
-        headers: { cookie: cookie ?? '', 'content-type': 'application/json' },
-        body: '{}',
-      },
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
+      { ...fetchInit, body: '{}' },
     );
     if (!res.ok) return null;
     return await readJson(res);
@@ -61,9 +71,16 @@ export async function revokeShareLink(
   shareLinkId: string,
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {};
+    const fetchInit: RequestInit = { method: 'POST', headers };
+    if (cookie) {
+      headers.cookie = cookie;
+    } else {
+      fetchInit.credentials = 'include';
+    }
     const res = await fetch(
-      `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
-      { method: 'POST', headers: { cookie: cookie ?? '' } },
+      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
+      fetchInit,
     );
     return res.ok;
   } catch {

@@ -45,216 +45,272 @@ export default function IntentDetail({ user, org, intentId, attachments }: Inten
   };
 
   return (
-    <OrgShell
-      user={user}
-      org={org}
-      title={`Intent ${intentId}`}
-      subtitle="Detail view with overview, coach, matches, and NDA."
-      navItems={getXNavItems(org.slug, 'intents')}
-    >
+    <OrgShell user={user} org={org} title="" subtitle="" navItems={getXNavItems(org.slug, 'intents')}>
       <Head>
-        <title>{org.name} - Intent {intentId}</title>
+        <title>
+          {org.name} - Intent {intentId}
+        </title>
       </Head>
-      <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Detail placeholder</p>
-        <p style={{ margin: 0 }}>
-          Tabs, activity timeline, and matching UI will be added here.
-        </p>
-      </div>
-
-      <div style={sectionStyle}>
-        <div style={sectionHeaderStyle}>
+      <div style={panel}>
+        <div style={headerRow}>
           <div>
-            <h3 style={sectionTitleStyle}>Attachments</h3>
-            <p style={sectionSubtitleStyle}>Share files that belong to this intent.</p>
+            <h2 style={headerTitle}>Intent {intentId}</h2>
+            <p style={headerSubtitle}>Detail view with overview, coach, matches, actions, attachments, and NDA.</p>
+          </div>
+          <div style={actionBar}>
+            <a href={`/${org.slug}/intents/${intentId}/export`} style={primaryButton}>
+              Export
+            </a>
+            <a href={`/${org.slug}/intents/${intentId}/share`} style={primaryButton}>
+              Share link
+            </a>
+            <a href={`/${org.slug}/intents/${intentId}/nda`} style={primaryButton}>
+              NDA
+            </a>
           </div>
         </div>
 
-        {canUpload ? (
-          <form onSubmit={onUpload} style={uploadFormStyle} encType="multipart/form-data">
-            <input type="file" name="file" required style={fileInputStyle} />
-            <select name="confidentiality" defaultValue="L1" style={selectStyle}>
-              <option value="L1">L1 (No NDA)</option>
-              <option value="L2">L2 (NDA required)</option>
-            </select>
-            <button type="submit" style={primaryButtonStyle} disabled={uploading}>
-              {uploading ? 'Uploading...' : 'Upload'}
-            </button>
-            {uploadError ? <span style={errorStyle}>{uploadError}</span> : null}
-          </form>
-        ) : (
-          <p style={mutedStyle}>Only Owners and BD/AM users can upload attachments.</p>
-        )}
+        <div style={placeholderBox}>
+          <p style={placeholderTitle}>Detail placeholder</p>
+          <p style={placeholderBody}>Tabs, activity timeline, and matching UI will be added here.</p>
+        </div>
 
-        {attachments.length ? (
-          <div style={tableCardStyle}>
-            <table style={tableStyle}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Name</th>
-                  <th style={thStyle}>Size</th>
-                  <th style={thStyle}>Level</th>
-                  <th style={thStyle}>Uploaded by</th>
-                  <th style={thStyle}>Date</th>
-                  <th style={thStyle}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {attachments.map((attachment) => (
-                  <tr key={attachment.id}>
-                    <td style={tdStyle}>{attachment.originalName}</td>
-                    <td style={tdStyle}>{formatBytes(attachment.sizeBytes)}</td>
-                    <td style={tdStyle}>
-                      <span style={badgeStyle}>{attachment.confidentialityLevel}</span>
-                    </td>
-                    <td style={tdStyle}>{attachment.uploadedBy?.email ?? '-'}</td>
-                    <td style={tdStyle}>{formatDateTime(attachment.createdAt)}</td>
-                    <td style={tdStyle}>
-                      {attachment.canDownload ? (
-                        <a href={`/api/attachments/${attachment.id}`} style={linkStyle}>
-                          Download
-                        </a>
-                      ) : (
-                        <div style={actionStackStyle}>
-                          <span style={lockedStyle}>Locked (NDA required)</span>
-                          <a href={`/${org.slug}/intents/${intentId}/nda`} style={linkStyle}>
-                            Review NDA
-                          </a>
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+        <div style={section}>
+          <div style={sectionHeader}>
+            <div>
+              <h3 style={sectionTitle}>Attachments</h3>
+              <p style={sectionSubtitle}>Share files that belong to this intent.</p>
+            </div>
           </div>
-        ) : (
-          <p style={mutedStyle}>No attachments yet.</p>
-        )}
+
+          {canUpload ? (
+            <form onSubmit={onUpload} style={uploadForm} encType="multipart/form-data">
+              <input type="file" name="file" required style={fileInput} />
+              <select name="confidentiality" defaultValue="L1" style={select}>
+                <option value="L1">L1 (No NDA)</option>
+                <option value="L2">L2 (NDA required)</option>
+              </select>
+              <button type="submit" style={primaryButton} disabled={uploading}>
+                {uploading ? 'Uploading...' : 'Upload'}
+              </button>
+              {uploadError ? <span style={errorStyle}>{uploadError}</span> : null}
+            </form>
+          ) : (
+            <p style={mutedText}>Only Owners and BD/AM users can upload attachments.</p>
+          )}
+
+          {attachments.length ? (
+            <div style={tableCard}>
+              <table style={table}>
+                <thead>
+                  <tr>
+                    <th style={th}>Name</th>
+                    <th style={th}>Size</th>
+                    <th style={th}>Level</th>
+                    <th style={th}>Uploaded by</th>
+                    <th style={th}>Date</th>
+                    <th style={th}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {attachments.map((attachment) => (
+                    <tr key={attachment.id}>
+                      <td style={td}>{attachment.originalName}</td>
+                      <td style={td}>{formatBytes(attachment.sizeBytes)}</td>
+                      <td style={td}>
+                        <span style={badge}>{attachment.confidentialityLevel}</span>
+                      </td>
+                      <td style={td}>{attachment.uploadedBy?.email ?? '-'}</td>
+                      <td style={td}>{formatDateTime(attachment.createdAt)}</td>
+                      <td style={td}>
+                        {attachment.canDownload ? (
+                          <a href={`/api/attachments/${attachment.id}`} style={link}>
+                            Download
+                          </a>
+                        ) : (
+                          <div style={actionStack}>
+                            <span style={locked}>Locked (NDA required)</span>
+                            <a href={`/${org.slug}/intents/${intentId}/nda`} style={link}>
+                              Review NDA
+                            </a>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p style={mutedText}>No attachments yet.</p>
+          )}
+        </div>
       </div>
     </OrgShell>
   );
 }
 
-const cardStyle = {
-  padding: '1rem 1.25rem',
-  borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+const panel: React.CSSProperties = {
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius-2)',
+  boxShadow: 'var(--shadow)',
+  padding: '1.5rem',
 };
 
-const sectionStyle = {
-  marginTop: '2rem',
+const headerRow: React.CSSProperties = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'flex-start',
+  gap: '1rem',
+  flexWrap: 'wrap',
+  marginBottom: '1rem',
 };
 
-const sectionHeaderStyle = {
+const headerTitle: React.CSSProperties = {
+  margin: 0,
+  fontSize: '1.6rem',
+  fontWeight: 750,
+  color: 'var(--text)',
+};
+
+const headerSubtitle: React.CSSProperties = {
+  margin: '0.25rem 0 0',
+  color: 'var(--muted)',
+};
+
+const actionBar: React.CSSProperties = {
+  display: 'flex',
+  gap: '0.5rem',
+  alignItems: 'center',
+  flexWrap: 'wrap',
+};
+
+const primaryButton: React.CSSProperties = {
+  display: 'inline-block',
+  padding: '0.65rem 1.1rem',
+  borderRadius: '999px',
+  border: '1px solid var(--navy)',
+  background: 'linear-gradient(135deg, var(--navy), var(--ocean))',
+  color: '#fff',
+  fontWeight: 700,
+  textDecoration: 'none',
+  minWidth: '98px',
+  textAlign: 'center',
+};
+
+const placeholderBox: React.CSSProperties = {
+  padding: '1rem 1.1rem',
+  borderRadius: 'var(--radius)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
+};
+
+const placeholderTitle: React.CSSProperties = { margin: 0, fontWeight: 700, color: 'var(--text)' };
+const placeholderBody: React.CSSProperties = { margin: '0.35rem 0 0', color: 'var(--muted)' };
+
+const section: React.CSSProperties = {
+  marginTop: '1.6rem',
+};
+
+const sectionHeader: React.CSSProperties = {
   display: 'flex',
   justifyContent: 'space-between',
   alignItems: 'flex-start',
   marginBottom: '1rem',
 };
 
-const sectionTitleStyle = {
-  margin: 0,
-  fontSize: '1.1rem',
-};
+const sectionTitle: React.CSSProperties = { margin: 0, fontSize: '1.1rem', fontWeight: 700, color: 'var(--text)' };
+const sectionSubtitle: React.CSSProperties = { margin: '0.25rem 0 0', color: 'var(--muted)' };
 
-const sectionSubtitleStyle = {
-  margin: '0.25rem 0 0',
-  color: '#4b5c6b',
-};
-
-const uploadFormStyle = {
+const uploadForm: React.CSSProperties = {
   display: 'flex',
-  flexWrap: 'wrap' as const,
+  flexWrap: 'wrap',
   gap: '0.75rem',
   alignItems: 'center',
   marginBottom: '1rem',
 };
 
-const fileInputStyle = {
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  borderRadius: '8px',
+const fileInput: React.CSSProperties = {
+  border: '1px solid var(--border)',
+  borderRadius: '10px',
   padding: '0.45rem 0.6rem',
-  background: '#fff',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
-const selectStyle = {
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  borderRadius: '8px',
+const select: React.CSSProperties = {
+  border: '1px solid var(--border)',
+  borderRadius: '10px',
   padding: '0.45rem 0.6rem',
-  background: '#fff',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
-const primaryButtonStyle = {
-  borderRadius: '999px',
-  border: 'none',
-  padding: '0.5rem 1rem',
-  background: '#0f2536',
-  color: '#fff',
-  fontWeight: 600,
-  cursor: 'pointer',
-};
-
-const errorStyle = {
-  color: '#b42318',
+const errorStyle: React.CSSProperties = {
+  color: 'var(--danger)',
   fontSize: '0.9rem',
 };
 
-const mutedStyle = {
+const mutedText: React.CSSProperties = {
   margin: 0,
-  color: '#6b7785',
+  color: 'var(--muted)',
 };
 
-const tableCardStyle = {
-  borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+const tableCard: React.CSSProperties = {
+  borderRadius: 'var(--radius)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   overflow: 'hidden',
 };
 
-const tableStyle = {
+const table: React.CSSProperties = {
   width: '100%',
-  borderCollapse: 'collapse' as const,
+  borderCollapse: 'collapse',
 };
 
-const thStyle = {
-  textAlign: 'left' as const,
+const th: React.CSSProperties = {
+  textAlign: 'left',
   padding: '0.75rem 1rem',
-  fontSize: '0.85rem',
-  color: '#6b7785',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  fontSize: '0.9rem',
+  color: 'var(--muted)',
+  borderBottom: '1px solid var(--border)',
 };
 
-const tdStyle = {
+const td: React.CSSProperties = {
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
   fontSize: '0.95rem',
+  color: 'var(--text)',
 };
 
-const badgeStyle = {
+const badge: React.CSSProperties = {
   display: 'inline-flex',
-  padding: '0.15rem 0.5rem',
+  alignItems: 'center',
+  gap: '4px',
+  padding: '0.2rem 0.6rem',
   borderRadius: '999px',
-  background: 'rgba(15, 37, 54, 0.08)',
-  fontSize: '0.75rem',
-  fontWeight: 600,
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  fontSize: '0.8rem',
+  fontWeight: 650,
+  color: 'var(--text)',
 };
 
-const linkStyle = {
-  color: '#0f2536',
-  fontWeight: 600,
+const link: React.CSSProperties = {
+  color: 'var(--text)',
+  fontWeight: 650,
   textDecoration: 'none',
 };
 
-const lockedStyle = {
-  color: '#b42318',
-  fontWeight: 600,
+const locked: React.CSSProperties = {
+  color: 'var(--danger)',
+  fontWeight: 650,
 };
 
-const actionStackStyle = {
+const actionStack: React.CSSProperties = {
   display: 'flex',
-  flexDirection: 'column' as const,
+  flexDirection: 'column',
   gap: '0.3rem',
 };
 

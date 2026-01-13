@@ -6,6 +6,9 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma.service';
 import { IntentRedactionService } from './intent-redaction.service';
+import { EventService } from '../events/event.service';
+import { EVENT_TYPES } from '../events/event-registry';
+import { ulid } from 'ulid';
 
 type CreateShareLinkInput = {
   orgId: string;
@@ -18,6 +21,7 @@ export class ShareLinkService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redaction: IntentRedactionService,
+    private readonly events: EventService,
   ) {}
 
   async createShareLink(input: CreateShareLinkInput) {
@@ -120,7 +124,34 @@ export class ShareLinkService {
       data: { accessCount: { increment: 1 }, lastAccessAt: now },
     });
 
-    const view = await this.redaction.getShareViewByIntentId(link.intentId);
+    const [view, intent] = await Promise.all([
+      this.redaction.getShareViewByIntentId(link.intentId),
+      this.prisma.intent.findUnique({
+        where: { id: link.intentId },
+        select: { id: true, stage: true },
+      }),
+    ]);
+
+    const correlationId = ulid();
+    await this.events.emitEvent({
+      orgId: link.orgId,
+      actorUserId: null,
+      actorOrgId: link.orgId,
+      subjectType: 'SHARE_LINK',
+      subjectId: link.id,
+      lifecycleStep: this.mapLifecycleStep(intent?.stage),
+      pipelineStage: (intent?.stage as any) || 'NEW',
+      channel: 'api',
+      correlationId,
+      occurredAt: now,
+      type: EVENT_TYPES.INTENT_SHARED_LINK_VIEWED,
+      payload: {
+        payloadVersion: 1,
+        intentId: link.intentId,
+        shareTokenId: link.id,
+      },
+    });
+
     return {
       intent: view.intent,
       attachments: view.attachments,
@@ -169,5 +200,12 @@ export class ShareLinkService {
     const result = new Date(date);
     result.setDate(result.getDate() + days);
     return result;
+  }
+
+  private mapLifecycleStep(stage?: string | null) {
+    const value = stage?.toUpperCase();
+    if (value === 'MATCH') return 'MATCH_ALIGN';
+    if (value === 'COMMIT') return 'COMMIT_ASSURE';
+    return 'CLARIFY';
   }
 }

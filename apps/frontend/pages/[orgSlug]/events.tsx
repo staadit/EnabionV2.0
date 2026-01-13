@@ -5,6 +5,15 @@ import { getXNavItems } from '../../lib/org-nav';
 import { formatDateTime } from '../../lib/date-format';
 import { getOwnerContext, type AdminOrg, type AdminUser } from '../../lib/admin-server';
 
+const colors = {
+  surface: 'var(--surface)',
+  surface2: 'var(--surface-2)',
+  border: 'var(--border)',
+  text: 'var(--text)',
+  muted: 'var(--muted)',
+  muted2: 'var(--muted-2)',
+};
+
 type OrgEvent = {
   id: string;
   type: string;
@@ -128,8 +137,9 @@ export const getServerSideProps: GetServerSideProps<EventsLogProps> = async (ctx
 const cardStyle = {
   padding: '1rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: 'rgba(248, 248, 248, 0.8)',
+  border: `1px solid ${colors.border}`,
+  background: colors.surface,
+  boxShadow: 'var(--shadow)',
 };
 
 const cardHeaderStyle = {
@@ -141,7 +151,7 @@ const cardHeaderStyle = {
 
 const metaLabelStyle = {
   margin: 0,
-  color: '#6a6f76',
+  color: colors.muted,
   fontSize: '0.75rem',
   textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
@@ -150,21 +160,24 @@ const metaLabelStyle = {
 const metaValueStyle = {
   margin: 0,
   fontWeight: 600,
+  color: colors.text,
 };
 
 const metaSubStyle = {
   margin: 0,
-  color: '#4b4f54',
+  color: colors.muted2,
 };
 
 const payloadStyle = {
   marginTop: '0.75rem',
   padding: '0.75rem',
   borderRadius: '8px',
-  background: '#0f1720',
-  color: '#f8fafc',
+  background: colors.surface2,
+  color: colors.text,
   fontSize: '0.8rem',
   overflowX: 'auto' as const,
+  border: `1px solid ${colors.border}`,
+  fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
 };
 
 const errorStyle = {

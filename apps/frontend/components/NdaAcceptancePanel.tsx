@@ -78,7 +78,7 @@ export default function NdaAcceptancePanel({
         <div style={acceptedStyle}>
           <p style={{ margin: 0, fontWeight: 600 }}>Accepted</p>
           <p style={acceptedMetaStyle}>
-            {status?.acceptance?.typedName} ({status?.acceptance?.typedRole}) ·{' '}
+            {status?.acceptance?.typedName} ({status?.acceptance?.typedRole}) -{' '}
             {status?.acceptance?.acceptedAt
               ? formatDateTime(status.acceptance.acceptedAt)
               : ''}
@@ -145,9 +145,11 @@ export default function NdaAcceptancePanel({
 
 const panelStyle = {
   borderRadius: '16px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
+  border: '1px solid var(--border)',
   padding: '1.5rem',
-  background: '#fff',
+  background: 'var(--surface)',
+  color: 'var(--text)',
+  boxShadow: 'var(--shadow)',
 };
 
 const headerStyle = {
@@ -166,7 +168,7 @@ const titleStyle = {
 
 const subtitleStyle = {
   margin: 0,
-  color: '#4b5c6b',
+  color: 'var(--muted)',
 };
 
 const badgeRowStyle = {
@@ -178,19 +180,20 @@ const badgeRowStyle = {
 const badgeStyle = {
   padding: '0.2rem 0.6rem',
   borderRadius: '999px',
-  border: '1px solid rgba(15, 37, 54, 0.15)',
+  border: '1px solid var(--border)',
   fontSize: '0.75rem',
-  color: '#0f3a4b',
-  background: 'rgba(15, 58, 75, 0.06)',
+  color: 'var(--text)',
+  background: 'var(--surface-2)',
 };
 
 const summaryStyle = {
   marginTop: '1rem',
   padding: '1rem',
   borderRadius: '12px',
-  background: 'rgba(15, 37, 54, 0.04)',
+  background: 'var(--surface-2)',
   whiteSpace: 'pre-wrap' as const,
   lineHeight: 1.5,
+  color: 'var(--text)',
 };
 
 const detailsStyle = {
@@ -200,17 +203,18 @@ const detailsStyle = {
 const summaryToggleStyle = {
   cursor: 'pointer',
   fontWeight: 600,
-  color: '#1c6e5a',
+  color: 'var(--text)',
 };
 
 const markdownStyle = {
   marginTop: '0.75rem',
   padding: '1rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   whiteSpace: 'pre-wrap' as const,
   lineHeight: 1.5,
+  color: 'var(--text)',
 };
 
 const formStyle = {
@@ -228,13 +232,15 @@ const fieldStyle = {
   flexDirection: 'column' as const,
   gap: '0.35rem',
   fontWeight: 600,
-  color: '#1f2933',
+  color: 'var(--text)',
 };
 
 const inputStyle = {
   padding: '0.55rem 0.7rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
 const checkboxStyle = {
@@ -243,6 +249,7 @@ const checkboxStyle = {
   gap: '0.6rem',
   marginTop: '1rem',
   fontWeight: 600,
+  color: 'var(--text)',
 };
 
 const actionsStyle = {
@@ -256,10 +263,11 @@ const primaryButtonStyle = {
   borderRadius: '999px',
   border: 'none',
   padding: '0.6rem 1.3rem',
-  background: '#0f3a4b',
+  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const errorStyle = {
@@ -271,11 +279,11 @@ const acceptedStyle = {
   marginTop: '1rem',
   padding: '0.8rem 1rem',
   borderRadius: '12px',
-  border: '1px solid rgba(16, 185, 129, 0.4)',
-  background: 'rgba(16, 185, 129, 0.08)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
 };
 
 const acceptedMetaStyle = {
   margin: 0,
-  color: '#0f3a4b',
+  color: 'var(--muted)',
 };

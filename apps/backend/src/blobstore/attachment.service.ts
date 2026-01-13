@@ -16,6 +16,10 @@ export interface UploadAttachmentInput {
   confidentiality: ConfidentialityLevel;
   buffer: Buffer;
   createdByUserId?: string;
+  pipelineStage?: string;
+  lifecycleStep?: string;
+  correlationId?: string;
+  channel?: string;
 }
 
 type AttachmentWithBlob = Prisma.AttachmentGetPayload<{ include: { blob: true } }>;
@@ -28,6 +32,7 @@ export type IntentMeta = {
   id: string;
   orgId: string;
   confidentialityLevel: ConfidentialityLevel;
+  stage?: string | null;
 };
 
 @Injectable()
@@ -63,14 +68,21 @@ export class AttachmentService {
       attachment,
       actorUserId: input.createdByUserId,
       actorOrgId: input.orgId,
+      pipelineStage: input.pipelineStage,
+      lifecycleStep: input.lifecycleStep,
+      correlationId: input.correlationId,
+      channel: input.channel,
     });
     return attachment;
   }
 
   async findIntent(intentId: string): Promise<IntentMeta | null> {
+    if (!this.prisma.intent?.findUnique) {
+      return null;
+    }
     return this.prisma.intent.findUnique({
       where: { id: intentId },
-      select: { id: true, orgId: true, confidentialityLevel: true },
+      select: { id: true, orgId: true, confidentialityLevel: true, stage: true },
     }) as Promise<IntentMeta | null>;
   }
 
@@ -114,18 +126,24 @@ export class AttachmentService {
     actorUserId?: string;
     actorOrgId?: string;
     via?: 'owner' | 'share_link' | 'system';
+    pipelineStage?: string | null;
+    lifecycleStep?: string | null;
+    correlationId?: string;
+    channel?: string;
   }) {
     const intentId = input.attachment.intentId || 'unknown';
+    const pipelineStage = (input.pipelineStage as any) || 'NEW';
+    const lifecycleStep = (input.lifecycleStep as any) || 'CLARIFY';
     await this.events.emitEvent({
       orgId: input.attachment.orgId,
       actorUserId: input.actorUserId,
       actorOrgId: input.actorOrgId ?? input.attachment.orgId,
       subjectType: 'ATTACHMENT',
       subjectId: input.attachment.id,
-      lifecycleStep: 'CLARIFY',
-      pipelineStage: 'NEW',
-      channel: 'api',
-      correlationId: crypto.randomUUID(),
+      lifecycleStep,
+      pipelineStage,
+      channel: (input.channel as any) || 'api',
+      correlationId: input.correlationId ?? crypto.randomUUID(),
       occurredAt: new Date(),
       type: EVENT_TYPES.ATTACHMENT_DOWNLOADED,
       payload: {
@@ -141,18 +159,24 @@ export class AttachmentService {
     attachment: any;
     actorUserId?: string;
     actorOrgId?: string;
+    pipelineStage?: string | null;
+    lifecycleStep?: string | null;
+    correlationId?: string;
+    channel?: string;
   }) {
     const intentId = input.attachment.intentId || 'unknown';
+    const pipelineStage = (input.pipelineStage as any) || 'NEW';
+    const lifecycleStep = (input.lifecycleStep as any) || 'CLARIFY';
     await this.events.emitEvent({
       orgId: input.attachment.orgId,
       actorUserId: input.actorUserId,
       actorOrgId: input.actorOrgId ?? input.attachment.orgId,
       subjectType: 'ATTACHMENT',
       subjectId: input.attachment.id,
-      lifecycleStep: 'CLARIFY',
-      pipelineStage: 'NEW',
-      channel: 'api',
-      correlationId: crypto.randomUUID(),
+      lifecycleStep,
+      pipelineStage,
+      channel: (input.channel as any) || 'api',
+      correlationId: input.correlationId ?? crypto.randomUUID(),
       occurredAt: new Date(),
       type: EVENT_TYPES.ATTACHMENT_UPLOADED,
       payload: {

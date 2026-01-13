@@ -14,6 +14,7 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import { ulid } from 'ulid';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { AuthGuard } from '../auth/auth.guard';
 import { AuthenticatedRequest } from '../auth/auth.types';
@@ -24,6 +25,8 @@ import { AttachmentAccessPolicy } from './attachment.policy';
 import { BlobService } from './blob.service';
 import { NdaPolicy } from './nda.policy';
 import { ConfidentialityLevel } from './types';
+import { EventService } from '../events/event.service';
+import { EVENT_TYPES } from '../events/event-registry';
 
 type UploadedFileType = {
   originalname: string;
@@ -40,6 +43,7 @@ export class AttachmentController {
     private readonly policy: AttachmentAccessPolicy,
     private readonly blobService: BlobService,
     private readonly ndaPolicy: NdaPolicy,
+    private readonly events: EventService,
   ) {}
 
   @Post('intents/:intentId/attachments')
@@ -73,6 +77,9 @@ export class AttachmentController {
       confidentiality,
       intent.confidentialityLevel,
     );
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
+    const pipelineStage = ((intent.stage as any) || 'NEW') as any;
+    const lifecycleStep = this.mapLifecycleStep(pipelineStage);
 
     const attachment = await this.attachmentService.uploadAttachment({
       orgId,
@@ -82,6 +89,10 @@ export class AttachmentController {
       confidentiality: confidentialityLevel,
       buffer,
       createdByUserId: user.id,
+      pipelineStage,
+      lifecycleStep,
+      correlationId,
+      channel: 'ui',
     });
 
     return {
@@ -102,6 +113,28 @@ export class AttachmentController {
     if (!intent) {
       throw new NotFoundException('Intent not found');
     }
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
+    const pipelineStage = (intent.stage as string) || 'NEW';
+    const lifecycleStep = this.mapLifecycleStep(pipelineStage);
+    await this.events.emitEvent({
+      orgId: intent.orgId,
+      actorUserId: user.id,
+      actorOrgId: user.orgId,
+      subjectType: 'INTENT',
+      subjectId: intentId,
+      lifecycleStep,
+      pipelineStage: pipelineStage as any,
+      channel: 'ui',
+      correlationId,
+      occurredAt: new Date(),
+      type: EVENT_TYPES.INTENT_VIEWED,
+      payload: {
+        payloadVersion: 1,
+        intentId,
+        viewContext: 'owner',
+      },
+    });
+
     const attachments = await this.attachmentService.listIntentAttachments({
       intentId,
       orgId: intent.orgId,
@@ -158,6 +191,9 @@ export class AttachmentController {
     const user = this.requireUser(req);
     const orgId = user.orgId;
     const confidentiality = attachment.blob.confidentiality as ConfidentialityLevel;
+    const intentMeta = attachment.intentId
+      ? await this.attachmentService.findIntent(attachment.intentId)
+      : null;
     const ndaOk = await this.resolveNdaAccepted({
       requestOrgId: orgId,
       resourceOrgId: attachment.orgId,
@@ -173,11 +209,16 @@ export class AttachmentController {
     });
 
     const download = await this.blobService.getBlobStream(attachment.blobId, attachment.orgId);
+    const correlationId = (req.headers?.['x-request-id'] as string) ?? ulid();
     await this.attachmentService.emitDownloadedEvent({
       attachment,
       actorUserId: user.id,
       actorOrgId: user.orgId,
       via: 'owner',
+      pipelineStage: intentMeta?.stage,
+      lifecycleStep: this.mapLifecycleStep(intentMeta?.stage),
+      correlationId,
+      channel: 'ui',
     });
 
     if (download.signedUrl) {
@@ -269,6 +310,13 @@ export class AttachmentController {
       stream.on('end', () => resolve(Buffer.concat(chunks)));
       stream.on('error', reject);
     });
+  }
+
+  private mapLifecycleStep(stage?: string | null) {
+    const value = stage?.toUpperCase();
+    if (value === 'MATCH') return 'MATCH_ALIGN';
+    if (value === 'COMMIT') return 'COMMIT_ASSURE';
+    return 'CLARIFY';
   }
 
   private requireUser(req: AuthenticatedRequest) {

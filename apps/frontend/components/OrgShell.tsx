@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode, CSSProperties } from 'react';
 import type { OrgInfo, OrgUser } from '../lib/org-context';
+import { ThemeSwitcher } from './theme/ThemeSwitcher';
 
 export type NavItem = {
   label: string;
@@ -38,6 +39,7 @@ export default function OrgShell({
           </p>
         </div>
         <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
+          <ThemeSwitcher compact />
           <Link href={`/${org.slug}/intents`} style={ghostButtonStyle}>
             Home
           </Link>
@@ -88,8 +90,8 @@ const shellStyle: CSSProperties = {
   minHeight: '100vh',
   padding: '2.5rem',
   fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif',
-  background: 'radial-gradient(120% 120% at 10% 0%, #f6e1c7 0%, #edf2f0 45%, #d2e4ef 100%)',
-  color: '#1b1d1f',
+  background: 'transparent',
+  color: 'var(--text)',
 };
 
 const headerStyle: CSSProperties = {
@@ -104,7 +106,7 @@ const eyebrowStyle: CSSProperties = {
   textTransform: 'uppercase',
   letterSpacing: '0.2em',
   fontSize: '0.7rem',
-  color: '#6a6f76',
+  color: 'var(--muted)',
   marginBottom: '0.5rem',
 };
 
@@ -115,7 +117,7 @@ const titleStyle: CSSProperties = {
 
 const subTitleStyle: CSSProperties = {
   marginTop: '0.4rem',
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const contentGridStyle: CSSProperties = {
@@ -131,30 +133,34 @@ const navStyle: CSSProperties = {
   flex: '0 0 220px',
   minWidth: '200px',
   maxWidth: '100%',
+  background: 'var(--surface)',
+  border: '1px solid var(--border)',
+  borderRadius: 'var(--radius)',
+  padding: '1rem',
 };
 
 const navItemStyle: CSSProperties = {
   padding: '0.75rem 1rem',
-  borderRadius: '12px',
+  borderRadius: 'var(--radius)',
   textDecoration: 'none',
   fontWeight: 600,
-  color: '#1f2933',
+  color: 'var(--text)',
   border: '1px solid transparent',
-  background: 'rgba(255, 255, 255, 0.65)',
+  background: 'var(--surface-2)',
 };
 
 const navItemActiveStyle: CSSProperties = {
-  borderColor: 'rgba(15, 37, 54, 0.2)',
-  boxShadow: '0 10px 18px rgba(15, 37, 54, 0.08)',
-  background: '#ffffff',
+  borderColor: 'var(--ocean)',
+  boxShadow: 'var(--shadow)',
+  background: 'var(--surface)',
 };
 
 const panelStyle: CSSProperties = {
-  background: '#ffffff',
-  borderRadius: '20px',
+  background: 'var(--surface)',
+  borderRadius: 'var(--radius-2)',
   padding: '2rem',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  boxShadow: '0 18px 36px rgba(15, 37, 54, 0.08)',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow)',
   minHeight: '60vh',
   flex: '1 1 520px',
   minWidth: '280px',
@@ -166,14 +172,14 @@ const panelHeaderStyle: CSSProperties = {
 
 const panelSubtitleStyle: CSSProperties = {
   marginTop: '0.5rem',
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const buttonStyle: CSSProperties = {
   padding: '0.75rem 1.2rem',
-  borderRadius: '12px',
-  border: 'none',
-  background: '#0f3a4b',
+  borderRadius: 'var(--radius)',
+  border: '1px solid var(--navy)',
+  background: 'linear-gradient(135deg, var(--navy), var(--ocean))',
   color: '#fff',
   fontWeight: 600,
   cursor: 'pointer',
@@ -181,10 +187,10 @@ const buttonStyle: CSSProperties = {
 
 const ghostButtonStyle: CSSProperties = {
   padding: '0.7rem 1.1rem',
-  borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  color: '#0f3a4b',
+  borderRadius: 'var(--radius)',
+  border: '1px solid var(--border)',
+  color: 'var(--text)',
   textDecoration: 'none',
   fontWeight: 600,
-  background: 'rgba(255, 255, 255, 0.7)',
+  background: 'var(--surface)',
 };
