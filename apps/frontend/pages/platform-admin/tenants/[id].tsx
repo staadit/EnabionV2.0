@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { GetServerSideProps } from 'next';
 import PlatformAdminLayout from '../../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../../lib/require-platform-admin';
@@ -43,6 +43,39 @@ export default function TenantDetailPage({
   const [paletteId, setPaletteId] = useState(org.themePaletteId ?? '');
   const [paletteSaving, setPaletteSaving] = useState(false);
   const [paletteError, setPaletteError] = useState<string | null>(null);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const paletteSelectRef = useRef<HTMLDivElement | null>(null);
+
+  const paletteOptions = [
+    { id: '', label: 'Global default' },
+    ...palettes.map((palette) => ({
+      id: palette.id,
+      label: `${palette.name} (${palette.slug})`,
+    })),
+  ];
+  const selectedPalette =
+    paletteOptions.find((option) => option.id === paletteId) ?? paletteOptions[0];
+
+  useEffect(() => {
+    if (!paletteOpen) return;
+    const handleClick = (event: MouseEvent) => {
+      if (!paletteSelectRef.current) return;
+      if (!paletteSelectRef.current.contains(event.target as Node)) {
+        setPaletteOpen(false);
+      }
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setPaletteOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClick);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [paletteOpen]);
 
   const savePalette = async () => {
     setPaletteSaving(true);
@@ -110,18 +143,43 @@ export default function TenantDetailPage({
       <div style={paletteCardStyle}>
         <h3 style={{ marginTop: 0 }}>Theme palette</h3>
         <div style={paletteRowStyle}>
-          <select
-            value={paletteId}
-            onChange={(event) => setPaletteId(event.target.value)}
-            style={selectStyle}
-          >
-            <option value="" style={optionStyle}>Global default</option>
-            {palettes.map((palette) => (
-              <option key={palette.id} value={palette.id} style={optionStyle}>
-                {palette.name} ({palette.slug})
-              </option>
-            ))}
-          </select>
+          <div style={paletteSelectWrapStyle} ref={paletteSelectRef}>
+            <button
+              type="button"
+              style={paletteSelectButtonStyle}
+              onClick={() => setPaletteOpen((prev) => !prev)}
+              aria-haspopup="listbox"
+              aria-expanded={paletteOpen}
+            >
+              <span>{selectedPalette.label}</span>
+              <span style={paletteChevronStyle}>▾</span>
+            </button>
+            {paletteOpen ? (
+              <div style={paletteDropdownStyle} role="listbox" aria-label="Theme palette">
+                {paletteOptions.map((option) => {
+                  const isSelected = option.id === paletteId;
+                  return (
+                    <button
+                      key={option.id || 'global-default'}
+                      type="button"
+                      role="option"
+                      aria-selected={isSelected}
+                      style={{
+                        ...paletteOptionStyle,
+                        ...(isSelected ? paletteOptionSelectedStyle : null),
+                      }}
+                      onClick={() => {
+                        setPaletteId(option.id);
+                        setPaletteOpen(false);
+                      }}
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+          </div>
           <button type="button" style={buttonStyle} onClick={savePalette} disabled={paletteSaving}>
             {paletteSaving ? 'Saving...' : 'Save palette'}
           </button>
@@ -256,17 +314,57 @@ const linkStyle = {
   fontWeight: 600,
 };
 
-const selectStyle = {
+const paletteSelectWrapStyle = {
+  position: 'relative' as const,
+  minWidth: '260px',
+};
+
+const paletteSelectButtonStyle = {
+  width: '100%',
   padding: '0.5rem 0.75rem',
   borderRadius: '8px',
   border: '1px solid var(--border)',
   background: 'var(--surface-2)',
   color: 'var(--text)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.5rem',
+  cursor: 'pointer',
 };
 
-const optionStyle = {
-  background: 'var(--surface-2)',
+const paletteChevronStyle = {
+  opacity: 0.7,
+  fontSize: '0.85rem',
+};
+
+const paletteDropdownStyle = {
+  position: 'absolute' as const,
+  top: 'calc(100% + 0.4rem)',
+  left: 0,
+  width: '100%',
+  padding: '0.35rem',
+  borderRadius: '10px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  boxShadow: 'var(--shadow)',
+  zIndex: 10,
+};
+
+const paletteOptionStyle = {
+  width: '100%',
+  border: 'none',
+  background: 'transparent',
   color: 'var(--text)',
+  textAlign: 'left' as const,
+  padding: '0.45rem 0.6rem',
+  borderRadius: '8px',
+  cursor: 'pointer',
+  fontWeight: 600,
+};
+
+const paletteOptionSelectedStyle = {
+  background: 'var(--surface-2)',
 };
 
 const buttonStyle = {
