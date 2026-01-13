@@ -14,7 +14,7 @@ export default function PlatformAdminTelemetry({ user }: TelemetryProps) {
         <title>Platform Admin - Telemetry</title>
       </Head>
       <h2 style={{ marginTop: 0 }}>Telemetry</h2>
-      <p style={{ color: '#4b4f54' }}>
+      <p style={{ color: 'var(--muted)' }}>
         Cross-tenant metrics for pilot health and event throughput.
       </p>
       <div style={cardStyle}>
@@ -31,8 +31,8 @@ const cardStyle = {
   marginTop: '1.5rem',
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
 };
 
 export const getServerSideProps: GetServerSideProps<TelemetryProps> = async (ctx) => {

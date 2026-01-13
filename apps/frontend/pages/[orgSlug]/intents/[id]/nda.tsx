@@ -35,7 +35,7 @@ export default function Nda({ user, org, intentId, ndaCurrent, ndaStatus }: Inte
           defaultLanguage={org.defaultLanguage}
         />
       ) : (
-        <p style={{ color: '#b42318' }}>Unable to load NDA content.</p>
+        <p style={{ color: 'var(--danger)' }}>Unable to load NDA content.</p>
       )}
     </OrgShell>
   );
@@ -44,7 +44,7 @@ export default function Nda({ user, org, intentId, ndaCurrent, ndaStatus }: Inte
 const metaStyle = {
   marginTop: 0,
   marginBottom: '1rem',
-  color: '#6b7785',
+  color: 'var(--muted-2)',
 };
 
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {

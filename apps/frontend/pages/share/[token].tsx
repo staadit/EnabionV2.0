@@ -118,8 +118,8 @@ const pageStyle = {
   minHeight: '100vh',
   padding: '3rem 1.5rem',
   fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif',
-  background: 'radial-gradient(120% 120% at 10% 0%, #f6e1c7 0%, #edf2f0 45%, #d2e4ef 100%)',
-  color: '#1b1d1f',
+  background: 'transparent',
+  color: 'var(--text)',
   display: 'flex',
   justifyContent: 'center',
   alignItems: 'center',
@@ -130,19 +130,19 @@ const pageStyle = {
 const cardStyle = {
   maxWidth: '680px',
   width: '100%',
-  background: '#ffffff',
+  background: 'var(--surface)',
   borderRadius: '20px',
   padding: '2rem',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  boxShadow: '0 18px 36px rgba(15, 37, 54, 0.08)',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow-2)',
 };
 
 const mutedTextStyle = {
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const errorTextStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
 };
 
@@ -157,7 +157,7 @@ const labelStyle = {
   fontSize: '0.7rem',
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-  color: '#6b7785',
+  color: 'var(--muted-2)',
 };
 
 const valueStyle = {
@@ -172,24 +172,24 @@ const summaryStyle = {
 const summaryTextStyle = {
   marginTop: '0.5rem',
   fontSize: '0.95rem',
-  color: '#1b1d1f',
+  color: 'var(--text)',
 };
 
 const lockedCardStyle = {
   marginTop: '1.5rem',
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px solid rgba(180, 35, 24, 0.3)',
-  background: 'rgba(180, 35, 24, 0.08)',
+  border: '1px solid var(--danger-border)',
+  background: 'var(--danger-bg)',
 };
 
 const lockedTextStyle = {
   margin: '0.4rem 0 0.6rem',
-  color: '#7a271a',
+  color: 'var(--danger)',
 };
 
 const linkStyle = {
-  color: '#0f2536',
+  color: 'var(--link)',
   fontWeight: 600,
   textDecoration: 'none',
 };
@@ -207,8 +207,8 @@ const sectionTitleStyle = {
 
 const tableCardStyle = {
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   overflow: 'hidden',
 };
 
@@ -221,13 +221,13 @@ const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem 1rem',
   fontSize: '0.85rem',
-  color: '#6b7785',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  color: 'var(--muted-2)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
   fontSize: '0.95rem',
 };
 
@@ -235,13 +235,13 @@ const badgeStyle = {
   display: 'inline-flex',
   padding: '0.15rem 0.5rem',
   borderRadius: '999px',
-  background: 'rgba(15, 37, 54, 0.08)',
+  background: 'var(--surface-2)',
   fontSize: '0.75rem',
   fontWeight: 600,
 };
 
 const lockedStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
 };
 

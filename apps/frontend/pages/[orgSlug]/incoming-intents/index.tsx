@@ -46,7 +46,7 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
               ))}
           </ul>
         ) : (
-          <p style={{ margin: 0, color: '#4b4f54' }}>No events yet.</p>
+          <p style={{ margin: 0, color: 'var(--muted)' }}>No events yet.</p>
         )}
       </section>
     </OrgShell>
@@ -56,8 +56,9 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
+  boxShadow: 'var(--shadow)',
 };
 
 const sectionStyle = {
@@ -75,15 +76,15 @@ const listStyle = {
 const listItemStyle = {
   padding: '0.75rem 1rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   display: 'flex',
   flexDirection: 'column' as const,
   gap: '0.35rem',
 };
 
 const metaStyle = {
-  color: '#4b4f54',
+  color: 'var(--muted)',
   fontSize: '0.85rem',
 };
 

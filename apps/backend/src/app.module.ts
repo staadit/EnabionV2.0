@@ -9,6 +9,7 @@ import { OrgModule } from './org/org.module';
 import { PlatformAdminModule } from './platform-admin/platform-admin.module';
 import { NdaModule } from './nda/nda.module';
 import { ExportModule } from './export/export.module';
+import { ThemeModule } from './theme/theme.module';
 
 @Module({
   imports: [
@@ -20,6 +21,7 @@ import { ExportModule } from './export/export.module';
     PlatformAdminModule,
     NdaModule,
     ExportModule,
+    ThemeModule,
   ],
   controllers: [AppController],
   providers: [AppService],

@@ -1,46 +1,95 @@
-/* Brand constants */
+/* Brand constants + semantic aliases */
 :root {
-  --ocean: #126E82;
-  --green: #38A169;
-  --gold:  #FDBA45;
-  --navy:  #0B2239;
-  --danger:#F87171;
+  --brand-ocean: #126E82;
+  --brand-green: #38A169;
+  --brand-gold: #FDBA45;
+  --brand-navy: #0B2239;
+
+  --accent-1: var(--brand-ocean);
+  --accent-2: var(--brand-green);
+  --accent-3: var(--brand-gold);
+
+  --danger: #F87171;
+  --success: #2F9E44;
+  --warning: #F59F00;
+  --info: #228BE6;
+  --danger-bg: rgba(248,113,113,0.12);
+  --danger-border: rgba(248,113,113,0.35);
+  --success-bg: rgba(47,158,68,0.12);
+  --success-border: rgba(47,158,68,0.35);
+
+  --ocean: var(--brand-ocean);
+  --green: var(--brand-green);
+  --gold: var(--brand-gold);
+  --navy: var(--brand-navy);
+
+  --gradient-primary: linear-gradient(135deg, var(--accent-1), var(--accent-2));
 
   --radius: 14px;
   --radius-2: 18px;
+  --r: var(--radius);
+  --r2: var(--radius-2);
+
   --shadow: 0 10px 30px rgba(0,0,0,0.15);
+  --shadow-2: 0 18px 40px rgba(0,0,0,0.15);
+  --shadow2: var(--shadow-2);
+
+  --link: var(--text);
+  --focus: var(--accent-1);
+  --text-on-brand: #ffffff;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
 /* DARK (Black) — matches landing mock */
 html[data-theme="dark"] {
   --bg: #070D16;
+  --bg2: #0B1220;
   --bg-gradient-1: rgba(18,110,130,0.30);
   --bg-gradient-2: rgba(56,161,105,0.22);
   --bg-gradient-3: rgba(253,186,69,0.12);
 
   --surface: rgba(255,255,255,0.06);
   --surface-2: rgba(255,255,255,0.04);
+  --card: rgba(255,255,255,0.06);
+  --card2: rgba(255,255,255,0.04);
+  --chip: rgba(255,255,255,0.06);
+  --demo: rgba(0,0,0,0.20);
   --border: rgba(255,255,255,0.12);
 
   --text: rgba(255,255,255,0.92);
   --muted: rgba(255,255,255,0.68);
   --muted-2: rgba(255,255,255,0.55);
+  --muted2: var(--muted-2);
+  --heroGlow1: var(--bg-gradient-1);
+  --heroGlow2: var(--bg-gradient-2);
+  --heroGlow3: var(--bg-gradient-3);
 }
 
 /* LIGHT (White) — matches landing mock */
 html[data-theme="light"] {
   --bg: #F6F8FB;
+  --bg2: #FFFFFF;
   --bg-gradient-1: rgba(18,110,130,0.10);
   --bg-gradient-2: rgba(56,161,105,0.10);
   --bg-gradient-3: rgba(253,186,69,0.08);
 
   --surface: rgba(255,255,255,0.92);
   --surface-2: rgba(255,255,255,0.78);
+  --card: rgba(255,255,255,0.92);
+  --card2: rgba(255,255,255,0.78);
+  --chip: rgba(11,34,57,0.05);
+  --demo: rgba(18,110,130,0.06);
   --border: rgba(11,34,57,0.12);
 
   --text: rgba(11,34,57,0.92);
   --muted: rgba(11,34,57,0.70);
   --muted-2: rgba(11,34,57,0.55);
+  --muted2: var(--muted-2);
+  --heroGlow1: var(--bg-gradient-1);
+  --heroGlow2: var(--bg-gradient-2);
+  --heroGlow3: var(--bg-gradient-3);
 }
 
 /* Global background using tokens */

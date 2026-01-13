@@ -15,7 +15,7 @@ export default function EmailIngestPage({ user }: EmailIngestProps) {
       </Head>
 
       <h2 style={{ marginTop: 0 }}>Email ingest monitor</h2>
-      <p style={{ color: '#4b4f54' }}>
+      <p style={{ color: 'var(--muted)' }}>
         G4/G5 pipeline monitoring will appear here once email ingest jobs are available.
       </p>
     </PlatformAdminLayout>

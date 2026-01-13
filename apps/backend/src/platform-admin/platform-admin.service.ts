@@ -121,7 +121,17 @@ export class PlatformAdminService {
   }
 
   async getTenant(actor: AuthUser, orgId: string) {
-    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        status: true,
+        createdAt: true,
+        themePaletteId: true,
+      },
+    });
     if (!org) {
       throw new NotFoundException('Tenant not found');
     }
@@ -145,6 +155,7 @@ export class PlatformAdminService {
         slug: org.slug,
         status: org.status,
         createdAt: org.createdAt,
+        themePaletteId: org.themePaletteId,
       },
       counts: { userCount, intentCount },
     };

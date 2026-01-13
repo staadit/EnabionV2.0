@@ -292,38 +292,44 @@ const modeRowStyle = {
 const modeButtonStyle = {
   padding: '0.5rem 1rem',
   borderRadius: '999px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  background: 'rgba(255, 255, 255, 0.7)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   fontWeight: 600,
   cursor: 'pointer',
+  color: 'var(--text)',
 };
 
 const modeActiveStyle = {
-  background: '#0f3a4b',
-  color: '#fff',
-  borderColor: '#0f3a4b',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  borderColor: 'transparent',
+  boxShadow: 'var(--shadow)',
 };
 
 const labelStyle = {
   display: 'grid',
   gap: '0.5rem',
   fontWeight: 600,
-  color: '#1f2933',
+  color: 'var(--text)',
 };
 
 const textAreaStyle = {
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
   padding: '0.75rem 0.9rem',
   fontSize: '0.95rem',
   resize: 'vertical' as const,
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
 const inputStyle = {
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
   padding: '0.65rem 0.9rem',
   fontSize: '0.95rem',
+  background: 'var(--surface)',
+  color: 'var(--text)',
 };
 
 const buttonRowStyle = {
@@ -336,39 +342,40 @@ const buttonRowStyle = {
 const buttonStyle = {
   padding: '0.75rem 1.4rem',
   borderRadius: '12px',
-  border: 'none',
-  background: '#0f3a4b',
-  color: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const ghostButtonStyle = {
   padding: '0.7rem 1.3rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  background: 'transparent',
-  color: '#0f3a4b',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   margin: 0,
 };
 
 const noticeStyle = {
   padding: '0.9rem 1rem',
   borderRadius: '12px',
-  background: 'rgba(15, 37, 54, 0.06)',
-  border: '1px solid rgba(15, 37, 54, 0.18)',
-  color: '#1f2933',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  color: 'var(--text)',
 };
 
 const helperStyle = {
   margin: 0,
-  color: '#4b4f54',
+  color: 'var(--muted)',
   fontSize: '0.9rem',
 };
 

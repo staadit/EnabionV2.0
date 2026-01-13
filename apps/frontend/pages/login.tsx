@@ -153,19 +153,18 @@ const shellStyle: CSSProperties = {
   alignItems: 'center',
   justifyContent: 'center',
   padding: '2rem',
-  background:
-    'radial-gradient(120% 120% at 10% 0%, #f5d9cc 0%, #f2efe9 40%, #d7e6ea 100%)',
+  background: 'transparent',
   fontFamily: '"Space Grotesk", "IBM Plex Sans", "Noto Sans", sans-serif',
-  color: '#1c1c1a',
+  color: 'var(--text)',
 };
 
 const cardStyle: CSSProperties = {
   width: 'min(440px, 100%)',
-  background: 'rgba(255, 255, 255, 0.92)',
+  background: 'var(--surface)',
   borderRadius: '20px',
   padding: '2.5rem',
-  boxShadow: '0 18px 40px rgba(15, 37, 54, 0.18)',
-  border: '1px solid rgba(15, 37, 54, 0.08)',
+  boxShadow: 'var(--shadow-2)',
+  border: '1px solid var(--border)',
 };
 
 const badgeStyle: CSSProperties = {
@@ -174,8 +173,8 @@ const badgeStyle: CSSProperties = {
   gap: '0.5rem',
   padding: '0.35rem 0.85rem',
   borderRadius: '999px',
-  background: '#0f3a4b',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontSize: '0.75rem',
   letterSpacing: '0.12em',
   textTransform: 'uppercase',
@@ -189,7 +188,7 @@ const titleStyle: CSSProperties = {
 
 const subtitleStyle: CSSProperties = {
   marginTop: '0.6rem',
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const labelStyle: CSSProperties = {
@@ -202,8 +201,9 @@ const labelStyle: CSSProperties = {
 const inputStyle: CSSProperties = {
   borderRadius: '12px',
   padding: '0.85rem 1rem',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
   fontSize: '1rem',
 };
 
@@ -213,8 +213,8 @@ const buttonStyle: CSSProperties = {
   padding: '0.9rem 1rem',
   borderRadius: '12px',
   border: 'none',
-  background: '#e4572e',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontSize: '1rem',
   fontWeight: 600,
   cursor: 'pointer',
@@ -222,17 +222,17 @@ const buttonStyle: CSSProperties = {
 
 const errorStyle: CSSProperties = {
   marginTop: '1rem',
-  color: '#b42318',
+  color: 'var(--danger)',
 };
 
 const footerStyle: CSSProperties = {
   marginTop: '1.5rem',
-  color: '#4b4f54',
+  color: 'var(--muted)',
   fontSize: '0.95rem',
 };
 
 const linkStyle: CSSProperties = {
-  color: '#0f3a4b',
+  color: 'var(--link)',
   fontWeight: 600,
   textDecoration: 'none',
 };

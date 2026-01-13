@@ -168,8 +168,8 @@ const buttonStyle: CSSProperties = {
   padding: '0.75rem 1.2rem',
   borderRadius: 'var(--radius)',
   border: '1px solid var(--navy)',
-  background: 'linear-gradient(135deg, var(--navy), var(--ocean))',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
 };

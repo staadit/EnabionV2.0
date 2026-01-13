@@ -35,8 +35,8 @@ export default function IncomingRespond({ user, org, intentId }: IncomingTabProp
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
 };
 
 export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (ctx) => {

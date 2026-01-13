@@ -17,6 +17,8 @@ model Organization {
   policyAiEnabled Boolean @default(true)
   policyShareLinksEnabled Boolean @default(false)
   policyEmailIngestEnabled Boolean @default(false)
+  themePaletteId String?
+  themePalette ThemePalette? @relation(fields: [themePaletteId], references: [id])
   users     User[]
   intents   Intent[]
   events    Event[]
@@ -25,6 +27,8 @@ model Organization {
   ndaAcceptances NdaAcceptance[]
   shareLinks IntentShareLink[]
   createdAt DateTime @default(now())
+
+  @@index([themePaletteId])
 }
 
 model User {
@@ -281,4 +285,32 @@ model IntentShareLink {
   @@unique([tokenHashSha256])
   @@index([expiresAt])
   @@index([revokedAt])
+}
+
+model ThemePalette {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  tokensJson      Json
+  isGlobalDefault Boolean  @default(false)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  organizations   Organization[]
+  revisions       ThemePaletteRevision[]
+}
+
+model ThemePaletteRevision {
+  id              String   @id @default(cuid())
+  paletteId       String
+  revision        Int
+  tokensJson      Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  palette ThemePalette @relation(fields: [paletteId], references: [id])
+
+  @@unique([paletteId, revision])
+  @@index([paletteId, createdAt])
 }

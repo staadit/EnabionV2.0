@@ -381,9 +381,9 @@ const primaryButtonStyle = {
   borderRadius: '10px',
   textDecoration: 'none',
   fontWeight: 600,
-  border: '1px solid rgba(255,255,255,0.16)',
-  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
-  color: '#fff',
+  border: `1px solid ${colors.border}`,
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   cursor: 'pointer',
   boxShadow: 'var(--shadow)',
 };

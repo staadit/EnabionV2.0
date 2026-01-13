@@ -32,7 +32,7 @@ export default function NdaSettings({ user, org, ndaCurrent, ndaStatus }: NdaSet
           defaultLanguage={org.defaultLanguage}
         />
       ) : (
-        <p style={{ color: '#b42318' }}>Unable to load NDA content.</p>
+        <p style={{ color: 'var(--danger)' }}>Unable to load NDA content.</p>
       )}
     </SettingsLayout>
   );

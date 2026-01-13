@@ -41,7 +41,7 @@ export default function IncomingIntentDetail({
       </Head>
       <div style={cardStyle}>
         {!intent ? (
-          <p style={{ margin: 0, color: '#b42318' }}>Unable to load intent details.</p>
+          <p style={{ margin: 0, color: 'var(--danger)' }}>Unable to load intent details.</p>
         ) : (
           <>
             <div style={detailGridStyle}>
@@ -146,8 +146,9 @@ export default function IncomingIntentDetail({
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  boxShadow: 'var(--shadow)',
 };
 
 const detailGridStyle = {
@@ -160,35 +161,41 @@ const labelStyle = {
   fontSize: '0.7rem',
   letterSpacing: '0.08em',
   textTransform: 'uppercase' as const,
-  color: '#6b7785',
+  color: 'var(--muted)',
 };
 
 const valueStyle = {
   marginTop: '0.35rem',
   fontWeight: 600,
+  color: 'var(--text)',
 };
 
 const summaryStyle = {
   marginTop: '1.25rem',
+  padding: '1rem',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
 };
 
 const summaryTextStyle = {
   marginTop: '0.5rem',
   fontSize: '0.95rem',
-  color: '#1b1d1f',
+  color: 'var(--text)',
 };
 
 const lockedCardStyle = {
   marginTop: '1.25rem',
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px solid rgba(180, 35, 24, 0.3)',
-  background: 'rgba(180, 35, 24, 0.08)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  boxShadow: 'var(--shadow)',
 };
 
 const lockedTextStyle = {
   margin: '0.4rem 0 0.6rem',
-  color: '#7a271a',
+  color: 'var(--muted)',
 };
 
 const l2BlockStyle = {
@@ -199,11 +206,12 @@ const sourceTextStyle = {
   marginTop: '0.5rem',
   padding: '0.75rem 1rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   whiteSpace: 'pre-wrap' as const,
   fontFamily: '"IBM Plex Mono", "Fira Code", monospace',
   fontSize: '0.85rem',
+  color: 'var(--text)',
 };
 
 const sectionStyle = {
@@ -217,9 +225,10 @@ const sectionTitleStyle = {
 
 const tableCardStyle = {
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
   overflow: 'hidden',
+  boxShadow: 'var(--shadow)',
 };
 
 const tableStyle = {
@@ -231,40 +240,43 @@ const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem 1rem',
   fontSize: '0.85rem',
-  color: '#6b7785',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  color: 'var(--muted)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem 1rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
   fontSize: '0.95rem',
+  color: 'var(--text)',
 };
 
 const badgeStyle = {
   display: 'inline-flex',
   padding: '0.15rem 0.5rem',
   borderRadius: '999px',
-  background: 'rgba(15, 37, 54, 0.08)',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
   fontSize: '0.75rem',
   fontWeight: 600,
+  color: 'var(--text)',
 };
 
 const linkStyle = {
-  color: '#0f2536',
+  color: 'var(--text)',
   fontWeight: 600,
   textDecoration: 'none',
 };
 
 const lockedStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
   textDecoration: 'none',
 };
 
 const mutedStyle = {
   margin: 0,
-  color: '#6b7785',
+  color: 'var(--muted)',
 };
 
 const formatBytes = (value: number) => {

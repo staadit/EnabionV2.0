@@ -1,4 +1,5 @@
 import Document, { Html, Head, Main, NextScript, DocumentContext } from 'next/document';
+import { buildPaletteStyle, resolvePalette } from '../lib/palette';
 
 const themeInitScript = `
 (function() {
@@ -19,16 +20,26 @@ const themeInitScript = `
 })();
 `;
 
-class MyDocument extends Document {
+type PaletteDocumentProps = {
+  paletteCss: string;
+  paletteSlug?: string;
+};
+
+class MyDocument extends Document<PaletteDocumentProps> {
   static async getInitialProps(ctx: DocumentContext) {
     const initialProps = await Document.getInitialProps(ctx);
-    return { ...initialProps };
+    const { tokens, slug } = await resolvePalette(ctx.req);
+    const paletteCss = buildPaletteStyle(tokens);
+    return { ...initialProps, paletteCss, paletteSlug: slug };
   }
 
   render() {
+    const { paletteCss, paletteSlug } = this.props;
     return (
-      <Html data-theme="light">
-        <Head />
+      <Html data-theme="light" data-palette={paletteSlug ?? 'default'}>
+        <Head>
+          <style id="enabion-palette-vars" dangerouslySetInnerHTML={{ __html: paletteCss }} />
+        </Head>
         <body>
           <script dangerouslySetInnerHTML={{ __html: themeInitScript }} />
           <Main />

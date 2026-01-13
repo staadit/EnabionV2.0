@@ -146,9 +146,9 @@ const buttonStyle = {
   marginTop: '0.5rem',
   padding: '0.9rem 1.1rem',
   borderRadius: '12px',
-  border: '1px solid rgba(255,255,255,0.16)',
-  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
-  color: '#fff',
+  border: '1px solid var(--border)',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
   boxShadow: 'var(--shadow)',
@@ -160,7 +160,7 @@ const errorStyle = {
 };
 
 const successStyle = {
-  color: 'var(--green)',
+  color: 'var(--success)',
   margin: 0,
 };
 

@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import Link from 'next/link';
+import { useState } from 'react';
 import type { GetServerSideProps } from 'next';
 import PlatformAdminLayout from '../../../components/PlatformAdminLayout';
 import { requirePlatformAdmin, type PlatformAdminUser } from '../../../lib/require-platform-admin';
@@ -22,15 +23,47 @@ type TenantDetailProps = {
     slug: string;
     status: string;
     createdAt: string;
+    themePaletteId?: string | null;
   };
   counts: {
     userCount: number;
     intentCount: number;
   };
   members: TenantUser[];
+  palettes: { id: string; name: string; slug: string }[];
 };
 
-export default function TenantDetailPage({ user, org, counts, members }: TenantDetailProps) {
+export default function TenantDetailPage({
+  user,
+  org,
+  counts,
+  members,
+  palettes,
+}: TenantDetailProps) {
+  const [paletteId, setPaletteId] = useState(org.themePaletteId ?? '');
+  const [paletteSaving, setPaletteSaving] = useState(false);
+  const [paletteError, setPaletteError] = useState<string | null>(null);
+
+  const savePalette = async () => {
+    setPaletteSaving(true);
+    setPaletteError(null);
+    try {
+      const res = await fetch(`/api/platform-admin/tenants/${org.id}/theme`, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ paletteId: paletteId || null }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setPaletteError(data?.error ?? 'Save failed');
+      }
+    } catch {
+      setPaletteError('Save failed');
+    } finally {
+      setPaletteSaving(false);
+    }
+  };
+
   return (
     <PlatformAdminLayout user={user} active="tenants">
       <Head>
@@ -72,6 +105,31 @@ export default function TenantDetailPage({ user, org, counts, members }: TenantD
         >
           View INTENT_CREATED events
         </Link>
+      </div>
+
+      <div style={paletteCardStyle}>
+        <h3 style={{ marginTop: 0 }}>Theme palette</h3>
+        <div style={paletteRowStyle}>
+          <select
+            value={paletteId}
+            onChange={(event) => setPaletteId(event.target.value)}
+            style={selectStyle}
+          >
+            <option value="">Global default</option>
+            {palettes.map((palette) => (
+              <option key={palette.id} value={palette.id}>
+                {palette.name} ({palette.slug})
+              </option>
+            ))}
+          </select>
+          <button type="button" style={buttonStyle} onClick={savePalette} disabled={paletteSaving}>
+            {paletteSaving ? 'Saving...' : 'Save palette'}
+          </button>
+        </div>
+        {paletteError ? <p style={errorStyle}>{paletteError}</p> : null}
+        <p style={paletteHintStyle}>
+          Assigning a palette overrides the global default for this tenant.
+        </p>
       </div>
 
       <h3>Members</h3>
@@ -124,9 +182,10 @@ export const getServerSideProps: GetServerSideProps<TenantDetailProps> = async (
   const backendBase = process.env.BACKEND_URL || 'http://backend:4000';
   const cookie = result.context!.cookie;
 
-  const [orgRes, membersRes] = await Promise.all([
+  const [orgRes, membersRes, palettesRes] = await Promise.all([
     fetch(`${backendBase}/platform-admin/tenants/${orgId}`, { headers: { cookie } }),
     fetch(`${backendBase}/platform-admin/tenants/${orgId}/users`, { headers: { cookie } }),
+    fetch(`${backendBase}/platform-admin/palettes`, { headers: { cookie } }),
   ]);
 
   if (!orgRes.ok) {
@@ -135,6 +194,7 @@ export const getServerSideProps: GetServerSideProps<TenantDetailProps> = async (
 
   const orgData = await orgRes.json();
   const membersData = membersRes.ok ? await membersRes.json() : { users: [] };
+  const palettesData = palettesRes.ok ? await palettesRes.json() : { palettes: [] };
 
   return {
     props: {
@@ -142,6 +202,7 @@ export const getServerSideProps: GetServerSideProps<TenantDetailProps> = async (
       org: orgData.org,
       counts: orgData.counts,
       members: membersData.users || [],
+      palettes: palettesData.palettes || [],
     },
   };
 };
@@ -155,13 +216,13 @@ const metaGridStyle = {
 const metaCardStyle = {
   padding: '0.9rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: 'rgba(248, 248, 248, 0.8)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
 };
 
 const metaLabelStyle = {
   margin: 0,
-  color: '#6a6f76',
+  color: 'var(--muted-2)',
   fontSize: '0.8rem',
   textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
@@ -181,16 +242,61 @@ const tableStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const linkStyle = {
-  color: '#1c6e5a',
+  color: 'var(--green)',
   textDecoration: 'none',
   fontWeight: 600,
+};
+
+const selectStyle = {
+  padding: '0.5rem 0.75rem',
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+};
+
+const buttonStyle = {
+  padding: '0.55rem 0.9rem',
+  borderRadius: '8px',
+  border: 'none',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  boxShadow: 'var(--shadow)',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
+const errorStyle = {
+  marginTop: '0.5rem',
+  color: 'var(--danger)',
+};
+
+const paletteCardStyle = {
+  marginBottom: '2rem',
+  padding: '1rem',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+};
+
+const paletteRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.75rem',
+  alignItems: 'center',
+};
+
+const paletteHintStyle = {
+  marginTop: '0.5rem',
+  marginBottom: 0,
+  color: 'var(--muted-2)',
 };

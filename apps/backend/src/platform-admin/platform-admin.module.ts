@@ -5,10 +5,12 @@ import { PrismaService } from '../prisma.service';
 import { NdaModule } from '../nda/nda.module';
 import { PlatformAdminController } from './platform-admin.controller';
 import { PlatformAdminService } from './platform-admin.service';
+import { ThemePalettesController } from './theme-palettes.controller';
+import { ThemePalettesService } from './theme-palettes.service';
 
 @Module({
   imports: [AuthModule, EventModule, NdaModule],
-  controllers: [PlatformAdminController],
-  providers: [PlatformAdminService, PrismaService],
+  controllers: [PlatformAdminController, ThemePalettesController],
+  providers: [PlatformAdminService, ThemePalettesService, PrismaService],
 })
 export class PlatformAdminModule {}
