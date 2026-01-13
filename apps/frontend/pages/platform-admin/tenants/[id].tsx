@@ -346,7 +346,7 @@ const paletteDropdownStyle = {
   padding: '0.35rem',
   borderRadius: '10px',
   border: '1px solid var(--border)',
-  background: 'var(--surface)',
+  background: 'var(--bg)',
   boxShadow: 'var(--shadow)',
   zIndex: 10,
 };
