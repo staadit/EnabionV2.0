@@ -129,7 +129,6 @@ export class PlatformAdminService {
         slug: true,
         status: true,
         createdAt: true,
-        themePaletteId: true,
       },
     });
     if (!org) {
@@ -155,7 +154,6 @@ export class PlatformAdminService {
         slug: org.slug,
         status: org.status,
         createdAt: org.createdAt,
-        themePaletteId: org.themePaletteId,
       },
       counts: { userCount, intentCount },
     };

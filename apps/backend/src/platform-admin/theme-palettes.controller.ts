@@ -7,7 +7,6 @@ import {
   Patch,
   Post,
   Get,
-  Query,
   Req,
   Res,
   UseGuards,
@@ -39,10 +38,6 @@ const updatePaletteSchema = z.object({
   slug: paletteSlugSchema.optional(),
   name: z.string().min(1).optional(),
   tokens: tokensSchema.optional(),
-});
-
-const assignPaletteSchema = z.object({
-  paletteId: z.string().optional().nullable(),
 });
 
 @UseGuards(PlatformAdminGuard)
@@ -113,16 +108,6 @@ export class ThemePalettesController {
       maxAge: 0,
     });
     return { ok: true };
-  }
-
-  @Patch('tenants/:orgId/theme')
-  async assignPalette(
-    @Param('orgId') orgId: string,
-    @Body() body: unknown,
-  ) {
-    const parsed = this.parseBody(assignPaletteSchema, body);
-    const palette = await this.palettes.assignPalette(orgId, parsed.paletteId ?? null);
-    return { org: palette };
   }
 
   private requireUser(req: AuthenticatedRequest) {

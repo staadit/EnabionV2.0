@@ -26,18 +26,6 @@ export class ThemePalettesService {
       orderBy: [{ isGlobalDefault: 'desc' }, { updatedAt: 'desc' }],
     });
 
-    const assignedCounts = await this.prisma.organization.groupBy({
-      by: ['themePaletteId'],
-      where: { themePaletteId: { not: null } },
-      _count: { _all: true },
-    });
-
-    const assignedMap = new Map(
-      assignedCounts
-        .filter((row) => row.themePaletteId)
-        .map((row) => [row.themePaletteId as string, row._count._all]),
-    );
-
     return palettes.map((palette) => ({
       id: palette.id,
       slug: palette.slug,
@@ -46,7 +34,6 @@ export class ThemePalettesService {
       isGlobalDefault: palette.isGlobalDefault,
       createdAt: palette.createdAt,
       updatedAt: palette.updatedAt,
-      assignedCount: assignedMap.get(palette.id) ?? 0,
     }));
   }
 
@@ -145,12 +132,6 @@ export class ThemePalettesService {
     if (palette.isGlobalDefault) {
       throw new BadRequestException('Cannot delete the global default palette');
     }
-    const assignedCount = await this.prisma.organization.count({
-      where: { themePaletteId: id },
-    });
-    if (assignedCount > 0) {
-      throw new BadRequestException('Palette is assigned to organizations');
-    }
     await this.prisma.themePalette.delete({ where: { id } });
   }
 
@@ -169,24 +150,6 @@ export class ThemePalettesService {
         where: { id },
         data: { isGlobalDefault: true, updatedByUserId: actorUserId },
       });
-    });
-  }
-
-  async assignPalette(orgId: string, paletteId: string | null) {
-    if (paletteId) {
-      const palette = await this.prisma.themePalette.findUnique({ where: { id: paletteId } });
-      if (!palette) {
-        throw new NotFoundException('Palette not found');
-      }
-    }
-    const org = await this.prisma.organization.findUnique({ where: { id: orgId } });
-    if (!org) {
-      throw new NotFoundException('Tenant not found');
-    }
-    return this.prisma.organization.update({
-      where: { id: orgId },
-      data: { themePaletteId: paletteId },
-      select: { id: true, name: true, slug: true, themePaletteId: true },
     });
   }
 

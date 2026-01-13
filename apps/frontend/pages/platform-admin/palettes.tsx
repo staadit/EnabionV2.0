@@ -13,7 +13,6 @@ type PaletteRow = {
   name: string;
   tokens: PaletteTokens;
   isGlobalDefault: boolean;
-  assignedCount: number;
   createdAt: string;
   updatedAt: string;
 };
@@ -253,7 +252,6 @@ export default function PaletteAdminPage({ user, palettes }: PaletteAdminProps) 
               <th style={thStyle}>Name</th>
               <th style={thStyle}>Slug</th>
               <th style={thStyle}>Default</th>
-              <th style={thStyle}>Assigned</th>
               <th style={thStyle}>Updated</th>
               <th style={thStyle}>Actions</th>
             </tr>
@@ -264,7 +262,6 @@ export default function PaletteAdminPage({ user, palettes }: PaletteAdminProps) 
                 <td style={tdStyle}>{palette.name}</td>
                 <td style={tdStyle}>{palette.slug}</td>
                 <td style={tdStyle}>{palette.isGlobalDefault ? 'Yes' : 'No'}</td>
-                <td style={tdStyle}>{palette.assignedCount}</td>
                 <td style={tdStyle}>{formatDateTime(palette.updatedAt)}</td>
                 <td style={tdStyle}>
                   <div style={actionRowStyle}>
@@ -304,7 +301,7 @@ export default function PaletteAdminPage({ user, palettes }: PaletteAdminProps) 
             ))}
             {!palettes.length ? (
               <tr>
-                <td style={tdStyle} colSpan={6}>
+                <td style={tdStyle} colSpan={5}>
                   No palettes found.
                 </td>
               </tr>
