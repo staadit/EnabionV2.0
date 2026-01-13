@@ -21,6 +21,7 @@ export class ThemePalettesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async listPalettes() {
+    await this.ensureDefaultPalette();
     const palettes = await this.prisma.themePalette.findMany({
       orderBy: [{ isGlobalDefault: 'desc' }, { updatedAt: 'desc' }],
     });
@@ -202,7 +203,7 @@ export class ThemePalettesService {
     paletteId: string,
     revision: number,
     tokens: PaletteTokens,
-    actorUserId: string,
+    actorUserId: string | null,
   ) {
     await this.prisma.themePaletteRevision.create({
       data: {
@@ -212,6 +213,46 @@ export class ThemePalettesService {
         createdByUserId: actorUserId,
       },
     });
+  }
+
+  private async ensureDefaultPalette() {
+    const existingDefault = await this.prisma.themePalette.findFirst({
+      where: { isGlobalDefault: true },
+      select: { id: true },
+    });
+    if (existingDefault) {
+      return;
+    }
+
+    const fallbackPalette = await this.prisma.themePalette.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
+    if (fallbackPalette) {
+      await this.prisma.themePalette.update({
+        where: { id: fallbackPalette.id },
+        data: { isGlobalDefault: true },
+      });
+      return;
+    }
+
+    const tokens = normalizeTokens({}, DEFAULT_PALETTE, { fillAccentsFromBrand: true });
+    try {
+      const palette = await this.prisma.themePalette.create({
+        data: {
+          slug: 'enabion-default',
+          name: 'Enabion Default',
+          tokensJson: tokens,
+          isGlobalDefault: true,
+        },
+      });
+      await this.createRevision(palette.id, 1, tokens, null);
+    } catch (err: any) {
+      if (!this.isUniqueViolation(err)) {
+        throw err;
+      }
+    }
   }
 
   private isUniqueViolation(err: any) {

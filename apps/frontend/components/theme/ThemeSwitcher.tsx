@@ -7,6 +7,7 @@ type Props = {
 
 export function ThemeSwitcher({ compact = false }: Props) {
   const [theme, setThemeState] = useState<Theme>('dark');
+  const optionStyle = { background: 'var(--bg)', color: 'var(--text)' };
 
   useEffect(() => {
     setThemeState(getTheme());
@@ -36,9 +37,9 @@ export function ThemeSwitcher({ compact = false }: Props) {
           outline: 'none',
         }}
       >
-        <option value="dark">Dark</option>
-        <option value="light">Light</option>
-        <option value="system">System</option>
+        <option value="dark" style={optionStyle}>Dark</option>
+        <option value="light" style={optionStyle}>Light</option>
+        <option value="system" style={optionStyle}>System</option>
       </select>
     </label>
   );
