@@ -28,6 +28,11 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     headers: { cookie: req.headers.cookie ?? '' },
   });
 
+  const setCookie = backendRes.headers.get('set-cookie');
+  if (setCookie) {
+    res.setHeader('Set-Cookie', setCookie);
+  }
+
   const text = await backendRes.text();
   res.status(backendRes.status).json(toJson(text));
 }
