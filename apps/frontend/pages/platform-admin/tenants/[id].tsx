@@ -43,6 +43,7 @@ export default function TenantDetailPage({
   const [paletteId, setPaletteId] = useState(org.themePaletteId ?? '');
   const [paletteSaving, setPaletteSaving] = useState(false);
   const [paletteError, setPaletteError] = useState<string | null>(null);
+  const [paletteSuccess, setPaletteSuccess] = useState<string | null>(null);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const paletteSelectRef = useRef<HTMLDivElement | null>(null);
 
@@ -80,6 +81,7 @@ export default function TenantDetailPage({
   const savePalette = async () => {
     setPaletteSaving(true);
     setPaletteError(null);
+    setPaletteSuccess(null);
     try {
       const res = await fetch(`/api/platform-admin/tenants/${org.id}/theme`, {
         method: 'PATCH',
@@ -89,7 +91,13 @@ export default function TenantDetailPage({
       if (!res.ok) {
         const data = await res.json().catch(() => null);
         setPaletteError(data?.error ?? 'Save failed');
+        return;
       }
+      const data = await res.json().catch(() => null);
+      const nextPaletteId = data?.org?.themePaletteId ?? paletteId;
+      setPaletteId(nextPaletteId ?? '');
+      setPaletteSuccess('Saved');
+      setTimeout(() => setPaletteSuccess(null), 2500);
     } catch {
       setPaletteError('Save failed');
     } finally {
@@ -185,6 +193,7 @@ export default function TenantDetailPage({
           </button>
         </div>
         {paletteError ? <p style={errorStyle}>{paletteError}</p> : null}
+        {paletteSuccess ? <p style={successStyle}>{paletteSuccess}</p> : null}
         <p style={paletteHintStyle}>
           Assigning a palette overrides the global default for this tenant.
         </p>
@@ -381,6 +390,12 @@ const buttonStyle = {
 const errorStyle = {
   marginTop: '0.5rem',
   color: 'var(--danger)',
+};
+
+const successStyle = {
+  marginTop: '0.5rem',
+  color: 'var(--green)',
+  fontWeight: 600,
 };
 
 const paletteCardStyle = {
