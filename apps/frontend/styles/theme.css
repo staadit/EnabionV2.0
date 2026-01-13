@@ -1,28 +1,5 @@
-/* Brand constants + semantic aliases */
+/* Palette tokens are injected server-side; keep semantic/structural tokens here. */
 :root {
-  --brand-ocean: #126E82;
-  --brand-green: #38A169;
-  --brand-gold: #FDBA45;
-  --brand-navy: #0B2239;
-
-  --accent-1: var(--brand-ocean);
-  --accent-2: var(--brand-green);
-  --accent-3: var(--brand-gold);
-
-  --danger: #F87171;
-  --success: #2F9E44;
-  --warning: #F59F00;
-  --info: #228BE6;
-  --danger-bg: rgba(248,113,113,0.12);
-  --danger-border: rgba(248,113,113,0.35);
-  --success-bg: rgba(47,158,68,0.12);
-  --success-border: rgba(47,158,68,0.35);
-
-  --ocean: var(--brand-ocean);
-  --green: var(--brand-green);
-  --gold: var(--brand-gold);
-  --navy: var(--brand-navy);
-
   --gradient-primary: linear-gradient(135deg, var(--accent-1), var(--accent-2));
 
   --radius: 14px;
@@ -46,9 +23,6 @@
 html[data-theme="dark"] {
   --bg: #070D16;
   --bg2: #0B1220;
-  --bg-gradient-1: rgba(18,110,130,0.30);
-  --bg-gradient-2: rgba(56,161,105,0.22);
-  --bg-gradient-3: rgba(253,186,69,0.12);
 
   --surface: rgba(255,255,255,0.06);
   --surface-2: rgba(255,255,255,0.04);
@@ -71,9 +45,6 @@ html[data-theme="dark"] {
 html[data-theme="light"] {
   --bg: #F6F8FB;
   --bg2: #FFFFFF;
-  --bg-gradient-1: rgba(18,110,130,0.10);
-  --bg-gradient-2: rgba(56,161,105,0.10);
-  --bg-gradient-3: rgba(253,186,69,0.08);
 
   --surface: rgba(255,255,255,0.92);
   --surface-2: rgba(255,255,255,0.78);
