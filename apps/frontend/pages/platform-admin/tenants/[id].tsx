@@ -115,9 +115,9 @@ export default function TenantDetailPage({
             onChange={(event) => setPaletteId(event.target.value)}
             style={selectStyle}
           >
-            <option value="">Global default</option>
+            <option value="" style={optionStyle}>Global default</option>
             {palettes.map((palette) => (
-              <option key={palette.id} value={palette.id}>
+              <option key={palette.id} value={palette.id} style={optionStyle}>
                 {palette.name} ({palette.slug})
               </option>
             ))}
@@ -260,6 +260,11 @@ const selectStyle = {
   padding: '0.5rem 0.75rem',
   borderRadius: '8px',
   border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+};
+
+const optionStyle = {
   background: 'var(--surface-2)',
   color: 'var(--text)',
 };
