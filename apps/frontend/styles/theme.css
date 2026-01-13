@@ -21,6 +21,7 @@
 
 /* DARK (Black) — matches landing mock */
 html[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #070D16;
   --bg2: #0B1220;
 
@@ -43,6 +44,7 @@ html[data-theme="dark"] {
 
 /* LIGHT (White) — matches landing mock */
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #F6F8FB;
   --bg2: #FFFFFF;
 
