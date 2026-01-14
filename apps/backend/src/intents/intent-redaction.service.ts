@@ -2,9 +2,12 @@ import { ForbiddenException, Injectable, NotFoundException } from '@nestjs/commo
 import { PrismaService } from '../prisma.service';
 import { NdaService } from '../nda/nda.service';
 import { ConfidentialityLevel } from '../blobstore/types';
+import { buildIntentShortId } from './intent.utils';
 
 type IntentRecord = {
   id: string;
+  intentNumber: number;
+  intentName: string;
   orgId: string;
   goal: string;
   title: string | null;
@@ -17,6 +20,8 @@ type IntentRecord = {
 
 export type IntentRedactionView = {
   id: string;
+  shortId: string;
+  intentName: string;
   title: string | null;
   goal: string;
   client: string | null;
@@ -130,6 +135,8 @@ export class IntentRedactionService {
       where: { id: intentId },
       select: {
         id: true,
+        intentNumber: true,
+        intentName: true,
         orgId: true,
         goal: true,
         title: true,
@@ -196,6 +203,8 @@ export class IntentRedactionService {
     const l2Redacted = input.hasL2 && !input.allowL2;
     return {
       id: intent.id,
+      shortId: buildIntentShortId(intent.intentNumber),
+      intentName: intent.intentName,
       title: intent.title,
       goal: intent.goal,
       client: intent.client,
@@ -237,7 +246,7 @@ export class IntentRedactionService {
   }
 
   private buildMarkdown(intent: IntentRedactionView): string {
-    const title = intent.title || 'Intent';
+    const title = intent.intentName || intent.title || 'Intent';
     const lines = [`# ${title}`, '', `Goal: ${intent.goal}`];
     if (intent.client) lines.push(`Client: ${intent.client}`);
     lines.push(`Stage: ${intent.stage}`);

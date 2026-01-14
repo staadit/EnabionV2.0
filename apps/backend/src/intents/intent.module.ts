@@ -5,6 +5,7 @@ import { NdaModule } from '../nda/nda.module';
 import { PrismaService } from '../prisma.service';
 import { IntentController } from './intent.controller';
 import { IntentRedactionController } from './intent-redaction.controller';
+import { IntentV1Controller } from './intent-v1.controller';
 import { IntentRedactionService } from './intent-redaction.service';
 import { ShareLinkController } from './share-link.controller';
 import { ShareLinkService } from './share-link.service';
@@ -13,7 +14,13 @@ import { IntentService } from './intent.service';
 
 @Module({
   imports: [AuthModule, EventModule, NdaModule],
-  controllers: [IntentController, IntentRedactionController, ShareLinkController, SharePublicController],
+  controllers: [
+    IntentController,
+    IntentV1Controller,
+    IntentRedactionController,
+    ShareLinkController,
+    SharePublicController,
+  ],
   providers: [IntentService, IntentRedactionService, ShareLinkService, PrismaService],
   exports: [IntentRedactionService, IntentService],
 })

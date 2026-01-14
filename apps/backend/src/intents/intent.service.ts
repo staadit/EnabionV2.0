@@ -6,10 +6,12 @@ import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
 import { IntentStage } from './intent.types';
+import { buildIntentShortId, normalizeIntentName } from './intent.utils';
 
 export type CreateIntentInput = {
   orgId: string;
   actorUserId: string;
+  intentName: string;
   ownerUserId?: string | null;
   client?: string | null;
   language?: string | null;
@@ -21,6 +23,23 @@ export type CreateIntentInput = {
   kpi?: string | null;
   risks?: string | null;
   deadlineAt?: Date | null;
+};
+
+export type UpdateIntentInput = {
+  orgId: string;
+  actorUserId: string;
+  intentId: string;
+  intentName?: string | null;
+  ownerUserId?: string | null;
+  client?: string | null;
+  language?: string | null;
+  goal?: string | null;
+  context?: string | null;
+  scope?: string | null;
+  kpi?: string | null;
+  risks?: string | null;
+  deadlineAt?: Date | null;
+  pipelineStage?: IntentStage;
 };
 
 export type ListIntentInput = {
@@ -65,6 +84,12 @@ export class IntentService {
       throw new NotFoundException('Org not found');
     }
 
+    const intentName = normalizeIntentName(input.intentName ?? '');
+    if (!intentName) {
+      throw new BadRequestException('Intent name is required');
+    }
+    await this.ensureIntentNameAvailable(input.orgId, intentName);
+
     const rawText = input.sourceTextRaw ?? null;
     const isPaste = Boolean(rawText && rawText.trim().length > 0);
     const title = isPaste ? this.deriveTitle(rawText!, input.title) : input.goal ?? '';
@@ -82,6 +107,7 @@ export class IntentService {
         createdByUserId: input.actorUserId,
         ownerUserId,
         client: input.client ?? null,
+        intentName,
         language,
         goal,
         title,
@@ -103,7 +129,7 @@ export class IntentService {
     const payload: Record<string, unknown> = {
       payloadVersion: 1,
       intentId: intent.id,
-      title,
+      title: intentName,
       language,
       confidentialityLevel: 'L1',
       source: isPaste ? 'paste' : 'manual',
@@ -161,6 +187,7 @@ export class IntentService {
     }
     if (input.q) {
       where.OR = [
+        { intentName: { contains: input.q, mode: 'insensitive' } },
         { title: { contains: input.q, mode: 'insensitive' } },
         { client: { contains: input.q, mode: 'insensitive' } },
       ];
@@ -197,6 +224,8 @@ export class IntentService {
       where,
       select: {
         id: true,
+        intentNumber: true,
+        intentName: true,
         goal: true,
         title: true,
         client: true,
@@ -222,6 +251,7 @@ export class IntentService {
     const items = results.slice(0, take).map((intent) => ({
       ...intent,
       status: intent.stage,
+      shortId: buildIntentShortId(intent.intentNumber),
       owner: intent.owner
         ? {
             id: intent.owner.id,
@@ -237,6 +267,51 @@ export class IntentService {
         : null;
 
     return { items, nextCursor };
+  }
+
+  async getIntentDetail(input: { orgId: string; intentId: string }) {
+    const intent = await this.prisma.intent.findFirst({
+      where: { id: input.intentId, orgId: input.orgId },
+      select: {
+        id: true,
+        intentNumber: true,
+        intentName: true,
+        goal: true,
+        title: true,
+        client: true,
+        stage: true,
+        language: true,
+        lastActivityAt: true,
+        deadlineAt: true,
+        ownerUserId: true,
+        context: true,
+        scope: true,
+        kpi: true,
+        risks: true,
+        sourceTextRaw: true,
+        owner: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+      },
+    });
+    if (!intent) {
+      throw new NotFoundException('Intent not found');
+    }
+
+    const hasL2Attachments = await this.prisma.attachment.count({
+      where: { intentId: intent.id, orgId: intent.orgId, blob: { confidentiality: 'L2' } },
+    });
+    const hasL2Source = Boolean(intent.sourceTextRaw && intent.sourceTextRaw.trim());
+    const hasL2 = hasL2Source || hasL2Attachments > 0;
+
+    return {
+      ...intent,
+      shortId: buildIntentShortId(intent.intentNumber),
+      hasL2,
+    };
   }
 
   async runIntentCoach(input: RunIntentCoachInput) {
@@ -257,57 +332,181 @@ export class IntentService {
     };
   }
 
-  async updatePipelineStage(input: UpdatePipelineStageInput) {
+  async updateIntent(input: UpdateIntentInput) {
     const intent = await this.prisma.intent.findFirst({
       where: { id: input.intentId, orgId: input.orgId },
-      select: { id: true, stage: true },
     });
     if (!intent) {
       throw new NotFoundException('Intent not found');
     }
 
-    const fromStage = intent.stage as IntentStage;
-    const toStage = input.pipelineStage;
-    if (fromStage === toStage) {
-      const existing = await this.prisma.intent.findUnique({
-        where: { id: intent.id },
-      });
-      if (!existing) {
-        throw new NotFoundException('Intent not found');
+    const updates: Prisma.IntentUpdateInput = {};
+    const changedFields: string[] = [];
+    const now = new Date();
+
+    if (input.intentName !== undefined) {
+      const normalized = normalizeIntentName(input.intentName ?? '');
+      if (!normalized) {
+        throw new BadRequestException('Intent name cannot be empty');
       }
-      return existing;
+      if (normalized !== intent.intentName) {
+        await this.ensureIntentNameAvailable(input.orgId, normalized, intent.id);
+        updates.intentName = normalized;
+        changedFields.push('intentName');
+      }
     }
 
-    const now = new Date();
+    if (input.client !== undefined) {
+      const normalized = this.normalizeOptionalText(input.client);
+      if (normalized !== intent.client) {
+        updates.client = normalized;
+        changedFields.push('client');
+      }
+    }
+
+    if (input.ownerUserId !== undefined) {
+      const normalized = input.ownerUserId?.trim() || null;
+      if (normalized !== intent.ownerUserId) {
+        updates.ownerUserId = normalized;
+        changedFields.push('ownerUserId');
+      }
+    }
+
+    if (input.language !== undefined) {
+      const normalized = input.language?.trim().toUpperCase();
+      if (normalized && normalized !== intent.language) {
+        updates.language = normalized;
+        changedFields.push('language');
+      }
+    }
+
+    if (input.goal !== undefined) {
+      const normalized = this.normalizeOptionalText(input.goal);
+      if (normalized !== intent.goal) {
+        updates.goal = normalized ?? '';
+        changedFields.push('goal');
+      }
+    }
+
+    if (input.context !== undefined) {
+      const normalized = this.normalizeOptionalText(input.context);
+      if (normalized !== intent.context) {
+        updates.context = normalized;
+        changedFields.push('context');
+      }
+    }
+
+    if (input.scope !== undefined) {
+      const normalized = this.normalizeOptionalText(input.scope);
+      if (normalized !== intent.scope) {
+        updates.scope = normalized;
+        changedFields.push('scope');
+      }
+    }
+
+    if (input.kpi !== undefined) {
+      const normalized = this.normalizeOptionalText(input.kpi);
+      if (normalized !== intent.kpi) {
+        updates.kpi = normalized;
+        changedFields.push('kpi');
+      }
+    }
+
+    if (input.risks !== undefined) {
+      const normalized = this.normalizeOptionalText(input.risks);
+      if (normalized !== intent.risks) {
+        updates.risks = normalized;
+        changedFields.push('risks');
+      }
+    }
+
+    if (input.deadlineAt !== undefined) {
+      const normalized = input.deadlineAt ?? null;
+      const current = intent.deadlineAt ? intent.deadlineAt.getTime() : null;
+      const next = normalized ? normalized.getTime() : null;
+      if (current !== next) {
+        updates.deadlineAt = normalized;
+        changedFields.push('deadlineAt');
+      }
+    }
+
+    let stageChanged = false;
+    let fromStage: IntentStage | null = null;
+    let toStage: IntentStage | null = null;
+    if (input.pipelineStage) {
+      const normalized = input.pipelineStage;
+      if (normalized !== intent.stage) {
+        updates.stage = normalized;
+        stageChanged = true;
+        fromStage = intent.stage as IntentStage;
+        toStage = normalized;
+      }
+    }
+
+    if (!stageChanged && changedFields.length === 0) {
+      return intent;
+    }
+
+    updates.lastActivityAt = now;
     const updated = await this.prisma.intent.update({
       where: { id: intent.id },
-      data: {
-        stage: toStage,
-        lastActivityAt: now,
-      },
+      data: updates,
     });
 
-    await this.events.emitEvent({
-      type: EVENT_TYPES.INTENT_UPDATED,
-      occurredAt: now,
-      orgId: input.orgId,
-      actorUserId: input.actorUserId,
-      actorOrgId: input.orgId,
-      subjectType: 'INTENT',
-      subjectId: intent.id,
-      lifecycleStep: this.mapLifecycleStep(toStage),
-      pipelineStage: toStage,
-      channel: 'ui',
-      correlationId: ulid(),
-      payload: {
-        payloadVersion: 1,
-        intentId: intent.id,
-        changedFields: ['pipelineStage'],
-        changeSummary: `Pipeline stage changed from ${fromStage} to ${toStage}`,
-      },
-    });
+    if (stageChanged && fromStage && toStage) {
+      await this.events.emitEvent({
+        type: EVENT_TYPES.INTENT_PIPELINE_STAGE_CHANGED,
+        occurredAt: now,
+        orgId: input.orgId,
+        actorUserId: input.actorUserId,
+        actorOrgId: input.orgId,
+        subjectType: 'INTENT',
+        subjectId: intent.id,
+        lifecycleStep: this.mapLifecycleStep(toStage),
+        pipelineStage: toStage,
+        channel: 'ui',
+        correlationId: ulid(),
+        payload: {
+          payloadVersion: 1,
+          intentId: intent.id,
+          fromStage,
+          toStage,
+        },
+      });
+    }
+
+    if (changedFields.length > 0) {
+      await this.events.emitEvent({
+        type: EVENT_TYPES.INTENT_UPDATED,
+        occurredAt: now,
+        orgId: input.orgId,
+        actorUserId: input.actorUserId,
+        actorOrgId: input.orgId,
+        subjectType: 'INTENT',
+        subjectId: intent.id,
+        lifecycleStep: this.mapLifecycleStep((updates.stage as IntentStage) ?? intent.stage),
+        pipelineStage: (updates.stage as IntentStage) ?? (intent.stage as IntentStage),
+        channel: 'ui',
+        correlationId: ulid(),
+        payload: {
+          payloadVersion: 1,
+          intentId: intent.id,
+          changedFields,
+          changeSummary: `Updated fields: ${changedFields.join(', ')}`,
+        },
+      });
+    }
 
     return updated;
+  }
+
+  async updatePipelineStage(input: UpdatePipelineStageInput) {
+    return this.updateIntent({
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      intentId: input.intentId,
+      pipelineStage: input.pipelineStage,
+    });
   }
 
   private encodeCursor(
@@ -373,5 +572,29 @@ export class IntentService {
       return 'COMMIT_ASSURE';
     }
     return 'CLARIFY';
+  }
+
+  private normalizeOptionalText(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) return null;
+    const trimmed = value.trim();
+    return trimmed ? trimmed : null;
+  }
+
+  private async ensureIntentNameAvailable(
+    orgId: string,
+    intentName: string,
+    excludeIntentId?: string,
+  ) {
+    const existing = await this.prisma.intent.findFirst({
+      where: {
+        orgId,
+        intentName: { equals: intentName, mode: 'insensitive' },
+        ...(excludeIntentId ? { id: { not: excludeIntentId } } : {}),
+      },
+      select: { id: true },
+    });
+    if (existing) {
+      throw new BadRequestException('Intent name already exists');
+    }
   }
 }

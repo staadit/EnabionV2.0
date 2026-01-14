@@ -22,6 +22,7 @@ import { INTENT_STAGES, IntentStage } from './intent.types';
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
 
 const createIntentSchema = z.object({
+  intentName: z.string().min(1),
   goal: z.string().optional().nullable(),
   title: z.string().optional().nullable(),
   sourceTextRaw: z.string().optional().nullable(),
@@ -32,7 +33,17 @@ const createIntentSchema = z.object({
   deadlineAt: z.string().optional().nullable(),
 });
 
-const updateStageSchema = z.object({
+const updateIntentSchema = z.object({
+  intentName: z.string().optional().nullable(),
+  client: z.string().optional().nullable(),
+  ownerUserId: z.string().optional().nullable(),
+  language: z.enum(LANGUAGE_OPTIONS).optional(),
+  goal: z.string().optional().nullable(),
+  context: z.string().optional().nullable(),
+  scope: z.string().optional().nullable(),
+  kpi: z.string().optional().nullable(),
+  risks: z.string().optional().nullable(),
+  deadlineAt: z.string().optional().nullable(),
   pipelineStage: z.string().optional(),
   stage: z.string().optional(),
 });
@@ -65,6 +76,7 @@ export class IntentController {
     const intent = await this.intentService.createIntent({
       orgId: user.orgId,
       actorUserId: user.id,
+      intentName: parsed.intentName,
       goal: hasRaw ? null : goal,
       title: hasRaw ? this.normalizeOptionalText(parsed.title) : null,
       sourceTextRaw: hasRaw ? rawText : null,
@@ -100,14 +112,25 @@ export class IntentController {
     @Body() body: unknown,
   ) {
     const user = this.requireUser(req);
-    const parsed = this.parseBody(updateStageSchema, body);
+    const parsed = this.parseBody(updateIntentSchema, body);
     const stageInput = parsed.pipelineStage ?? parsed.stage;
-    const nextStage = this.parseStageValue(stageInput);
+    const nextStage = stageInput ? this.parseStageValue(stageInput) : undefined;
 
-    const intent = await this.intentService.updatePipelineStage({
+    const intent = await this.intentService.updateIntent({
       orgId: user.orgId,
       actorUserId: user.id,
       intentId,
+      intentName: this.normalizeOptionalText(parsed.intentName) ?? undefined,
+      client: this.normalizeOptionalText(parsed.client) ?? undefined,
+      ownerUserId: this.normalizeOptionalText(parsed.ownerUserId) ?? undefined,
+      language: parsed.language ?? undefined,
+      goal: this.normalizeOptionalText(parsed.goal) ?? undefined,
+      context: this.normalizeOptionalText(parsed.context) ?? undefined,
+      scope: this.normalizeOptionalText(parsed.scope) ?? undefined,
+      kpi: this.normalizeOptionalText(parsed.kpi) ?? undefined,
+      risks: this.normalizeOptionalText(parsed.risks) ?? undefined,
+      deadlineAt:
+        parsed.deadlineAt !== undefined ? this.parseDeadline(parsed.deadlineAt) : undefined,
       pipelineStage: nextStage,
     });
 

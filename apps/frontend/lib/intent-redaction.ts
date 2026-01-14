@@ -1,5 +1,7 @@
 export type IntentRedactionView = {
   id: string;
+  shortId: string;
+  intentName: string;
   title: string | null;
   goal: string;
   client: string | null;

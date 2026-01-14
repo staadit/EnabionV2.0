@@ -223,6 +223,8 @@ model NdaAcceptance {
 
 model Intent {
   id                   String               @id @default(cuid())
+  intentNumber         Int                  @unique @default(autoincrement())
+  intentName           String
   orgId                String
   createdByUserId      String
   ownerUserId          String?
@@ -257,6 +259,7 @@ model Intent {
   @@index([orgId, language])
   @@index([orgId, stage, lastActivityAt])
   @@index([createdByUserId])
+  @@unique([orgId, intentName])
 }
 
 model IntentShareLink {

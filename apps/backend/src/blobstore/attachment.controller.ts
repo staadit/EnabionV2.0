@@ -2,10 +2,12 @@ import {
   BadRequestException,
   Body,
   Controller,
+  Delete,
   ForbiddenException,
   Get,
   NotFoundException,
   Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -168,6 +170,40 @@ export class AttachmentController {
   ) {
     const attachment = await this.attachmentService.findByIdWithBlob(id);
     return this.handleDownload(req, attachment, asInline);
+  }
+
+  @Delete('attachments/:id')
+  @Roles('Owner', 'BD_AM')
+  async deleteAttachment(@Req() req: AuthenticatedRequest, @Param('id') id: string) {
+    const user = this.requireUser(req);
+    await this.attachmentService.deleteAttachment({
+      attachmentId: id,
+      actorUserId: user.id,
+      actorOrgId: user.orgId,
+    });
+    return { ok: true };
+  }
+
+  @Patch('attachments/:id')
+  @Roles('Owner', 'BD_AM')
+  async updateAttachment(
+    @Req() req: AuthenticatedRequest,
+    @Param('id') id: string,
+    @Body('confidentiality') confidentiality?: string,
+    @Body('confidentialityLevel') confidentialityLevel?: string,
+  ) {
+    const user = this.requireUser(req);
+    const next = (confidentialityLevel ?? confidentiality ?? '').toUpperCase();
+    if (next !== 'L1' && next !== 'L2') {
+      throw new BadRequestException('Invalid confidentiality level');
+    }
+    const updated = await this.attachmentService.updateAttachmentConfidentiality({
+      attachmentId: id,
+      actorUserId: user.id,
+      actorOrgId: user.orgId,
+      confidentiality: next as ConfidentialityLevel,
+    });
+    return { attachment: updated };
   }
 
   private parseBool(value?: string): boolean {

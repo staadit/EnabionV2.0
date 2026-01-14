@@ -63,6 +63,8 @@ export const EVENT_TYPES = {
   EXPORT_GENERATED: 'EXPORT_GENERATED',
   ATTACHMENT_UPLOADED: 'ATTACHMENT_UPLOADED',
   ATTACHMENT_DOWNLOADED: 'ATTACHMENT_DOWNLOADED',
+  ATTACHMENT_DELETED: 'ATTACHMENT_DELETED',
+  ATTACHMENT_CONFIDENTIALITY_CHANGED: 'ATTACHMENT_CONFIDENTIALITY_CHANGED',
   USER_SIGNED_UP: 'USER_SIGNED_UP',
   USER_LOGGED_IN: 'USER_LOGGED_IN',
   USER_LOGGED_OUT: 'USER_LOGGED_OUT',
@@ -253,6 +255,17 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     attachmentId: z.string().min(1),
     via: z.enum(['owner', 'share_link', 'system']),
+  }),
+  [EVENT_TYPES.ATTACHMENT_DELETED]: basePayload.extend({
+    intentId: z.string().min(1),
+    attachmentId: z.string().min(1),
+    filename: z.string().min(1).optional(),
+  }),
+  [EVENT_TYPES.ATTACHMENT_CONFIDENTIALITY_CHANGED]: basePayload.extend({
+    intentId: z.string().min(1),
+    attachmentId: z.string().min(1),
+    fromLevel: z.enum(['L1', 'L2']),
+    toLevel: z.enum(['L1', 'L2']),
   }),
   [EVENT_TYPES.USER_SIGNED_UP]: basePayload.extend({
     userId: z.string().min(1),

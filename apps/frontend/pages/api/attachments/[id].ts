@@ -16,8 +16,8 @@ function buildBackendUrl(id: string, req: NextApiRequest) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'GET') {
-    res.setHeader('Allow', 'GET');
+  if (req.method !== 'GET' && req.method !== 'DELETE' && req.method !== 'PATCH') {
+    res.setHeader('Allow', 'GET, DELETE, PATCH');
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -33,6 +33,25 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   if (req.headers.cookie) {
     headers.cookie = req.headers.cookie;
   }
+
+  if (req.method === 'DELETE' || req.method === 'PATCH') {
+    if (req.method === 'PATCH') {
+      headers['content-type'] = 'application/json';
+    }
+    const backendRes = await fetch(backendUrl, {
+      method: req.method,
+      headers,
+      body: req.method === 'PATCH' ? JSON.stringify(req.body ?? {}) : undefined,
+    });
+    const text = await backendRes.text();
+    try {
+      res.status(backendRes.status).json(JSON.parse(text));
+    } catch {
+      res.status(backendRes.status).json({ error: text || 'Unexpected response' });
+    }
+    return;
+  }
+
   const backendRes = await fetch(backendUrl, { headers });
   const contentType = backendRes.headers.get('content-type') || '';
 
