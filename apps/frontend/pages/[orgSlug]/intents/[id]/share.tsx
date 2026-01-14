@@ -278,7 +278,8 @@ export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
-  const links = await listShareLinks(ctx.req.headers.cookie, intentId);
+  const { listShareLinksServer } = await import('../../../../lib/share-links.server');
+  const links = await listShareLinksServer(ctx.req.headers.cookie, intentId);
   return {
     props: {
       user: result.context!.user,

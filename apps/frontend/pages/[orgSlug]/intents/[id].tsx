@@ -1855,6 +1855,7 @@ export const getServerSideProps: GetServerSideProps<IntentDetailProps> = async (
   }
 
   const cookie = result.context!.cookie;
+  const { listShareLinksServer } = await import('../../../lib/share-links.server');
   const intent = await fetchIntentDetail(cookie, intentId);
   if (!intent) {
     return { notFound: true };
@@ -1865,7 +1866,7 @@ export const getServerSideProps: GetServerSideProps<IntentDetailProps> = async (
       fetchIntentAttachments(cookie, intentId),
       fetchOrgMembers(cookie),
       fetchIntentEvents(cookie, intentId),
-      listShareLinks(cookie, intentId),
+      listShareLinksServer(cookie, intentId),
       fetchNdaCurrent(cookie, intent.language),
       fetchNdaStatus(cookie),
     ]);
