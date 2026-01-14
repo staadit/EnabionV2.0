@@ -1,6 +1,7 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import type { AiGatewayMessage } from './ai-gateway.types';
 import type { AiGatewayConfig } from './ai-gateway.config';
+import { AI_GATEWAY_CONFIG } from './ai-gateway.tokens';
 
 type OpenAiUsage = {
   inputTokens?: number;
@@ -26,7 +27,7 @@ export class OpenAiProviderError extends Error {
 
 @Injectable()
 export class OpenAiProvider {
-  constructor(private readonly config: AiGatewayConfig) {}
+  constructor(@Inject(AI_GATEWAY_CONFIG) private readonly config: AiGatewayConfig) {}
 
   async generateText(input: {
     model: string;
