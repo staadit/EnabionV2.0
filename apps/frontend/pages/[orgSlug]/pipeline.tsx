@@ -228,8 +228,8 @@ const columnTitleStyle = {
 };
 
 const columnCountStyle = {
-  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontSize: '0.75rem',
   padding: '0.2rem 0.5rem',
   borderRadius: '999px',

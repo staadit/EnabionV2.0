@@ -4,57 +4,6 @@ import { useEffect, useState } from 'react';
 
 // CSS copied 1:1 from mockup (light/dark themes, layout, tokens)
 const css = `
-:root{
-  --ocean:#126E82;
-  --green:#38A169;
-  --gold: #FDBA45;
-  --navy: #0B2239;
-  --danger:#F87171;
-
-  --r:16px;
-  --r2:22px;
-  --shadow: 0 18px 40px rgba(0,0,0,.14);
-  --shadow2: 0 12px 26px rgba(0,0,0,.10);
-
-  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
-  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
-}
-
-/* THEME TOKENS */
-html[data-theme="light"]{
-  --bg: #F6F8FB;
-  --bg2: #FFFFFF;
-  --card: rgba(255,255,255,.92);
-  --card2: rgba(255,255,255,.78);
-  --text: rgba(11,34,57,.92);
-  --muted: rgba(11,34,57,.68);
-  --muted2: rgba(11,34,57,.56);
-  --border: rgba(11,34,57,.12);
-  --chip: rgba(11,34,57,.05);
-  --demo: rgba(18,110,130,.06);
-  --heroGlow1: rgba(18,110,130,.22);
-  --heroGlow2: rgba(56,161,105,.18);
-  --heroGlow3: rgba(253,186,69,.10);
-}
-
-html[data-theme="dark"]{
-  --bg: #070D16;
-  --bg2: #0B1220;
-  --card: rgba(255,255,255,.06);
-  --card2: rgba(255,255,255,.04);
-  --text: rgba(255,255,255,.92);
-  --muted: rgba(255,255,255,.68);
-  --muted2: rgba(255,255,255,.54);
-  --border: rgba(255,255,255,.12);
-  --chip: rgba(255,255,255,.06);
-  --demo: rgba(0,0,0,.20);
-  --heroGlow1: rgba(18,110,130,.30);
-  --heroGlow2: rgba(56,161,105,.22);
-  --heroGlow3: rgba(253,186,69,.12);
-  --shadow: 0 18px 42px rgba(0,0,0,.38);
-  --shadow2: 0 12px 28px rgba(0,0,0,.32);
-}
-
 html,body{height:100%;}
 body{
   margin:0;
@@ -103,15 +52,15 @@ a{color:inherit; text-decoration:none;}
 .mark{
   width:32px; height:32px; border-radius:12px;
   background: linear-gradient(135deg, var(--ocean), var(--green));
-  box-shadow: 0 14px 28px rgba(0,0,0,.22);
+  box-shadow: var(--shadow-2);
   position:relative;
 }
 .mark:after{
   content:"";
   position:absolute; inset:8px;
   border-radius:10px;
-  background: rgba(253,186,69,.95);
-  box-shadow: 0 0 0 1px rgba(255,255,255,.25);
+  background: var(--gold);
+  box-shadow: 0 0 0 1px var(--border);
 }
 .brandName{font-weight:780; letter-spacing:.3px;}
 .navLinks{display:none; gap:14px; flex-wrap:wrap; align-items:center; justify-content:center;}
@@ -136,9 +85,10 @@ a{color:inherit; text-decoration:none;}
 .btn:hover{filter: brightness(1.03);}
 .btn:active{transform: translateY(0.5px);}
 .btnPrimary{
-  border-color: rgba(255,255,255,.14);
-  background: linear-gradient(135deg, rgba(18,110,130,.98), rgba(56,161,105,.98));
-  color: rgba(255,255,255,.95);
+  border-color: var(--border);
+  background: var(--gradient-primary);
+  color: var(--text-on-brand);
+  box-shadow: var(--shadow);
 }
 .btnGhost{background:transparent;}
 .btnSmall{padding:8px 10px; border-radius: 12px; font-size:12px;}
@@ -203,7 +153,7 @@ h1{
   font-size: 11px;
   color: var(--muted);
   border:1px solid var(--border);
-  background: rgba(0,0,0,.10);
+  background: var(--surface-2);
   padding:2px 6px;
   border-radius: 8px;
 }
@@ -214,26 +164,24 @@ h1{
   padding:10px 11px;
   border-radius: 14px;
   border:1px solid var(--border);
-  background: rgba(0,0,0,.10);
+  background: var(--surface-2);
   color: var(--text);
   font-size: 12px;
   line-height:1.45;
   outline: none;
   font-family: var(--sans);
 }
-html[data-theme="light"] .ta{ background: rgba(255,255,255,.78); }
 .demoActions{display:flex; gap:10px; flex-wrap:wrap; margin-top:10px;}
 .out{
   margin-top:10px;
   padding:10px;
   border-radius: 14px;
   border:1px dashed var(--border);
-  background: rgba(0,0,0,.08);
+  background: var(--surface-2);
   font-size:12px;
   color: var(--muted);
   display:none;
 }
-html[data-theme="light"] .out{ background: rgba(255,255,255,.62); }
 .out b{color: var(--text);}
 
 /* SECTIONS */
@@ -262,12 +210,11 @@ html[data-theme="light"] .out{ background: rgba(255,255,255,.62); }
 }
 .card{
   border:1px solid var(--border);
-  background: rgba(0,0,0,.10);
+  background: var(--surface-2);
   border-radius: 18px;
   padding: 12px;
   min-height: 118px;
 }
-html[data-theme="light"] .card{ background: rgba(255,255,255,.62); }
 .card h3{margin:0 0 6px; font-size:13px; font-weight:780;}
 .card p{margin:0; font-size:12.5px; color:var(--muted); line-height:1.5;}
 
@@ -282,13 +229,12 @@ html[data-theme="light"] .card{ background: rgba(255,255,255,.62); }
 }
 .step{
   border:1px solid var(--border);
-  background: rgba(0,0,0,.10);
+  background: var(--surface-2);
   border-radius: 18px;
   padding: 12px;
   position: relative;
   overflow:hidden;
 }
-html[data-theme="light"] .step{ background: rgba(255,255,255,.62); }
 .step .n{
   font-family: var(--mono);
   font-size: 11px;
@@ -302,7 +248,7 @@ html[data-theme="light"] .step{ background: rgba(255,255,255,.62); }
   position:absolute;
   right:-30px; top:-30px;
   width:90px; height:90px;
-  background: radial-gradient(circle at 30% 30%, rgba(253,186,69,.25), transparent 62%);
+  background: radial-gradient(circle at 30% 30%, var(--bg-gradient-3), transparent 62%);
   transform: rotate(10deg);
 }
 
@@ -341,17 +287,13 @@ html[data-theme="light"] .step{ background: rgba(255,255,255,.62); }
   margin-top: 16px;
   padding: 16px;
   border-radius: var(--r2);
-  border:1px solid rgba(255,255,255,.16);
-  background: linear-gradient(135deg, rgba(18,110,130,.22), rgba(56,161,105,.18));
+  border:1px solid var(--border);
+  background: linear-gradient(135deg, var(--bg-gradient-1), var(--bg-gradient-2));
   display:flex;
   align-items:center;
   justify-content:space-between;
   gap:12px;
   flex-wrap:wrap;
-}
-html[data-theme="light"] .ctaBand{
-  border-color: rgba(11,34,57,.12);
-  background: linear-gradient(135deg, rgba(18,110,130,.10), rgba(56,161,105,.10));
 }
 .ctaBand h2{margin:0; font-size:16px; font-weight:860;}
 .ctaBand p{margin:4px 0 0; font-size:12.5px; color:var(--muted);}
@@ -760,4 +702,3 @@ function Step({ n, t, d }: { n: string; t: string; d: string }) {
 function Badge({ children }: { children: React.ReactNode }) {
   return <span className="badge">{children}</span>;
 }
-

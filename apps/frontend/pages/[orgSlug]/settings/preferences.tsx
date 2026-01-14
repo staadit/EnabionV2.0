@@ -136,7 +136,9 @@ const labelStyle = {
 const selectStyle = {
   padding: '0.6rem 0.75rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 };
 
 const toggleStyle = {
@@ -151,19 +153,20 @@ const buttonStyle = {
   padding: '0.9rem 1.1rem',
   borderRadius: '12px',
   border: 'none',
-  background: '#e4572e',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  boxShadow: 'var(--shadow)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   margin: 0,
 };
 
 const successStyle = {
-  color: '#157f3b',
+  color: 'var(--success)',
   margin: 0,
 };
 

@@ -125,19 +125,21 @@ const labelStyle = {
   flexDirection: 'column' as const,
   gap: '0.6rem',
   fontWeight: 600,
-  color: '#1f2933',
+  color: 'var(--text)',
 };
 
 const inputStyle = {
   borderRadius: '12px',
   padding: '0.85rem 1rem',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
   fontSize: '1rem',
 };
 
 const hintStyle = {
   fontSize: '0.85rem',
-  color: '#6a6f76',
+  color: 'var(--muted-2)',
 };
 
 const buttonStyle = {
@@ -145,19 +147,19 @@ const buttonStyle = {
   padding: '0.9rem 1.1rem',
   borderRadius: '12px',
   border: 'none',
-  background: '#e4572e',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   margin: 0,
 };
 
 const successStyle = {
-  color: '#157f3b',
+  color: 'var(--success)',
   margin: 0,
 };
 
@@ -165,7 +167,7 @@ const pillStyle = {
   display: 'inline-flex',
   padding: '0.5rem 0.75rem',
   borderRadius: '999px',
-  background: 'rgba(15, 37, 54, 0.08)',
+  background: 'var(--surface-2)',
   fontWeight: 600,
 };
 

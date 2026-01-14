@@ -299,8 +299,8 @@ const headerRowStyle = {
 const inviteCardStyle = {
   padding: '1rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: 'rgba(15, 37, 54, 0.03)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
   marginBottom: '1.5rem',
 };
 
@@ -328,32 +328,37 @@ const formActionsStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const selectStyle = {
   padding: '0.4rem 0.6rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 };
 
 const inputStyle = {
   padding: '0.5rem 0.65rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 };
 
 const primaryButtonStyle = {
   padding: '0.55rem 0.9rem',
   borderRadius: '8px',
   border: 'none',
-  background: '#1c6e5a',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  boxShadow: 'var(--shadow)',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -361,17 +366,18 @@ const primaryButtonStyle = {
 const ghostButtonStyle = {
   padding: '0.4rem 0.75rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
   background: 'transparent',
+  color: 'var(--text)',
   cursor: 'pointer',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
 };
 
 const successStyle = {
-  color: '#157f3b',
+  color: 'var(--success)',
   marginTop: '0.75rem',
   marginBottom: 0,
 };
@@ -380,14 +386,14 @@ const noteStyle = {
   marginTop: '0.75rem',
   padding: '0.6rem 0.75rem',
   borderRadius: '10px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: '#fff',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface)',
 };
 
 const noteLabelStyle = {
   margin: 0,
   fontSize: '0.85rem',
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const codeStyle = {

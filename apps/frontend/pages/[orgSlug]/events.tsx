@@ -181,5 +181,5 @@ const payloadStyle = {
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
 };

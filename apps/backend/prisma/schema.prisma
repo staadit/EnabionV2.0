@@ -282,3 +282,30 @@ model IntentShareLink {
   @@index([expiresAt])
   @@index([revokedAt])
 }
+
+model ThemePalette {
+  id              String   @id @default(cuid())
+  slug            String   @unique
+  name            String
+  tokensJson      Json
+  isGlobalDefault Boolean  @default(false)
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  revisions       ThemePaletteRevision[]
+}
+
+model ThemePaletteRevision {
+  id              String   @id @default(cuid())
+  paletteId       String
+  revision        Int
+  tokensJson      Json
+  createdByUserId String?
+  createdAt       DateTime @default(now())
+
+  palette ThemePalette @relation(fields: [paletteId], references: [id])
+
+  @@unique([paletteId, revision])
+  @@index([paletteId, createdAt])
+}

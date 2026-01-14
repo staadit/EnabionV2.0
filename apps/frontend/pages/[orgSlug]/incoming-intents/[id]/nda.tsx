@@ -42,7 +42,7 @@ export default function IncomingNda({
           defaultLanguage={org.defaultLanguage}
         />
       ) : (
-        <p style={{ color: '#b42318' }}>Unable to load NDA content.</p>
+        <p style={{ color: 'var(--danger)' }}>Unable to load NDA content.</p>
       )}
     </OrgShell>
   );
@@ -51,7 +51,7 @@ export default function IncomingNda({
 const metaStyle = {
   marginTop: 0,
   marginBottom: '1rem',
-  color: '#6b7785',
+  color: 'var(--muted-2)',
 };
 
 export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (ctx) => {

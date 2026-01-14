@@ -37,3 +37,7 @@ prisma/*.db
 
 # Docker volumes (local)
 infra/dev-data/
+
+# Temp previews
+tmp/
+apps/backend/tmp/

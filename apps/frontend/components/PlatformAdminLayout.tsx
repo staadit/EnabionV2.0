@@ -5,7 +5,7 @@ import { ThemeSwitcher } from './theme/ThemeSwitcher';
 
 type PlatformAdminLayoutProps = {
   user: PlatformAdminUser;
-  active: 'home' | 'tenants' | 'users' | 'events' | 'email' | 'telemetry' | 'nda';
+  active: 'home' | 'tenants' | 'users' | 'events' | 'email' | 'telemetry' | 'nda' | 'palettes';
   children: ReactNode;
 };
 
@@ -52,6 +52,9 @@ export default function PlatformAdminLayout({ user, active, children }: Platform
           </NavItem>
           <NavItem href="/platform-admin/nda" active={active === 'nda'}>
             NDA
+          </NavItem>
+          <NavItem href="/platform-admin/palettes" active={active === 'palettes'}>
+            Palettes
           </NavItem>
           <NavItem href="/platform-admin/telemetry" active={active === 'telemetry'}>
             Telemetry
@@ -158,8 +161,8 @@ const buttonStyle: CSSProperties = {
   padding: '0.75rem 1.2rem',
   borderRadius: 'var(--radius)',
   border: '1px solid var(--navy)',
-  background: 'linear-gradient(135deg, var(--navy), var(--ocean))',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
 };

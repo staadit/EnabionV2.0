@@ -1,0 +1,228 @@
+import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { PrismaService } from '../prisma.service';
+import { DEFAULT_PALETTE, normalizeTokens, PALETTE_TOKEN_KEYS } from '../theme/theme.tokens';
+
+type PaletteTokens = Record<(typeof PALETTE_TOKEN_KEYS)[number], string>;
+
+type CreatePaletteInput = {
+  slug: string;
+  name: string;
+  tokens?: Record<string, string>;
+};
+
+type UpdatePaletteInput = {
+  slug?: string;
+  name?: string;
+  tokens?: Record<string, string>;
+};
+
+@Injectable()
+export class ThemePalettesService {
+  constructor(private readonly prisma: PrismaService) {}
+
+  async listPalettes() {
+    await this.ensureDefaultPalette();
+    const palettes = await this.prisma.themePalette.findMany({
+      orderBy: [{ isGlobalDefault: 'desc' }, { updatedAt: 'desc' }],
+    });
+
+    return palettes.map((palette) => ({
+      id: palette.id,
+      slug: palette.slug,
+      name: palette.name,
+      tokens: palette.tokensJson,
+      isGlobalDefault: palette.isGlobalDefault,
+      createdAt: palette.createdAt,
+      updatedAt: palette.updatedAt,
+    }));
+  }
+
+  async getPalette(id: string) {
+    const palette = await this.prisma.themePalette.findUnique({ where: { id } });
+    if (!palette) {
+      throw new NotFoundException('Palette not found');
+    }
+    return palette;
+  }
+
+  async createPalette(actorUserId: string, input: CreatePaletteInput) {
+    const tokens = normalizeTokens(input.tokens ?? {}, DEFAULT_PALETTE, {
+      fillAccentsFromBrand: true,
+    });
+
+    try {
+      const palette = await this.prisma.themePalette.create({
+        data: {
+          slug: input.slug,
+          name: input.name,
+          tokensJson: tokens,
+          createdByUserId: actorUserId,
+          updatedByUserId: actorUserId,
+        },
+      });
+      await this.createRevision(palette.id, 1, tokens, actorUserId);
+      return palette;
+    } catch (err: any) {
+      if (this.isUniqueViolation(err)) {
+        throw new BadRequestException('Palette slug already exists');
+      }
+      if (this.isTokenError(err)) {
+        throw new BadRequestException(err.message);
+      }
+      throw err;
+    }
+  }
+
+  async updatePalette(actorUserId: string, id: string, input: UpdatePaletteInput) {
+    const palette = await this.prisma.themePalette.findUnique({ where: { id } });
+    if (!palette) {
+      throw new NotFoundException('Palette not found');
+    }
+
+    let tokensChanged = false;
+    let nextTokens: PaletteTokens | undefined;
+    if (input.tokens) {
+      try {
+        nextTokens = normalizeTokens(
+          input.tokens,
+          palette.tokensJson as PaletteTokens,
+          { fillAccentsFromBrand: false },
+        );
+      } catch (err: any) {
+        if (this.isTokenError(err)) {
+          throw new BadRequestException(err.message);
+        }
+        throw err;
+      }
+      tokensChanged = PALETTE_TOKEN_KEYS.some(
+        (key) => nextTokens![key] !== (palette.tokensJson as PaletteTokens)[key],
+      );
+    }
+
+    try {
+      const updated = await this.prisma.themePalette.update({
+        where: { id },
+        data: {
+          slug: input.slug ?? palette.slug,
+          name: input.name ?? palette.name,
+          ...(tokensChanged && nextTokens ? { tokensJson: nextTokens } : {}),
+          updatedByUserId: actorUserId,
+        },
+      });
+
+      if (tokensChanged && nextTokens) {
+        const nextRevision = await this.nextRevisionNumber(id);
+        await this.createRevision(id, nextRevision, nextTokens, actorUserId);
+      }
+
+      return updated;
+    } catch (err: any) {
+      if (this.isUniqueViolation(err)) {
+        throw new BadRequestException('Palette slug already exists');
+      }
+      throw err;
+    }
+  }
+
+  async deletePalette(id: string) {
+    const palette = await this.prisma.themePalette.findUnique({ where: { id } });
+    if (!palette) {
+      throw new NotFoundException('Palette not found');
+    }
+    if (palette.isGlobalDefault) {
+      throw new BadRequestException('Cannot delete the global default palette');
+    }
+    await this.prisma.themePalette.delete({ where: { id } });
+  }
+
+  async activatePalette(actorUserId: string, id: string) {
+    const palette = await this.prisma.themePalette.findUnique({ where: { id } });
+    if (!palette) {
+      throw new NotFoundException('Palette not found');
+    }
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.themePalette.updateMany({
+        where: { isGlobalDefault: true },
+        data: { isGlobalDefault: false },
+      });
+      await tx.themePalette.update({
+        where: { id },
+        data: { isGlobalDefault: true, updatedByUserId: actorUserId },
+      });
+    });
+  }
+
+  private async nextRevisionNumber(paletteId: string) {
+    const latest = await this.prisma.themePaletteRevision.findFirst({
+      where: { paletteId },
+      orderBy: { revision: 'desc' },
+      select: { revision: true },
+    });
+    return (latest?.revision ?? 0) + 1;
+  }
+
+  private async createRevision(
+    paletteId: string,
+    revision: number,
+    tokens: PaletteTokens,
+    actorUserId: string | null,
+  ) {
+    await this.prisma.themePaletteRevision.create({
+      data: {
+        paletteId,
+        revision,
+        tokensJson: tokens,
+        createdByUserId: actorUserId,
+      },
+    });
+  }
+
+  private async ensureDefaultPalette() {
+    const existingDefault = await this.prisma.themePalette.findFirst({
+      where: { isGlobalDefault: true },
+      select: { id: true },
+    });
+    if (existingDefault) {
+      return;
+    }
+
+    const fallbackPalette = await this.prisma.themePalette.findFirst({
+      orderBy: { createdAt: 'asc' },
+      select: { id: true },
+    });
+
+    if (fallbackPalette) {
+      await this.prisma.themePalette.update({
+        where: { id: fallbackPalette.id },
+        data: { isGlobalDefault: true },
+      });
+      return;
+    }
+
+    const tokens = normalizeTokens({}, DEFAULT_PALETTE, { fillAccentsFromBrand: true });
+    try {
+      const palette = await this.prisma.themePalette.create({
+        data: {
+          slug: 'enabion-default',
+          name: 'Enabion Default',
+          tokensJson: tokens,
+          isGlobalDefault: true,
+        },
+      });
+      await this.createRevision(palette.id, 1, tokens, null);
+    } catch (err: any) {
+      if (!this.isUniqueViolation(err)) {
+        throw err;
+      }
+    }
+  }
+
+  private isUniqueViolation(err: any) {
+    return err?.code === 'P2002';
+  }
+
+  private isTokenError(err: any) {
+    return typeof err?.message === 'string' && err.message.includes('Token');
+  }
+}

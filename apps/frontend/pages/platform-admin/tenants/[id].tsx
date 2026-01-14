@@ -30,7 +30,12 @@ type TenantDetailProps = {
   members: TenantUser[];
 };
 
-export default function TenantDetailPage({ user, org, counts, members }: TenantDetailProps) {
+export default function TenantDetailPage({
+  user,
+  org,
+  counts,
+  members,
+}: TenantDetailProps) {
   return (
     <PlatformAdminLayout user={user} active="tenants">
       <Head>
@@ -155,13 +160,13 @@ const metaGridStyle = {
 const metaCardStyle = {
   padding: '0.9rem',
   borderRadius: '12px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: 'rgba(248, 248, 248, 0.8)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
 };
 
 const metaLabelStyle = {
   margin: 0,
-  color: '#6a6f76',
+  color: 'var(--muted-2)',
   fontSize: '0.8rem',
   textTransform: 'uppercase' as const,
   letterSpacing: '0.08em',
@@ -181,16 +186,16 @@ const tableStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const linkStyle = {
-  color: '#1c6e5a',
+  color: 'var(--green)',
   textDecoration: 'none',
   fontWeight: 600,
 };

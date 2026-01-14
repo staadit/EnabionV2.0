@@ -304,7 +304,7 @@ export const getServerSideProps: GetServerSideProps<NdaAdminProps> = async (ctx)
 
 const subtitleStyle = {
   marginTop: 0,
-  color: '#4b5c6b',
+  color: 'var(--muted)',
   marginBottom: '1.5rem',
 };
 
@@ -317,12 +317,12 @@ const tableStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
   verticalAlign: 'top' as const,
 };
 
@@ -336,7 +336,7 @@ const linkButtonStyle = {
   border: 'none',
   background: 'none',
   padding: 0,
-  color: '#1c6e5a',
+  color: 'var(--green)',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -345,13 +345,13 @@ const dangerButtonStyle = {
   border: 'none',
   background: 'none',
   padding: 0,
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const formStyle = {
-  borderTop: '1px solid rgba(15, 37, 54, 0.12)',
+  borderTop: '1px solid var(--border)',
   paddingTop: '1.5rem',
 };
 
@@ -373,13 +373,17 @@ const fieldStyle = {
 const inputStyle = {
   padding: '0.6rem 0.75rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 };
 
 const textareaStyle = {
   padding: '0.6rem 0.75rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
   fontFamily: 'inherit',
 };
 
@@ -407,13 +411,14 @@ const primaryButtonStyle = {
   padding: '0.7rem 1.2rem',
   borderRadius: '10px',
   border: 'none',
-  background: '#0f3a4b',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  boxShadow: 'var(--shadow)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
 };

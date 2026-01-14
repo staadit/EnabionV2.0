@@ -263,15 +263,15 @@ const primaryButtonStyle = {
   borderRadius: '999px',
   border: 'none',
   padding: '0.6rem 1.3rem',
-  background: 'linear-gradient(135deg, var(--ocean), var(--green))',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
   boxShadow: 'var(--shadow)',
 };
 
 const errorStyle = {
-  color: '#b42318',
+  color: 'var(--danger)',
   fontWeight: 600,
 };
 

@@ -40,8 +40,8 @@ export default function OpsTelemetry({ user, org }: OpsTelemetryProps) {
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
 };
 
 const actionsStyle = {
@@ -53,9 +53,9 @@ const actionsStyle = {
 const actionButtonStyle = {
   padding: '0.6rem 1rem',
   borderRadius: '10px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
-  background: '#ffffff',
-  color: '#0f3a4b',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--link)',
   fontWeight: 600,
   textDecoration: 'none',
 };

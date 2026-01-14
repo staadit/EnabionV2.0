@@ -84,8 +84,8 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
 };
 
 const actionRowStyle = {
@@ -100,25 +100,25 @@ const buttonStyle = {
   padding: '0.7rem 1.2rem',
   borderRadius: '12px',
   border: 'none',
-  background: '#0f3a4b',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 600,
   cursor: 'pointer',
 };
 
 const helperStyle = {
-  color: '#4b4f54',
+  color: 'var(--muted)',
   fontSize: '0.9rem',
 };
 
 const messageStyle = {
   marginTop: '0.75rem',
-  color: '#1f2933',
+  color: 'var(--text)',
 };
 
 const errorStyle = {
   marginTop: '0.75rem',
-  color: '#b42318',
+  color: 'var(--danger)',
 };
 
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {

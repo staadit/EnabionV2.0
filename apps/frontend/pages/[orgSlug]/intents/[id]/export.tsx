@@ -27,7 +27,7 @@ export default function Export({ user, org, intentId }: IntentTabProps) {
       </Head>
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>L1 export</p>
-        <p style={{ margin: 0, color: '#4b5c6b' }}>
+        <p style={{ margin: 0, color: 'var(--muted)' }}>
           Exported content is L1-only in R1.0. L2 details remain locked by design.
         </p>
       </div>
@@ -53,13 +53,13 @@ export default function Export({ user, org, intentId }: IntentTabProps) {
 const cardStyle = {
   padding: '1rem 1.25rem',
   borderRadius: '12px',
-  border: '1px dashed rgba(15, 37, 54, 0.2)',
-  background: 'rgba(15, 37, 54, 0.04)',
+  border: '1px dashed var(--border)',
+  background: 'var(--surface-2)',
 };
 
 const mutedStyle = {
   marginTop: '1rem',
-  color: '#6b7785',
+  color: 'var(--muted-2)',
 };
 
 const buttonRow = {
@@ -73,8 +73,8 @@ const primaryButton = {
   display: 'inline-block',
   padding: '0.65rem 1.1rem',
   borderRadius: '999px',
-  background: '#0f2536',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
   fontWeight: 700,
   textDecoration: 'none',
 };
@@ -83,8 +83,8 @@ const ghostButton = {
   display: 'inline-block',
   padding: '0.65rem 1.1rem',
   borderRadius: '999px',
-  background: '#eef2f6',
-  color: '#0f2536',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
   fontWeight: 700,
   textDecoration: 'none',
 };

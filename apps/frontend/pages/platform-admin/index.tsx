@@ -34,6 +34,10 @@ export default function PlatformAdminHome({ user }: PlatformAdminHomeProps) {
           <h3 style={cardTitleStyle}>NDA</h3>
           <p style={cardBodyStyle}>Manage mutual NDA versions and summaries.</p>
         </Link>
+        <Link href="/platform-admin/palettes" style={cardStyle}>
+          <h3 style={cardTitleStyle}>Palettes</h3>
+          <p style={cardBodyStyle}>Manage UI color palettes and defaults.</p>
+        </Link>
         <Link href="/platform-admin/email-ingest" style={cardStyle}>
           <h3 style={cardTitleStyle}>Email ingest</h3>
           <p style={cardBodyStyle}>Monitor inbound pipeline status.</p>
@@ -75,10 +79,10 @@ const cardStyle = {
   display: 'block',
   padding: '1.2rem',
   borderRadius: '14px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
+  border: '1px solid var(--border)',
   textDecoration: 'none',
-  color: '#1b1d1f',
-  background: 'rgba(245, 245, 245, 0.7)',
+  color: 'var(--text)',
+  background: 'var(--surface)',
 };
 
 const cardTitleStyle = {
@@ -88,15 +92,15 @@ const cardTitleStyle = {
 
 const cardBodyStyle = {
   margin: 0,
-  color: '#4b4f54',
+  color: 'var(--muted)',
 };
 
 const reservedStyle = {
   marginTop: '2rem',
   padding: '1.2rem',
   borderRadius: '14px',
-  border: '1px solid rgba(15, 37, 54, 0.12)',
-  background: 'rgba(245, 245, 245, 0.6)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
 };
 
 const pillRowStyle = {
@@ -109,8 +113,8 @@ const pillRowStyle = {
 const pillStyle = {
   padding: '0.35rem 0.6rem',
   borderRadius: '999px',
-  background: '#0f3a4b',
-  color: '#fff',
+  background: 'var(--accent-1)',
+  color: 'var(--text-on-brand)',
   fontSize: '0.75rem',
   letterSpacing: '0.04em',
 };

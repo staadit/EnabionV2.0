@@ -162,15 +162,18 @@ const labelStyle = {
 const inputStyle = {
   padding: '0.5rem 0.7rem',
   borderRadius: '8px',
-  border: '1px solid rgba(15, 37, 54, 0.2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
 };
 
 const buttonStyle = {
   padding: '0.6rem 0.9rem',
   borderRadius: '8px',
   border: 'none',
-  background: '#1c6e5a',
-  color: '#fff',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  boxShadow: 'var(--shadow)',
   fontWeight: 600,
   cursor: 'pointer',
 };
@@ -184,16 +187,16 @@ const tableStyle = {
 const thStyle = {
   textAlign: 'left' as const,
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.12)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const tdStyle = {
   padding: '0.75rem',
-  borderBottom: '1px solid rgba(15, 37, 54, 0.08)',
+  borderBottom: '1px solid var(--border)',
 };
 
 const linkStyle = {
-  color: '#1c6e5a',
+  color: 'var(--green)',
   textDecoration: 'none',
   fontWeight: 600,
 };

@@ -1,46 +1,68 @@
-/* Brand constants */
+/* Palette tokens are injected server-side; keep semantic/structural tokens here. */
 :root {
-  --ocean: #126E82;
-  --green: #38A169;
-  --gold:  #FDBA45;
-  --navy:  #0B2239;
-  --danger:#F87171;
+  --gradient-primary: linear-gradient(135deg, var(--accent-1), var(--accent-2));
 
   --radius: 14px;
   --radius-2: 18px;
+  --r: var(--radius);
+  --r2: var(--radius-2);
+
   --shadow: 0 10px 30px rgba(0,0,0,0.15);
+  --shadow-2: 0 18px 40px rgba(0,0,0,0.15);
+  --shadow2: var(--shadow-2);
+
+  --link: var(--text);
+  --focus: var(--accent-1);
+  --text-on-brand: #ffffff;
+
+  --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace;
+  --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
 }
 
 /* DARK (Black) — matches landing mock */
 html[data-theme="dark"] {
+  color-scheme: dark;
   --bg: #070D16;
-  --bg-gradient-1: rgba(18,110,130,0.30);
-  --bg-gradient-2: rgba(56,161,105,0.22);
-  --bg-gradient-3: rgba(253,186,69,0.12);
+  --bg2: #0B1220;
 
   --surface: rgba(255,255,255,0.06);
   --surface-2: rgba(255,255,255,0.04);
+  --card: rgba(255,255,255,0.06);
+  --card2: rgba(255,255,255,0.04);
+  --chip: rgba(255,255,255,0.06);
+  --demo: rgba(0,0,0,0.20);
   --border: rgba(255,255,255,0.12);
 
   --text: rgba(255,255,255,0.92);
   --muted: rgba(255,255,255,0.68);
   --muted-2: rgba(255,255,255,0.55);
+  --muted2: var(--muted-2);
+  --heroGlow1: var(--bg-gradient-1);
+  --heroGlow2: var(--bg-gradient-2);
+  --heroGlow3: var(--bg-gradient-3);
 }
 
 /* LIGHT (White) — matches landing mock */
 html[data-theme="light"] {
+  color-scheme: light;
   --bg: #F6F8FB;
-  --bg-gradient-1: rgba(18,110,130,0.10);
-  --bg-gradient-2: rgba(56,161,105,0.10);
-  --bg-gradient-3: rgba(253,186,69,0.08);
+  --bg2: #FFFFFF;
 
   --surface: rgba(255,255,255,0.92);
   --surface-2: rgba(255,255,255,0.78);
+  --card: rgba(255,255,255,0.92);
+  --card2: rgba(255,255,255,0.78);
+  --chip: rgba(11,34,57,0.05);
+  --demo: rgba(18,110,130,0.06);
   --border: rgba(11,34,57,0.12);
 
   --text: rgba(11,34,57,0.92);
   --muted: rgba(11,34,57,0.70);
   --muted-2: rgba(11,34,57,0.55);
+  --muted2: var(--muted-2);
+  --heroGlow1: var(--bg-gradient-1);
+  --heroGlow2: var(--bg-gradient-2);
+  --heroGlow3: var(--bg-gradient-3);
 }
 
 /* Global background using tokens */
