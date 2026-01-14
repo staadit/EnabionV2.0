@@ -48,6 +48,19 @@ const updateIntentSchema = z.object({
   stage: z.string().optional(),
 });
 
+const suggestIntentCoachSchema = z
+  .object({
+    requestedLanguage: z.string().optional().nullable(),
+    tasks: z.array(z.string()).optional(),
+  })
+  .default({});
+
+const decideSuggestionSchema = z
+  .object({
+    reasonCode: z.string().optional().nullable(),
+  })
+  .default({});
+
 const MAX_SOURCE_TEXT_LENGTH = 100000;
 
 @UseGuards(AuthGuard, RolesGuard)
@@ -102,6 +115,61 @@ export class IntentController {
       orgId: user.orgId,
       intentId,
       actorUserId: user.id,
+    });
+  }
+
+  @Post(':intentId/coach/suggest')
+  @Roles('Owner', 'BD_AM')
+  async suggestIntentCoach(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(suggestIntentCoachSchema, body);
+    return this.intentService.suggestIntentCoach({
+      orgId: user.orgId,
+      intentId,
+      actorUserId: user.id,
+      tasks: parsed.tasks,
+      requestedLanguage: this.normalizeOptionalText(parsed.requestedLanguage),
+    });
+  }
+
+  @Post(':intentId/coach/suggestions/:suggestionId/accept')
+  @Roles('Owner', 'BD_AM')
+  async acceptIntentCoachSuggestion(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Param('suggestionId') suggestionId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    this.parseBody(decideSuggestionSchema, body);
+    return this.intentService.acceptIntentCoachSuggestion({
+      orgId: user.orgId,
+      intentId,
+      suggestionId,
+      actorUserId: user.id,
+    });
+  }
+
+  @Post(':intentId/coach/suggestions/:suggestionId/reject')
+  @Roles('Owner', 'BD_AM')
+  async rejectIntentCoachSuggestion(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Param('suggestionId') suggestionId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(decideSuggestionSchema, body);
+    return this.intentService.rejectIntentCoachSuggestion({
+      orgId: user.orgId,
+      intentId,
+      suggestionId,
+      actorUserId: user.id,
+      reasonCode: this.normalizeOptionalText(parsed.reasonCode) ?? undefined,
     });
   }
 

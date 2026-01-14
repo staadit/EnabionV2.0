@@ -20,6 +20,7 @@ model Organization {
   users     User[]
   intents   Intent[]
   events    Event[]
+  avatarSuggestions AvatarSuggestion[]
   blobs     Blob[]
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
@@ -119,6 +120,26 @@ enum IntentSource {
   email
 }
 
+enum AvatarType {
+  SYSTEM
+  ORG_X
+  INTENT_COACH
+}
+
+enum AvatarSuggestionKind {
+  missing_info
+  question
+  risk
+  rewrite
+  summary
+}
+
+enum AvatarSuggestionStatus {
+  ISSUED
+  ACCEPTED
+  REJECTED
+}
+
 model Event {
   id             String   @id
   schemaVersion  Int
@@ -152,6 +173,29 @@ model AiRateLimitWindow {
 
   @@unique([key, windowStart])
   @@index([windowStart])
+}
+
+model AvatarSuggestion {
+  id             String                 @id @default(uuid())
+  orgId          String
+  intentId       String
+  avatarType     AvatarType
+  kind           AvatarSuggestionKind
+  title          String
+  l1Text         String?
+  evidenceRef    String?
+  proposedPatch  Json?
+  status         AvatarSuggestionStatus @default(ISSUED)
+  createdAt      DateTime               @default(now())
+  decidedAt      DateTime?
+  decidedByUserId String?
+
+  org    Organization @relation(fields: [orgId], references: [id])
+  intent Intent       @relation(fields: [intentId], references: [id])
+
+  @@index([orgId, intentId, createdAt])
+  @@index([intentId, status])
+  @@index([orgId, status])
 }
 
 model Blob {
@@ -262,6 +306,7 @@ model Intent {
   createdByUser  User         @relation("IntentCreatedBy", fields: [createdByUserId], references: [id])
   owner          User?        @relation("IntentOwner", fields: [ownerUserId], references: [id])
   shareLinks     IntentShareLink[]
+  avatarSuggestions AvatarSuggestion[]
 
   @@index([orgId])
   @@index([orgId, stage])
