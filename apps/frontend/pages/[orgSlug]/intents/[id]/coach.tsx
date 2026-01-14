@@ -15,6 +15,11 @@ type IntentTabProps = {
 export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [running, setRunning] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [responseText, setResponseText] = useState<string | null>(null);
+  const [responseMeta, setResponseMeta] = useState<{
+    model?: string;
+    requestId?: string;
+  } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const isViewer = user.role === 'Viewer';
 
@@ -22,6 +27,8 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     if (running || isViewer) return;
     setRunning(true);
     setMessage(null);
+    setResponseText(null);
+    setResponseMeta(null);
     setError(null);
     try {
       const res = await fetch(`/api/intents/${intentId}/coach/run`, { method: 'POST' });
@@ -35,6 +42,13 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       const status = data?.status ?? 'queued';
       if (status === 'not_implemented') {
         setMessage('Intent Coach is not implemented yet.');
+      } else if (status === 'completed' && typeof data?.text === 'string') {
+        setMessage('Intent Coach completed.');
+        setResponseText(data.text);
+        setResponseMeta({
+          model: data?.model,
+          requestId: data?.requestId,
+        });
       } else {
         setMessage(`Intent Coach status: ${status}`);
       }
@@ -57,7 +71,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         <title>{org.name} - Intent Coach</title>
       </Head>
       <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Intent Coach placeholder</p>
+        <p style={{ marginTop: 0, fontWeight: 600 }}>Intent Coach</p>
         <p style={{ margin: 0 }}>Intent ID: {intentId}</p>
       </div>
       <div style={actionRowStyle}>
@@ -72,10 +86,22 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         {isViewer ? (
           <span style={helperStyle}>View-only access.</span>
         ) : (
-          <span style={helperStyle}>Uses the pasted intent text.</span>
+          <span style={helperStyle}>Uses L1 intent fields only (no raw/pasted text).</span>
         )}
       </div>
       {message ? <p style={messageStyle}>{message}</p> : null}
+      {responseText ? (
+        <div style={responseStyle}>
+          <div style={responseHeaderStyle}>
+            <span style={{ fontWeight: 600 }}>Avatar response</span>
+            {responseMeta?.model ? <span style={metaStyle}>Model: {responseMeta.model}</span> : null}
+            {responseMeta?.requestId ? (
+              <span style={metaStyle}>Request ID: {responseMeta.requestId}</span>
+            ) : null}
+          </div>
+          <pre style={responseTextStyle}>{responseText}</pre>
+        </div>
+      ) : null}
       {error ? <p style={errorStyle}>{error}</p> : null}
     </OrgShell>
   );
@@ -114,6 +140,34 @@ const helperStyle = {
 const messageStyle = {
   marginTop: '0.75rem',
   color: 'var(--text)',
+};
+
+const responseStyle = {
+  marginTop: '0.75rem',
+  padding: '1rem 1.25rem',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-1)',
+};
+
+const responseHeaderStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.75rem',
+  alignItems: 'center',
+  marginBottom: '0.75rem',
+};
+
+const metaStyle = {
+  color: 'var(--muted)',
+  fontSize: '0.85rem',
+};
+
+const responseTextStyle = {
+  margin: 0,
+  whiteSpace: 'pre-wrap' as const,
+  color: 'var(--text)',
+  fontFamily: 'inherit',
 };
 
 const errorStyle = {
