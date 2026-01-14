@@ -119,6 +119,7 @@ export default function IntentDetail({
     : 'No active link yet.';
   const shareExpires = activeShareLink ? formatDateShort(activeShareLink.expiresAt) : '—';
   const shareAccessed = activeShareLink ? `${activeShareLink.accessCount}x` : '0x';
+  const canCopyShare = Boolean(activeShareLink && shareUrl);
   const ndaAccepted = ndaStatus?.accepted ? 'Accepted' : 'Not accepted';
   const ndaVersion = ndaCurrent?.ndaVersion ?? 'mutual_nda_v0.1_en';
   const ndaHash = ndaCurrent?.enHashSha256 ? shortHash(ndaCurrent.enHashSha256) : '2b5c...9a1f';
@@ -1530,9 +1531,11 @@ export default function IntentDetail({
                       Expires: {shareExpires} - Accessed: {shareAccessed}
                     </div>
                     <div className="actions" style={{ justifyContent: 'flex-start', marginTop: '6px' }}>
-                      <a className="btn btnSmall" href="#" onClick={handleShareCopy}>
-                        Copy
-                      </a>
+                      {canCopyShare ? (
+                        <a className="btn btnSmall" href="#" onClick={handleShareCopy}>
+                          Copy
+                        </a>
+                      ) : null}
                       <a className="btn btnSmall btnWarn" href="#" onClick={handleShareRevoke}>
                         Revoke
                       </a>
