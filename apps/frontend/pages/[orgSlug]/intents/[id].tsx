@@ -1067,7 +1067,7 @@ export default function IntentDetail({
                           type="button"
                           onClick={() => handleOverviewEdit('field-client')}
                         >
-                          ?
+                          &#x270E;
                         </button>
                       </div>
                       <div className="viewOnly metaValue">
@@ -1098,7 +1098,7 @@ export default function IntentDetail({
                           type="button"
                           onClick={() => handleOverviewEdit('field-owner')}
                         >
-                          ?
+                          &#x270E;
                         </button>
                       </div>
                       <div className="viewOnly metaValue">
@@ -1133,7 +1133,7 @@ export default function IntentDetail({
                           type="button"
                           onClick={() => handleOverviewEdit('field-deadline')}
                         >
-                          ?
+                          &#x270E;
                         </button>
                       </div>
                       <div className="viewOnly metaValue">
@@ -1163,7 +1163,7 @@ export default function IntentDetail({
                           type="button"
                           onClick={() => handleOverviewEdit('field-stage')}
                         >
-                          ?
+                          &#x270E;
                         </button>
                       </div>
                       <div className="viewOnly metaValue">
@@ -1199,7 +1199,7 @@ export default function IntentDetail({
                           type="button"
                           onClick={() => handleOverviewEdit('field-language')}
                         >
-                          ?
+                          &#x270E;
                         </button>
                       </div>
                       <div className="viewOnly metaValue">
@@ -1438,9 +1438,6 @@ export default function IntentDetail({
                             <td>{formatDateShort(attachment.createdAt)}</td>
                             <td className="cellRight">
                               <div className="tableActions">
-                                <a className="btn btnSmall" href={`/api/attachments/${attachment.id}`}>
-                                  Download
-                                </a>
                                 <div className="menuWrap">
                                   <button
                                     className="btn btnSmall"
@@ -1456,6 +1453,9 @@ export default function IntentDetail({
                                     aria-label="Manage attachment"
                                     onClick={handleMenuPanelClick}
                                   >
+                                    <a className="btn btnSmall" href={`/api/attachments/${attachment.id}`}>
+                                      Download
+                                    </a>
                                     <a
                                       className="btn btnSmall"
                                       href={`/api/attachments/${attachment.id}?asInline=1`}
