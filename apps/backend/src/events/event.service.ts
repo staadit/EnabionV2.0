@@ -18,6 +18,7 @@ export interface EventQuery {
   type?: EventType;
   subjectId?: string;
   limit?: number;
+  offset?: number;
 }
 
 @Injectable()
@@ -69,6 +70,7 @@ export class EventService {
 
   async findMany(query: EventQuery) {
     const take = query.limit && query.limit > 0 ? Math.min(query.limit, 200) : 50;
+    const skip = query.offset && query.offset > 0 ? query.offset : undefined;
     return this.prisma.event.findMany({
       where: {
         orgId: query.orgId,
@@ -78,6 +80,7 @@ export class EventService {
       orderBy: {
         occurredAt: 'desc',
       },
+      skip,
       take,
     });
   }

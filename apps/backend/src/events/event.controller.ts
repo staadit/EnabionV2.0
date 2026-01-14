@@ -38,16 +38,19 @@ export class EventController {
     @Query('type') type?: EventType,
     @Query('subjectId') subjectId?: string,
     @Query('limit') limit?: string,
+    @Query('offset') offset?: string,
   ) {
     const user = this.requireUser(req);
 
     const parsedLimit = limit ? Number(limit) : undefined;
+    const parsedOffset = offset ? Number(offset) : undefined;
 
     return this.eventService.findMany({
       orgId: user.orgId,
       type,
       subjectId,
       limit: Number.isNaN(parsedLimit) ? undefined : parsedLimit,
+      offset: Number.isNaN(parsedOffset) ? undefined : parsedOffset,
     });
   }
 
