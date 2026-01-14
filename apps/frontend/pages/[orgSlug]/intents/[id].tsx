@@ -1536,9 +1536,11 @@ export default function IntentDetail({
                           Copy
                         </a>
                       ) : null}
-                      <a className="btn btnSmall btnWarn" href="#" onClick={handleShareRevoke}>
-                        Revoke
-                      </a>
+                      {activeShareLink ? (
+                        <a className="btn btnSmall btnWarn" href="#" onClick={handleShareRevoke}>
+                          Revoke
+                        </a>
+                      ) : null}
                     </div>
                   </div>
                 </div>
