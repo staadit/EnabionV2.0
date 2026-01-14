@@ -1241,7 +1241,7 @@ export default function IntentDetail({
                         type="button"
                         onClick={() => handleOverviewEdit('field-goal')}
                       >
-                        ?
+                        &#x270E;
                       </button>
                     </div>
                     <div className="viewOnly">
@@ -1269,7 +1269,7 @@ export default function IntentDetail({
                         type="button"
                         onClick={() => handleOverviewEdit('field-context')}
                       >
-                        ?
+                        &#x270E;
                       </button>
                     </div>
                     <div className="viewOnly">
@@ -1297,7 +1297,7 @@ export default function IntentDetail({
                         type="button"
                         onClick={() => handleOverviewEdit('field-scope')}
                       >
-                        ?
+                        &#x270E;
                       </button>
                     </div>
                     <div className="viewOnly">
@@ -1326,7 +1326,7 @@ export default function IntentDetail({
                         type="button"
                         onClick={() => handleOverviewEdit('field-kpis')}
                       >
-                        ?
+                        &#x270E;
                       </button>
                     </div>
                     <div className="viewOnly">
@@ -1355,7 +1355,7 @@ export default function IntentDetail({
                         type="button"
                         onClick={() => handleOverviewEdit('field-risks')}
                       >
-                        ?
+                        &#x270E;
                       </button>
                     </div>
                     <div className="viewOnly">
