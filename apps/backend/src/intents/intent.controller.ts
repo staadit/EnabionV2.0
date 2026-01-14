@@ -101,6 +101,7 @@ export class IntentController {
     return this.intentService.runIntentCoach({
       orgId: user.orgId,
       intentId,
+      actorUserId: user.id,
     });
   }
 

@@ -11,6 +11,7 @@ export const SUBJECT_TYPES = {
   ATTACHMENT: 'ATTACHMENT',
   SHARE_LINK: 'SHARE_LINK',
   EXPORT: 'EXPORT',
+  AI_GATEWAY: 'AI_GATEWAY',
 } as const;
 
 export const LIFECYCLE_STEPS = {
@@ -56,6 +57,11 @@ export const EVENT_TYPES = {
   EMAIL_APPLIED_AS_INTENT_UPDATE: 'EMAIL_APPLIED_AS_INTENT_UPDATE',
   EMAIL_SENT: 'EMAIL_SENT',
   EMAIL_FAILED: 'EMAIL_FAILED',
+  AI_GATEWAY_REQUESTED: 'AI_GATEWAY_REQUESTED',
+  AI_GATEWAY_SUCCEEDED: 'AI_GATEWAY_SUCCEEDED',
+  AI_GATEWAY_FAILED: 'AI_GATEWAY_FAILED',
+  AI_GATEWAY_BLOCKED_POLICY: 'AI_GATEWAY_BLOCKED_POLICY',
+  AI_GATEWAY_RATE_LIMITED: 'AI_GATEWAY_RATE_LIMITED',
   TRUSTSCORE_SNAPSHOT_CREATED: 'TRUSTSCORE_SNAPSHOT_CREATED',
   // Audit-critical coverage
   INTENT_VIEWED: 'INTENT_VIEWED',
@@ -84,6 +90,15 @@ export type PipelineStage = (typeof PIPELINE_STAGES)[keyof typeof PIPELINE_STAGE
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
 
 const languageEnum = z.enum(['PL', 'DE', 'NL', 'EN', 'unknown']);
+const aiGatewayUseCaseEnum = z.enum([
+  'intent_structuring',
+  'intent_gap_detection',
+  'clarifying_questions',
+  'fit_scoring',
+  'summary_internal',
+  'help_explanation',
+]);
+const inputClassEnum = z.enum(['L1', 'L2']);
 const lifecycleEnum = z.enum(Object.values(LIFECYCLE_STEPS) as [LifecycleStep, ...LifecycleStep[]]);
 const pipelineEnum = z.enum(Object.values(PIPELINE_STAGES) as [PipelineStage, ...PipelineStage[]]);
 const channelEnum = z.enum(Object.values(CHANNELS) as [Channel, ...Channel[]]);
@@ -224,6 +239,54 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     transport: z.enum(['smtp']),
     resetTokenId: z.string().min(1),
     errorCode: z.string().min(1),
+  }),
+  [EVENT_TYPES.AI_GATEWAY_REQUESTED]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    inputClass: inputClassEnum,
+    containsL2: z.boolean().optional(),
+    messageCount: z.number().int().nonnegative().optional(),
+    totalChars: z.number().int().nonnegative().optional(),
+    contentHash: z.string().length(64).optional(),
+  }),
+  [EVENT_TYPES.AI_GATEWAY_SUCCEEDED]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    inputTokens: z.number().int().nonnegative().nullable().optional(),
+    outputTokens: z.number().int().nonnegative().nullable().optional(),
+    totalTokens: z.number().int().nonnegative().nullable().optional(),
+    latencyMs: z.number().int().nonnegative().optional(),
+  }),
+  [EVENT_TYPES.AI_GATEWAY_FAILED]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    errorClass: z.string().min(1),
+    latencyMs: z.number().int().nonnegative().optional(),
+  }),
+  [EVENT_TYPES.AI_GATEWAY_BLOCKED_POLICY]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    errorClass: z.string().min(1),
+  }),
+  [EVENT_TYPES.AI_GATEWAY_RATE_LIMITED]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    errorClass: z.string().min(1),
   }),
   [EVENT_TYPES.TRUSTSCORE_SNAPSHOT_CREATED]: basePayload.extend({
     orgId: z.string().min(1),

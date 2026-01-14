@@ -1,0 +1,2 @@
+export const AI_GATEWAY_CONFIG = 'AI_GATEWAY_CONFIG';
+export const AI_RATE_LIMITER = 'AI_RATE_LIMITER';

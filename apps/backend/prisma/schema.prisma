@@ -143,6 +143,17 @@ model Event {
   @@index([occurredAt])
 }
 
+model AiRateLimitWindow {
+  id          String   @id @default(cuid())
+  key         String
+  windowStart DateTime
+  count       Int
+  updatedAt   DateTime @updatedAt
+
+  @@unique([key, windowStart])
+  @@index([windowStart])
+}
+
 model Blob {
   id               String                @id @default(uuid())
   orgId            String

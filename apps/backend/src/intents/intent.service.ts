@@ -5,6 +5,8 @@ import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
+import type { AiGatewayMessage } from '../ai-gateway/ai-gateway.types';
 import { IntentStage } from './intent.types';
 import { buildIntentShortId, normalizeIntentName } from './intent.utils';
 
@@ -59,6 +61,7 @@ export type ListIntentInput = {
 export type RunIntentCoachInput = {
   orgId: string;
   intentId: string;
+  actorUserId?: string;
 };
 
 export type UpdatePipelineStageInput = {
@@ -73,6 +76,7 @@ export class IntentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
+    private readonly aiGateway: AiGatewayService,
   ) {}
 
   async createIntent(input: CreateIntentInput) {
@@ -317,19 +321,100 @@ export class IntentService {
   async runIntentCoach(input: RunIntentCoachInput) {
     const intent = await this.prisma.intent.findFirst({
       where: { id: input.intentId, orgId: input.orgId },
-      select: { id: true, sourceTextRaw: true },
+      select: {
+        id: true,
+        intentName: true,
+        goal: true,
+        title: true,
+        client: true,
+        language: true,
+        context: true,
+        scope: true,
+        kpi: true,
+        risks: true,
+        deadlineAt: true,
+        stage: true,
+      },
     });
     if (!intent) {
       throw new NotFoundException('Intent not found');
     }
-    if (!intent.sourceTextRaw) {
-      throw new BadRequestException('Intent has no source text');
+
+    const messages = this.buildIntentCoachMessages(intent);
+    if (!messages) {
+      throw new BadRequestException('INSUFFICIENT_L1_DATA');
     }
 
+    const response = await this.aiGateway.generateText({
+      tenantId: input.orgId,
+      userId: input.actorUserId ?? null,
+      useCase: 'intent_gap_detection',
+      messages,
+      inputClass: 'L1',
+      containsL2: false,
+    });
+
     return {
-      status: 'not_implemented',
+      status: 'completed',
       intentId: intent.id,
+      text: response.text,
+      model: response.model,
+      requestId: response.requestId,
     };
+  }
+
+  private buildIntentCoachMessages(intent: {
+    intentName: string;
+    goal: string;
+    title?: string | null;
+    client?: string | null;
+    language?: string | null;
+    context?: string | null;
+    scope?: string | null;
+    kpi?: string | null;
+    risks?: string | null;
+    deadlineAt?: Date | null;
+    stage?: string | null;
+  }): AiGatewayMessage[] | null {
+    const lines: string[] = [];
+    const addLine = (label: string, value?: string | null) => {
+      if (!value) return;
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      lines.push(`${label}: ${trimmed}`);
+    };
+
+    addLine('Intent name', intent.intentName);
+    addLine('Goal', intent.goal);
+    addLine('Title', intent.title);
+    addLine('Client', intent.client);
+    addLine('Language', intent.language);
+    addLine('Context', intent.context);
+    addLine('Scope', intent.scope);
+    addLine('KPIs', intent.kpi);
+    addLine('Risks', intent.risks);
+    if (intent.deadlineAt) {
+      lines.push(`Deadline: ${intent.deadlineAt.toISOString()}`);
+    }
+    if (intent.stage) {
+      lines.push(`Stage: ${intent.stage}`);
+    }
+
+    if (lines.length === 0) {
+      return null;
+    }
+
+    return [
+      {
+        role: 'system',
+        content:
+          'You are an Intent Coach. Identify missing or unclear information based on the provided fields. Respond with 3-7 concise bullet points.',
+      },
+      {
+        role: 'user',
+        content: lines.join('\n'),
+      },
+    ];
   }
 
   async updateIntent(input: UpdateIntentInput) {
