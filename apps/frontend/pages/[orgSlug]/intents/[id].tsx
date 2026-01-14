@@ -540,7 +540,7 @@ export default function IntentDetail({
     .pill--stage .dot{background:var(--green);}
     .pill--lang .dot{background:var(--ocean);}
     .pill--l2 .dot{background:var(--gold);}
-    .pill--l2{color:rgba(255,255,255,.88);border-color:rgba(253,186,69,.26);background:rgba(253,186,69,.07);}
+    .pill--l2{color:var(--text);border-color:rgba(253,186,69,.26);background:rgba(253,186,69,.07);}
 
     /* Tabs */
     .tabs{margin-top:12px;display:flex;gap:8px;flex-wrap:wrap;}
@@ -553,7 +553,7 @@ export default function IntentDetail({
       color:var(--muted);
     }
     .tab--active{
-      color:rgba(255,255,255,.92);
+      color:var(--text);
       border-color:rgba(56,161,105,.35);
       background:rgba(56,161,105,.12);
     }
@@ -575,10 +575,10 @@ export default function IntentDetail({
     }
     .cardHeader{
       padding:14px 14px 10px;
-      border-bottom:1px solid rgba(255,255,255,.06);
+      border-bottom:1px solid var(--border);
       display:flex;align-items:center;justify-content:space-between;gap:10px;
     }
-    .cardTitle{margin:0;font-size:13px;font-weight:720;color:rgba(255,255,255,.90);letter-spacing:.2px;}
+    .cardTitle{margin:0;font-size:13px;font-weight:720;color:var(--text);letter-spacing:.2px;}
     .cardBody{padding:14px;}
 
     /* Meta grid */
@@ -604,13 +604,13 @@ export default function IntentDetail({
     .badgeWarn{
       border-color:rgba(253,186,69,.35);
       background:rgba(253,186,69,.12);
-      color:rgba(255,255,255,.92);
+      color:var(--text);
     }
 
     /* Content blocks */
     .section{margin-top:12px;}
     .sectionHead{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;}
-    .section h3{margin:0;font-size:12px;letter-spacing:.2px;color:rgba(255,255,255,.88);}
+    .section h3{margin:0;font-size:12px;letter-spacing:.2px;color:var(--text);}
     .section p{margin:0;font-size:13px;line-height:1.55;color:var(--muted);}
     .bullets{margin:0;padding-left:18px;color:var(--muted);font-size:13px;line-height:1.55;}
     .bullets li{margin:4px 0;}
@@ -619,9 +619,9 @@ export default function IntentDetail({
     .editPencil{
       display:inline-flex;align-items:center;justify-content:center;
       width:26px;height:26px;border-radius:10px;
-      border:1px solid rgba(255,255,255,.10);
+      border:1px solid var(--border);
       background:rgba(255,255,255,.05);
-      color:rgba(255,255,255,.75);
+      color:var(--muted);
       font-size:13px;
       cursor:pointer;
     }
@@ -681,8 +681,8 @@ export default function IntentDetail({
 
     /* Tables */
     table{width:100%;border-collapse:collapse;}
-    th{text-align:left;font-size:11px;color:var(--muted2);font-weight:650;padding:10px;border-bottom:1px solid rgba(255,255,255,.07);}
-    td{font-size:12px;color:rgba(255,255,255,.84);padding:10px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:middle;}
+    th{text-align:left;font-size:11px;color:var(--muted2);font-weight:650;padding:10px;border-bottom:1px solid var(--border);}
+    td{font-size:12px;color:var(--text);padding:10px;border-bottom:1px solid var(--border);vertical-align:middle;}
     .cellRight{text-align:right;}
     .tableActions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;}
 
@@ -691,18 +691,30 @@ export default function IntentDetail({
       display:grid;grid-template-columns:1fr auto;gap:8px;
       padding:10px 12px;border-radius:14px;
       background:rgba(0,0,0,.16);
-      border:1px solid rgba(255,255,255,.06);
+      border:1px solid var(--border);
       margin-bottom:10px;
       align-items:center;
     }
     .kv .k{font-size:11px;color:var(--muted2);}
-    .kv .v{font-size:12px;color:rgba(255,255,255,.88);font-weight:650;}
+    .kv .v{font-size:12px;color:var(--text);font-weight:650;}
 
     .timeline{display:grid;gap:10px;}
     .titem{display:grid;grid-template-columns:auto 1fr;gap:10px;align-items:start;}
-    .tmark{width:10px;height:10px;border-radius:999px;margin-top:5px;background:rgba(255,255,255,.25);box-shadow:0 0 0 3px rgba(255,255,255,.06);}
-    .ttext{font-size:12px;color:rgba(255,255,255,.84);line-height:1.35;}
+    .tmark{width:10px;height:10px;border-radius:999px;margin-top:5px;background:var(--muted2);box-shadow:0 0 0 3px var(--border);}
+    .ttext{font-size:12px;color:var(--text);line-height:1.35;}
     .tmeta{display:block;font-size:11px;color:var(--muted2);margin-top:2px;}
+
+    body[data-theme="light"] .metaItem,
+    body[data-theme="light"] .kv,
+    body[data-theme="light"] .formRow{
+      background:var(--surface-2);
+      border-color:var(--border);
+    }
+    body[data-theme="light"] .kbd{
+      background:var(--surface-2);
+      border-color:var(--border);
+      color:var(--muted);
+    }
 
     /* Edit bar */
     .editBar{
@@ -718,8 +730,8 @@ export default function IntentDetail({
       flex-wrap:wrap;
     }
     body.editOverviewMode .editBar{display:flex;}
-    .editBar .left{font-size:12px;color:rgba(255,255,255,.86);}
-    .footer{margin-top:18px;color:rgba(255,255,255,.45);font-size:11px;text-align:center;}
+    .editBar .left{font-size:12px;color:var(--muted);}
+    .footer{margin-top:18px;color:var(--muted2);font-size:11px;text-align:center;}
 
     /* Shell + left nav */
     .appShell{display:flex;gap:18px;align-items:flex-start;}
@@ -887,18 +899,18 @@ export default function IntentDetail({
                 <div className="pillRow">
                   <span className="pill pill--stage">
                     <span className="dot"></span>
-                    Stage: <b style={{ color: 'rgba(255,255,255,.92)' }}>{intentState.stage || 'MATCH'}</b>
+                    Stage: <b style={{ color: 'var(--text)' }}>{intentState.stage || 'MATCH'}</b>
                   </span>
                   <span className="pill pill--lang">
                     <span className="dot"></span>
-                    Language: <b style={{ color: 'rgba(255,255,255,.92)' }}>{intentState.language || 'EN'}</b>
+                    Language: <b style={{ color: 'var(--text)' }}>{intentState.language || 'EN'}</b>
                   </span>
                   <span className="pill pill--l2" id="pill-l2">
                     <span className="dot"></span>Contains L2
                   </span>
                   <span className="pill">
                     <span className="dot"></span>Last activity:{' '}
-                    <b style={{ color: 'rgba(255,255,255,.92)' }}>{lastActivityText}</b>
+                    <b style={{ color: 'var(--text)' }}>{lastActivityText}</b>
                   </span>
                 </div>
               </div>
