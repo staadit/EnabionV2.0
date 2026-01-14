@@ -1,4 +1,4 @@
-﻿-- Add intentNumber sequence/column
+-- Add intentNumber sequence/column
 CREATE SEQUENCE IF NOT EXISTS "Intent_intentNumber_seq";
 
 ALTER TABLE "Intent" ADD COLUMN "intentNumber" INTEGER;
