@@ -12,7 +12,6 @@ import { formatDateTime } from '../../../lib/date-format';
 import { getTheme, resolveSystemTheme, setTheme } from '../../../lib/theme';
 
 const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
-const DEFAULT_SHARE_URL = 'https://app.enabion.com/share/intent/AbCDefGhIJKlmNOP...';
 
 type IntentDetail = {
   id: string;
@@ -111,9 +110,15 @@ export default function IntentDetail({
   const lastActivityText = formatDateTime(intentState.lastActivityAt);
   const deadlineText = intentState.deadlineAt ? formatDateShort(intentState.deadlineAt) : 'Not set';
   const activeShareLink = useMemo(() => findActiveShareLink(shareLinks), [shareLinks]);
-  const shareUrlValue = shareUrl ?? DEFAULT_SHARE_URL;
-  const shareExpires = activeShareLink ? formatDateShort(activeShareLink.expiresAt) : '2026-01-26';
-  const shareAccessed = activeShareLink ? `${activeShareLink.accessCount}x` : '2x';
+  const shareTtlDays = activeShareLink
+    ? computeTtlDays(activeShareLink.createdAt, activeShareLink.expiresAt)
+    : null;
+  const shareTtlLabel = shareTtlDays ? `${shareTtlDays} days` : 'set by server';
+  const shareUrlValue = activeShareLink
+    ? shareUrl ?? 'Open Share tab to copy link.'
+    : 'No active link yet.';
+  const shareExpires = activeShareLink ? formatDateShort(activeShareLink.expiresAt) : '—';
+  const shareAccessed = activeShareLink ? `${activeShareLink.accessCount}x` : '0x';
   const ndaAccepted = ndaStatus?.accepted ? 'Accepted' : 'Not accepted';
   const ndaVersion = ndaCurrent?.ndaVersion ?? 'mutual_nda_v0.1_en';
   const ndaHash = ndaCurrent?.enHashSha256 ? shortHash(ndaCurrent.enHashSha256) : '2b5c...9a1f';
@@ -332,7 +337,10 @@ export default function IntentDetail({
 
   const handleShareCopy = async (event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault();
-    await navigator.clipboard.writeText(shareUrlValue);
+    if (!activeShareLink || !shareUrl) {
+      return;
+    }
+    await navigator.clipboard.writeText(shareUrl);
   };
 
   const handleShareRevoke = async (event: MouseEvent<HTMLAnchorElement>) => {
@@ -1510,7 +1518,7 @@ export default function IntentDetail({
                 </header>
                 <div className="cardBody">
                   <div className="small">
-                    Share links are L1-only. Default TTL: <b>14 days</b>.
+                    Share links are L1-only. Default TTL: <b>{shareTtlLabel}</b>.
                   </div>
                   <div style={{ height: '10px' }}></div>
                   <div className="kv" style={{ gridTemplateColumns: '1fr', gap: '6px' }}>
@@ -1611,6 +1619,19 @@ function formatDateShort(value: string) {
     return value;
   }
   return date.toISOString().slice(0, 10);
+}
+
+function computeTtlDays(createdAt: string, expiresAt: string) {
+  const createdTime = new Date(createdAt).getTime();
+  const expiresTime = new Date(expiresAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(expiresTime)) {
+    return null;
+  }
+  const diffMs = Math.max(0, expiresTime - createdTime);
+  if (!diffMs) {
+    return null;
+  }
+  return Math.max(1, Math.ceil(diffMs / 86400000));
 }
 
 function shortHash(value: string) {
