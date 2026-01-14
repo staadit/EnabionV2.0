@@ -445,7 +445,13 @@ export default function IntentDetail({
     }
     html,body{color-scheme:dark;color-scheme:var(--control-scheme);}
 
-    body[data-theme="light"]{
+    html[data-theme="light"]{
+      --bg:#F6F8FB;
+      --border:rgba(11,34,57,.12);
+      --text:rgba(11,34,57,.92);
+      --muted:rgba(11,34,57,.70);
+      --muted2:rgba(11,34,57,.55);
+      --shadow:0 10px 30px rgba(0,0,0,.15);
       --control-scheme: light;
       --control-bg: rgba(255,255,255,.92);
       --control-border: rgba(0,0,0,.12);
@@ -704,13 +710,13 @@ export default function IntentDetail({
     .ttext{font-size:12px;color:var(--text);line-height:1.35;}
     .tmeta{display:block;font-size:11px;color:var(--muted2);margin-top:2px;}
 
-    body[data-theme="light"] .metaItem,
-    body[data-theme="light"] .kv,
-    body[data-theme="light"] .formRow{
+    html[data-theme="light"] .metaItem,
+    html[data-theme="light"] .kv,
+    html[data-theme="light"] .formRow{
       background:var(--surface-2);
       border-color:var(--border);
     }
-    body[data-theme="light"] .kbd{
+    html[data-theme="light"] .kbd{
       background:var(--surface-2);
       border-color:var(--border);
       color:var(--muted);
