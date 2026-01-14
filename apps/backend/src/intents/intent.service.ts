@@ -540,7 +540,7 @@ export class IntentService {
             title: suggestion.title,
             l1Text: suggestion.l1Text ?? null,
             evidenceRef: suggestion.evidenceRef ?? null,
-            proposedPatch: suggestion.proposedPatch ?? null,
+            proposedPatch: suggestion.proposedPatch ?? undefined,
             status: 'ISSUED',
             createdAt: now,
           },
@@ -941,16 +941,38 @@ export class IntentService {
     return `${value.slice(0, maxLength)}...`;
   }
 
+  private normalizeProposedPatch(
+    value: Prisma.JsonValue | null | undefined,
+  ): DraftCoachSuggestion['proposedPatch'] | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const rawFields = (value as { fields?: unknown }).fields;
+    if (!rawFields || typeof rawFields !== 'object' || Array.isArray(rawFields)) {
+      return null;
+    }
+    const fields: Record<string, string | null> = {};
+    for (const [key, rawValue] of Object.entries(rawFields as Record<string, unknown>)) {
+      if (typeof rawValue === 'string') {
+        fields[key] = rawValue;
+      } else if (rawValue === null) {
+        fields[key] = null;
+      }
+    }
+    if (Object.keys(fields).length === 0) {
+      return null;
+    }
+    return { fields };
+  }
+
   private async applySuggestionPatch(input: {
     orgId: string;
     intentId: string;
     actorUserId?: string;
-    proposedPatch?: DraftCoachSuggestion['proposedPatch'] | null;
+    proposedPatch?: Prisma.JsonValue | null;
   }): Promise<string[]> {
-    const patch = input.proposedPatch;
-    if (!patch || typeof patch !== 'object' || !patch.fields || typeof patch.fields !== 'object') {
-      return [];
-    }
+    const patch = this.normalizeProposedPatch(input.proposedPatch);
+    if (!patch) return [];
 
     const intent = await this.prisma.intent.findFirst({
       where: { id: input.intentId, orgId: input.orgId },
