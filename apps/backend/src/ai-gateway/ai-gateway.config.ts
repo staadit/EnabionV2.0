@@ -38,7 +38,10 @@ function parseJsonMap(value: string | undefined): Record<string, number> {
     const entries = Object.entries(parsed).filter(
       ([, v]) => typeof v === 'number' && Number.isFinite(v),
     );
-    return Object.fromEntries(entries);
+    return entries.reduce<Record<string, number>>((acc, [key, value]) => {
+      acc[key] = value as number;
+      return acc;
+    }, {});
   } catch {
     return {};
   }
