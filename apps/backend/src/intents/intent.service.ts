@@ -302,7 +302,7 @@ export class IntentService {
     }
 
     const hasL2Attachments = await this.prisma.attachment.count({
-      where: { intentId: intent.id, orgId: intent.orgId, blob: { confidentiality: 'L2' } },
+      where: { intentId: intent.id, orgId: input.orgId, blob: { confidentiality: 'L2' } },
     });
     const hasL2Source = Boolean(intent.sourceTextRaw && intent.sourceTextRaw.trim());
     const hasL2 = hasL2Source || hasL2Attachments > 0;
@@ -340,7 +340,7 @@ export class IntentService {
       throw new NotFoundException('Intent not found');
     }
 
-    const updates: Prisma.IntentUpdateInput = {};
+    const updates: Prisma.IntentUncheckedUpdateInput = {};
     const changedFields: string[] = [];
     const now = new Date();
 
