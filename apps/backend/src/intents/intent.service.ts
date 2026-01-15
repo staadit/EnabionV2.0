@@ -457,7 +457,7 @@ export class IntentService {
         createdByUserId: input.actorUserId ?? null,
         summaryItems: summaryBlock,
         instructions: instructions ?? null,
-        focusFields: focusFields.length ? focusFields : null,
+        focusFields: focusFields.length ? focusFields : undefined,
         createdAt: now,
       },
     });
