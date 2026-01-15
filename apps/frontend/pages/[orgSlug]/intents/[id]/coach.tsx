@@ -54,6 +54,8 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [summarySelected, setSummarySelected] = useState(false);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [hasHistory, setHasHistory] = useState(false);
+  const [historyPopupText, setHistoryPopupText] = useState<string | null>(null);
+  const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
   const isViewer = user.role === 'Viewer';
 
   const orderedSuggestions = useMemo(() => {
@@ -186,32 +188,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
           return `${createdAt}\n${summaryText}`;
         })
         .join('\n\n');
-      const popup = window.open(
-        '',
-        'intent-coach-history',
-        'width=920,height=700,noopener,noreferrer',
-      );
-      if (!popup) {
-        window.alert(historyText);
-        return;
-      }
-      popup.document.open();
-      popup.document.write(`<!doctype html>
-<html>
-  <head>
-    <title>Intent Coach history</title>
-    <style>
-      body { margin: 16px; font-family: Arial, sans-serif; color: #111; }
-      h1 { font-size: 18px; margin: 0 0 12px; }
-      pre { white-space: pre-wrap; word-break: break-word; font-size: 13px; line-height: 1.4; }
-    </style>
-  </head>
-  <body>
-    <h1>Intent Coach history</h1>
-    <pre>${escapeHtml(historyText)}</pre>
-  </body>
-</html>`);
-      popup.document.close();
+      setHistoryPopupText(historyText);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to load history');
     } finally {
@@ -285,12 +262,17 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       return;
     }
     const trimmedInstructions = instructions.trim();
-    await runCoach({
-      instructions: trimmedInstructions ? trimmedInstructions : undefined,
-      focusFields: [suggestion.targetField],
-      includeSummary: false,
-      replaceField: suggestion.targetField,
-    });
+    setRerunSuggestionId(suggestion.id);
+    try {
+      await runCoach({
+        instructions: trimmedInstructions ? trimmedInstructions : undefined,
+        focusFields: [suggestion.targetField],
+        includeSummary: false,
+        replaceField: suggestion.targetField,
+      });
+    } finally {
+      setRerunSuggestionId(null);
+    }
   };
 
   return (
@@ -360,6 +342,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
             <div style={suggestionListStyle}>
               {orderedSuggestions.map((item) => {
                 const actionable = item.actionable !== false;
+                const isRerunActive = running && rerunSuggestionId === item.id;
                 return (
                   <div key={item.id} style={suggestionCardStyle}>
                     <div style={suggestionHeaderStyle}>
@@ -417,7 +400,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
                           onClick={() => askCoachAgain(item)}
                           disabled={isViewer || running}
                         >
-                          Ask Intent Coach again
+                          {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
                         </button>
                       </div>
                     ) : null}
@@ -480,6 +463,28 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         ) : null}
       </div>
       {error ? <p style={errorStyle}>{error}</p> : null}
+      {historyPopupText ? (
+        <div style={modalOverlayStyle} onClick={() => setHistoryPopupText(null)}>
+          <div
+            style={modalStyle}
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={modalHeaderStyle}>
+              <p style={modalTitleStyle}>Intent Coach history</p>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => setHistoryPopupText(null)}
+              >
+                Close
+              </button>
+            </div>
+            <pre style={modalBodyStyle}>{historyPopupText}</pre>
+          </div>
+        </div>
+      ) : null}
     </OrgShell>
   );
 }
@@ -490,15 +495,6 @@ function readApiError(data: any) {
     return data.message.join('; ');
   }
   return data?.message || data?.error || null;
-}
-
-function escapeHtml(value: string) {
-  return value
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/\"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }
 
 function formatPatchFields(fields: Record<string, string | null>) {
@@ -701,6 +697,55 @@ const errorStyle = {
   color: 'var(--danger)',
 };
 
+const modalOverlayStyle = {
+  position: 'fixed' as const,
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.55)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: '1rem',
+  zIndex: 40,
+};
+
+const modalStyle = {
+  width: 'min(980px, 95vw)',
+  maxHeight: '85vh',
+  overflow: 'hidden',
+  borderRadius: '14px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  boxShadow: '0 24px 60px rgba(15, 23, 42, 0.35)',
+  display: 'flex',
+  flexDirection: 'column' as const,
+};
+
+const modalHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '0.75rem',
+  padding: '0.9rem 1rem',
+  borderBottom: '1px solid var(--border)',
+};
+
+const modalTitleStyle = {
+  margin: 0,
+  fontWeight: 600,
+};
+
+const modalBodyStyle = {
+  margin: 0,
+  padding: '1rem',
+  whiteSpace: 'pre-wrap' as const,
+  wordBreak: 'break-word' as const,
+  overflow: 'auto',
+  color: 'var(--text)',
+  fontFamily: 'inherit',
+  fontSize: '0.95rem',
+  lineHeight: 1.45,
+};
+
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {
   const result = await requireOrgContext(ctx);
   if (result.redirect) {
@@ -715,3 +760,4 @@ export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx
     },
   };
 };
+
