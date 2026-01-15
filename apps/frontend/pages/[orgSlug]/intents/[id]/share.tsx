@@ -10,7 +10,7 @@ import {
   revokeShareLink,
   type ShareLink,
 } from '../../../../lib/share-links';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { formatDateTime } from '../../../../lib/date-format';
 
 type IntentTabProps = {
@@ -26,6 +26,9 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string | null>(null);
   const [loadingList, setLoadingList] = useState(false);
+  const activeLink = useMemo(() => findActiveShareLink(links), [links]);
+  const ttlDays = activeLink ? computeTtlDays(activeLink.createdAt, activeLink.expiresAt) : null;
+  const ttlLabel = ttlDays ? `${ttlDays} days` : 'set by server';
 
   useEffect(() => {
     const stored = window.localStorage.getItem(`share:url:${intentId}`);
@@ -85,7 +88,7 @@ export default function Share({ user, org, intentId, links: initialLinks }: Inte
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>Generate share link (L1-only)</p>
         <p style={{ margin: '0 0 1rem', color: 'var(--muted)' }}>
-          Default TTL: 14 days. Creating a new link revokes the previous one.
+          Default TTL: <b>{ttlLabel}</b>. Creating a new link revokes the previous one.
         </p>
         <button style={primaryButton} onClick={handleCreate} disabled={creating}>
           {creating ? 'Generating...' : 'Generate share link'}
@@ -249,13 +252,34 @@ const mutedStyle = {
   color: 'var(--muted)',
 };
 
+function findActiveShareLink(links: ShareLink[]) {
+  const now = Date.now();
+  return (
+    links.find((link) => !link.revokedAt && new Date(link.expiresAt).getTime() > now) ?? null
+  );
+}
+
+function computeTtlDays(createdAt: string, expiresAt: string) {
+  const createdTime = new Date(createdAt).getTime();
+  const expiresTime = new Date(expiresAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(expiresTime)) {
+    return null;
+  }
+  const diffMs = Math.max(0, expiresTime - createdTime);
+  if (!diffMs) {
+    return null;
+  }
+  return Math.max(1, Math.ceil(diffMs / 86400000));
+}
+
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {
   const result = await requireOrgContext(ctx);
   if (result.redirect) {
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
-  const links = await listShareLinks(ctx.req.headers.cookie, intentId);
+  const { listShareLinksServer } = await import('../../../../lib/share-links.server');
+  const links = await listShareLinksServer(ctx.req.headers.cookie, intentId);
   return {
     props: {
       user: result.context!.user,

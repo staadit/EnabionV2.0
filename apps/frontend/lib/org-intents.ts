@@ -1,5 +1,7 @@
 export type OrgIntent = {
   id: string;
+  intentName?: string | null;
+  shortId?: string | null;
   goal: string;
   title?: string | null;
   client?: string | null;
@@ -71,6 +73,8 @@ export async function fetchOrgIntents(
     }
     const items = intents.map((row) => ({
       id: String(row.id ?? ''),
+      intentName: row.intentName ?? null,
+      shortId: row.shortId ?? null,
       goal: String(row.goal ?? ''),
       title: row.title ?? null,
       client: row.client ?? null,

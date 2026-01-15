@@ -154,7 +154,7 @@ export default function IntentsIndex({
               onChange={(event) =>
                 setFilters((prev) => ({ ...prev, q: event.target.value }))
               }
-              placeholder="Search title or client"
+              placeholder="Search intent name or client"
               style={inputStyle}
             />
           </label>
@@ -278,9 +278,9 @@ export default function IntentsIndex({
                   <td style={tdStyle}>
                     <div style={titleCellStyle}>
                       <span style={{ fontWeight: 600 }}>
-                        {intent.title || intent.goal || 'Untitled intent'}
+                        {intent.intentName || intent.title || intent.goal || 'Untitled intent'}
                       </span>
-                      <span style={metaTextStyle}>{intent.id}</span>
+                      <span style={metaTextStyle}>{intent.shortId || intent.id}</span>
                     </div>
                   </td>
                   <td style={tdStyle}>{intent.client || 'Not set'}</td>

@@ -11,8 +11,8 @@ function toJson(text: string) {
 }
 
 export default async function handler(req: NextApiRequest, res: NextApiResponse) {
-  if (req.method !== 'PATCH') {
-    res.setHeader('Allow', 'PATCH');
+  if (req.method !== 'GET' && req.method !== 'PATCH') {
+    res.setHeader('Allow', 'GET, PATCH');
     res.status(405).json({ error: 'Method not allowed' });
     return;
   }
@@ -23,13 +23,20 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
     return;
   }
 
-  const backendRes = await fetch(`${BACKEND_BASE}/intents/${intentId}`, {
-    method: 'PATCH',
-    headers: {
-      'content-type': 'application/json',
-      cookie: req.headers.cookie ?? '',
-    },
-    body: JSON.stringify(req.body ?? {}),
+  const target =
+    req.method === 'GET'
+      ? `${BACKEND_BASE}/v1/intents/${intentId}`
+      : `${BACKEND_BASE}/intents/${intentId}`;
+  const headers: Record<string, string> = {
+    cookie: req.headers.cookie ?? '',
+  };
+  if (req.method === 'PATCH') {
+    headers['content-type'] = 'application/json';
+  }
+  const backendRes = await fetch(target, {
+    method: req.method,
+    headers,
+    body: req.method === 'PATCH' ? JSON.stringify(req.body ?? {}) : undefined,
   });
 
   const text = await backendRes.text();

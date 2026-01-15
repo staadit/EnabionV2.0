@@ -121,6 +121,116 @@ export class AttachmentService {
     return attachment;
   }
 
+  async deleteAttachment(input: {
+    attachmentId: string;
+    actorUserId: string;
+    actorOrgId: string;
+  }) {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: input.attachmentId },
+      include: { blob: true },
+    });
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+    if (attachment.orgId !== input.actorOrgId) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const intentMeta = attachment.intentId
+      ? await this.findIntent(attachment.intentId)
+      : null;
+    const pipelineStage = (intentMeta?.stage as any) || 'NEW';
+    const lifecycleStep = (intentMeta?.stage as any)
+      ? this.mapLifecycleStep(intentMeta?.stage)
+      : 'CLARIFY';
+
+    await this.prisma.attachment.delete({ where: { id: attachment.id } });
+    await this.blobService.deleteBlob(attachment.blobId, attachment.orgId);
+
+    await this.events.emitEvent({
+      orgId: attachment.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.actorOrgId,
+      subjectType: 'ATTACHMENT',
+      subjectId: attachment.id,
+      lifecycleStep,
+      pipelineStage,
+      channel: 'ui',
+      correlationId: crypto.randomUUID(),
+      occurredAt: new Date(),
+      type: EVENT_TYPES.ATTACHMENT_DELETED,
+      payload: {
+        payloadVersion: 1,
+        intentId: attachment.intentId ?? 'unknown',
+        attachmentId: attachment.id,
+        filename: attachment.filename,
+      },
+    });
+
+    return attachment;
+  }
+
+  async updateAttachmentConfidentiality(input: {
+    attachmentId: string;
+    actorUserId: string;
+    actorOrgId: string;
+    confidentiality: ConfidentialityLevel;
+  }) {
+    const attachment = await this.prisma.attachment.findUnique({
+      where: { id: input.attachmentId },
+      include: { blob: true },
+    });
+    if (!attachment) {
+      throw new NotFoundException('Attachment not found');
+    }
+    if (attachment.orgId !== input.actorOrgId) {
+      throw new NotFoundException('Attachment not found');
+    }
+
+    const fromLevel = attachment.blob.confidentiality as ConfidentialityLevel;
+    const toLevel = input.confidentiality;
+    if (fromLevel === toLevel) {
+      return attachment;
+    }
+
+    const updatedBlob = await this.prisma.blob.update({
+      where: { id: attachment.blobId },
+      data: { confidentiality: toLevel },
+    });
+
+    const intentMeta = attachment.intentId
+      ? await this.findIntent(attachment.intentId)
+      : null;
+    const pipelineStage = (intentMeta?.stage as any) || 'NEW';
+    const lifecycleStep = (intentMeta?.stage as any)
+      ? this.mapLifecycleStep(intentMeta?.stage)
+      : 'CLARIFY';
+
+    await this.events.emitEvent({
+      orgId: attachment.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.actorOrgId,
+      subjectType: 'ATTACHMENT',
+      subjectId: attachment.id,
+      lifecycleStep,
+      pipelineStage,
+      channel: 'ui',
+      correlationId: crypto.randomUUID(),
+      occurredAt: new Date(),
+      type: EVENT_TYPES.ATTACHMENT_CONFIDENTIALITY_CHANGED,
+      payload: {
+        payloadVersion: 1,
+        intentId: attachment.intentId ?? 'unknown',
+        attachmentId: attachment.id,
+        fromLevel,
+        toLevel,
+      },
+    });
+
+    return { ...attachment, blob: updatedBlob };
+  }
+
   async emitDownloadedEvent(input: {
     attachment: any;
     actorUserId?: string;
@@ -187,5 +297,12 @@ export class AttachmentService {
         sizeBytes: input.attachment.blob?.sizeBytes,
       },
     });
+  }
+
+  private mapLifecycleStep(stage?: string | null) {
+    const value = stage?.toUpperCase();
+    if (value === 'MATCH') return 'MATCH_ALIGN';
+    if (value === 'COMMIT') return 'COMMIT_ASSURE';
+    return 'CLARIFY';
   }
 }

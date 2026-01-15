@@ -40,6 +40,7 @@ export class IntentExportService {
       select: {
         id: true,
         orgId: true,
+        intentName: true,
         title: true,
         goal: true,
         context: true,
@@ -71,7 +72,7 @@ export class IntentExportService {
 
     return {
       intentId: intent.id,
-      title: intent.title ?? redacted.intent.title ?? 'Intent',
+      title: intent.intentName ?? intent.title ?? redacted.intent.intentName ?? redacted.intent.title ?? 'Intent',
       orgName: org?.name ?? 'Organization',
       ownerName: owner?.email ?? null,
       clientName: intent.client,

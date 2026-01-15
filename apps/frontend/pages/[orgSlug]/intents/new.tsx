@@ -12,6 +12,7 @@ type NewIntentProps = {
 };
 
 type IntentFormState = {
+  intentName: string;
   goal: string;
   title: string;
   sourceTextRaw: string;
@@ -28,6 +29,7 @@ export default function NewIntent({ user, org }: NewIntentProps) {
   const router = useRouter();
   const [mode, setMode] = useState<IntentMode>('manual');
   const [form, setForm] = useState<IntentFormState>({
+    intentName: '',
     goal: '',
     title: '',
     sourceTextRaw: '',
@@ -56,9 +58,15 @@ export default function NewIntent({ user, org }: NewIntentProps) {
     if (isViewer || loading) return;
 
     const isPaste = mode === 'paste';
+    const intentName = form.intentName.trim();
     const goal = form.goal.trim();
     const sourceTextRaw = form.sourceTextRaw;
     const sourceTextTrimmed = sourceTextRaw.trim();
+
+    if (!intentName) {
+      setError('Intent name is required.');
+      return;
+    }
 
     if (isPaste) {
       if (!sourceTextTrimmed) {
@@ -76,6 +84,7 @@ export default function NewIntent({ user, org }: NewIntentProps) {
     let payload: Record<string, unknown>;
     if (isPaste) {
       payload = {
+        intentName,
         sourceTextRaw,
         title: normalizeOptional(form.title),
       };
@@ -84,6 +93,7 @@ export default function NewIntent({ user, org }: NewIntentProps) {
         ? new Date(form.deadline).toISOString()
         : null;
       payload = {
+        intentName,
         goal,
         context: normalizeOptional(form.context),
         scope: normalizeOptional(form.scope),
@@ -158,6 +168,17 @@ export default function NewIntent({ user, org }: NewIntentProps) {
         {mode === 'paste' ? (
           <>
             <label style={labelStyle}>
+              Intent name *
+              <input
+                type="text"
+                value={form.intentName}
+                onChange={updateField('intentName')}
+                style={inputStyle}
+                placeholder="Unique name for this intent"
+                disabled={isViewer || loading}
+              />
+            </label>
+            <label style={labelStyle}>
               Paste email/RFP text *
               <textarea
                 value={form.sourceTextRaw}
@@ -186,6 +207,17 @@ export default function NewIntent({ user, org }: NewIntentProps) {
           </>
         ) : (
           <>
+            <label style={labelStyle}>
+              Intent name *
+              <input
+                type="text"
+                value={form.intentName}
+                onChange={updateField('intentName')}
+                style={inputStyle}
+                placeholder="Unique name for this intent"
+                disabled={isViewer || loading}
+              />
+            </label>
             <label style={labelStyle}>
               Goal *
               <textarea

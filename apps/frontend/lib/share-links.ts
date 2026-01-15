@@ -8,7 +8,7 @@ export type ShareLink = {
   lastAccessAt?: string | null;
 };
 
-const BACKEND_BASE = '';
+const INTERNAL_BACKEND_BASE = 'http://backend:4000';
 
 async function readJson<T>(res: Response): Promise<T | null> {
   try {
@@ -23,6 +23,8 @@ export async function listShareLinks(
   intentId: string,
 ): Promise<ShareLink[]> {
   try {
+    const base = resolveShareBase(cookie);
+    const prefix = base ? '/v1' : '/api';
     const headers: Record<string, string> = {};
     const fetchInit: RequestInit = {};
     if (cookie) {
@@ -31,7 +33,7 @@ export async function listShareLinks(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
+      `${base}${prefix}/intents/${encodeURIComponent(intentId)}/share-links`,
       { headers, ...fetchInit },
     );
     if (!res.ok) return [];
@@ -47,6 +49,8 @@ export async function createShareLink(
   intentId: string,
 ): Promise<{ token: string; shareUrl: string; expiresAt: string } | null> {
   try {
+    const base = resolveShareBase(cookie);
+    const prefix = base ? '/v1' : '/api';
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     const fetchInit: RequestInit = { method: 'POST', headers };
     if (cookie) {
@@ -55,7 +59,7 @@ export async function createShareLink(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links`,
+      `${base}${prefix}/intents/${encodeURIComponent(intentId)}/share-links`,
       { ...fetchInit, body: '{}' },
     );
     if (!res.ok) return null;
@@ -71,6 +75,8 @@ export async function revokeShareLink(
   shareLinkId: string,
 ): Promise<boolean> {
   try {
+    const base = resolveShareBase(cookie);
+    const prefix = base ? '/v1' : '/api';
     const headers: Record<string, string> = {};
     const fetchInit: RequestInit = { method: 'POST', headers };
     if (cookie) {
@@ -79,11 +85,18 @@ export async function revokeShareLink(
       fetchInit.credentials = 'include';
     }
     const res = await fetch(
-      `${BACKEND_BASE}/api/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
+      `${base}${prefix}/intents/${encodeURIComponent(intentId)}/share-links/${encodeURIComponent(shareLinkId)}/revoke`,
       fetchInit,
     );
     return res.ok;
   } catch {
     return false;
   }
+}
+
+function resolveShareBase(cookie: string | undefined) {
+  if (!cookie || typeof window !== 'undefined') {
+    return '';
+  }
+  return process.env.BACKEND_URL || INTERNAL_BACKEND_BASE;
 }
