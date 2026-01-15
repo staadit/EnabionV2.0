@@ -52,6 +52,9 @@ const suggestIntentCoachSchema = z
   .object({
     requestedLanguage: z.string().optional().nullable(),
     tasks: z.array(z.string()).optional(),
+    instructions: z.string().optional().nullable(),
+    focusFields: z.array(z.string()).optional().nullable(),
+    mode: z.enum(['initial', 'refine']).optional(),
   })
   .default({});
 
@@ -133,6 +136,22 @@ export class IntentController {
       actorUserId: user.id,
       tasks: parsed.tasks,
       requestedLanguage: this.normalizeOptionalText(parsed.requestedLanguage),
+      instructions: this.normalizeOptionalText(parsed.instructions),
+      focusFields: parsed.focusFields ?? null,
+      mode: parsed.mode,
+    });
+  }
+
+  @Get(':intentId/coach/history')
+  @Roles('Owner', 'BD_AM')
+  async getIntentCoachHistory(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+  ) {
+    const user = this.requireUser(req);
+    return this.intentService.getIntentCoachHistory({
+      orgId: user.orgId,
+      intentId,
     });
   }
 

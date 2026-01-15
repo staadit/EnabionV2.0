@@ -2,8 +2,15 @@
 
 ## Overview
 
-Intent Coach generates reviewable suggestions for an Intent using L1 fields only.
-It supports accept/reject decisions and emits AVATAR_SUGGESTION_* events.
+Intent Coach generates a summary block plus field-level suggestions for an Intent
+using L1 fields only. It supports accept/reject decisions and emits
+AVATAR_SUGGESTION_* events.
+
+The UI is structured into three blocks:
+
+1) Summary and observations (stored in history, no accept/reject).
+2) Field suggestions (accept/reject per field).
+3) Follow-up instructions + field focus for a new run.
 
 ## Endpoints
 
@@ -14,7 +21,8 @@ Request body (optional):
 ```json
 {
   "requestedLanguage": "EN",
-  "tasks": ["intent_gap_detection", "clarifying_questions", "summary_internal"]
+  "instructions": "Focus on KPIs and scope only.",
+  "focusFields": ["kpi", "scope"]
 }
 ```
 
@@ -24,15 +32,40 @@ Response:
 {
   "coachRunId": "01J...",
   "intentId": "intentId",
+  "summaryBlock": [
+    "Short summary bullet.",
+    "Observation or risk."
+  ],
   "suggestions": [
     {
       "id": "uuid",
-      "kind": "missing_info",
-      "title": "Missing KPIs",
-      "l1Text": "How will success be measured?",
-      "evidenceRef": "field:kpi empty",
+      "kind": "rewrite",
+      "title": "KPIs",
+      "l1Text": "Add KPI targets with numeric thresholds.",
+      "evidenceRef": "ai:intent_structuring",
       "status": "ISSUED",
-      "proposedPatch": null
+      "actionable": true,
+      "targetField": "kpi",
+      "proposedPatch": { "fields": { "kpi": "..." } }
+    }
+  ]
+}
+```
+
+### GET /intents/:intentId/coach/history
+
+Returns chronological history of summary blocks.
+
+Response:
+
+```json
+{
+  "intentId": "intentId",
+  "items": [
+    {
+      "id": "01J...",
+      "createdAt": "2026-01-23T09:00:00.000Z",
+      "summaryItems": ["Bullet 1", "Bullet 2"]
     }
   ]
 }
@@ -72,11 +105,19 @@ Response:
 
 Suggestions are stored in the AvatarSuggestion table:
 
-- kind: missing_info | question | risk | rewrite | summary
+- kind: rewrite
+- targetField: goal | context | scope | kpi | risks
+- actionable: true when a patch exists, false for "Jest ok, brak zmian"
 - l1Text: short, safe summary of the suggestion
 - evidenceRef: safe reference (field name or heuristic)
 - proposedPatch: optional JSON with fields to apply
 - status: ISSUED | ACCEPTED | REJECTED
+
+Summary history is stored in IntentCoachRun:
+
+- summaryItems: array of bullet points (L1-safe)
+- instructions: optional user input for that run
+- focusFields: optional field list for that run
 
 ## Data boundary
 

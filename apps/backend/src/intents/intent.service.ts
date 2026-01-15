@@ -16,42 +16,28 @@ import type { AiGatewayMessage } from '../ai-gateway/ai-gateway.types';
 import { IntentStage } from './intent.types';
 import { buildIntentShortId, normalizeIntentName } from './intent.utils';
 
-const INTENT_COACH_TASKS = [
-  'intent_gap_detection',
-  'clarifying_questions',
-  'summary_internal',
-] as const;
+const INTENT_COACH_FIELDS = ['goal', 'context', 'scope', 'kpi', 'risks'] as const;
 
-type IntentCoachTask = (typeof INTENT_COACH_TASKS)[number];
+type IntentCoachField = (typeof INTENT_COACH_FIELDS)[number];
 
-type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
+const INTENT_COACH_FIELD_LABELS: Record<IntentCoachField, string> = {
+  goal: 'Goal',
+  context: 'Context',
+  scope: 'Scope',
+  kpi: 'KPIs',
+  risks: 'Risks',
+};
 
-type DraftCoachSuggestion = {
-  kind: CoachSuggestionKind;
+type DraftFieldSuggestion = {
+  field: IntentCoachField;
   title: string;
-  l1Text?: string;
+  l1Text: string;
+  actionable: boolean;
   evidenceRef?: string;
   proposedPatch?: {
     fields: Record<string, string | null>;
   };
 };
-
-const COACH_REQUIRED_FIELDS: Array<{
-  field: keyof Pick<
-    Prisma.IntentUncheckedCreateInput,
-    'goal' | 'context' | 'scope' | 'kpi' | 'risks' | 'deadlineAt' | 'client' | 'title'
-  >;
-  label: string;
-  question: string;
-}> = [
-  { field: 'goal', label: 'Goal', question: 'What is the primary goal?' },
-  { field: 'scope', label: 'Scope', question: 'What is included and excluded from scope?' },
-  { field: 'kpi', label: 'KPIs', question: 'How will success be measured?' },
-  { field: 'deadlineAt', label: 'Deadline', question: 'What is the target deadline?' },
-  { field: 'context', label: 'Context', question: 'What is the business context?' },
-  { field: 'client', label: 'Client', question: 'Who is the client or main stakeholder?' },
-  { field: 'title', label: 'Title', question: 'What short title best describes this intent?' },
-];
 
 export type CreateIntentInput = {
   orgId: string;
@@ -111,8 +97,11 @@ export type SuggestIntentCoachInput = {
   orgId: string;
   intentId: string;
   actorUserId?: string;
-  tasks?: string[];
   requestedLanguage?: string | null;
+  tasks?: string[];
+  instructions?: string | null;
+  focusFields?: string[] | null;
+  mode?: 'initial' | 'refine';
 };
 
 export type DecideIntentCoachSuggestionInput = {
@@ -429,14 +418,11 @@ export class IntentService {
         id: true,
         intentName: true,
         goal: true,
-        title: true,
-        client: true,
         language: true,
         context: true,
         scope: true,
         kpi: true,
         risks: true,
-        deadlineAt: true,
         stage: true,
       },
     });
@@ -449,99 +435,60 @@ export class IntentService {
       throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
-    const tasks = this.normalizeCoachTasks(input.tasks);
     const requestedLanguage = (input.requestedLanguage || intent.language || 'EN').toUpperCase();
     const coachRunId = ulid();
-    const suggestions: DraftCoachSuggestion[] = [];
-
-    const missingInfo = this.buildMissingInfoSuggestions(intent);
-    if (missingInfo.length) {
-      suggestions.push(...missingInfo);
-    }
-
-    if (tasks.includes('intent_gap_detection')) {
-      const aiGaps = await this.runCoachBulletTask({
-        tenantId: input.orgId,
-        userId: input.actorUserId,
-        useCase: 'intent_gap_detection',
-        prompt: `List missing or unclear information as 3-7 bullet points. Keep it concise.`,
-        context: coachContext,
-        requestedLanguage,
-      });
-      for (const item of aiGaps) {
-        suggestions.push({
-          kind: 'missing_info',
-          title: this.buildSuggestionTitle(item, 'Missing info'),
-          l1Text: item,
-          evidenceRef: 'ai:intent_gap_detection',
-        });
-      }
-    }
-
-    if (tasks.includes('clarifying_questions')) {
-      const aiQuestions = await this.runCoachBulletTask({
-        tenantId: input.orgId,
-        userId: input.actorUserId,
-        useCase: 'clarifying_questions',
-        prompt: `Write 3-7 concise clarifying questions as bullet points.`,
-        context: coachContext,
-        requestedLanguage,
-      });
-      for (const question of aiQuestions) {
-        const text = question.endsWith('?') ? question : `${question}?`;
-        suggestions.push({
-          kind: 'question',
-          title: this.buildSuggestionTitle(text, 'Clarify'),
-          l1Text: text,
-          evidenceRef: 'ai:clarifying_questions',
-        });
-      }
-    }
-
-    if (tasks.includes('summary_internal')) {
-      const summary = await this.runCoachTextTask({
-        tenantId: input.orgId,
-        userId: input.actorUserId,
-        useCase: 'summary_internal',
-        prompt: `Write a 2-3 sentence internal summary. Keep it business-neutral.`,
-        context: coachContext,
-        requestedLanguage,
-      });
-      if (summary) {
-        suggestions.push({
-          kind: 'summary',
-          title: 'Internal summary',
-          l1Text: summary,
-          evidenceRef: 'ai:summary_internal',
-        });
-      }
-    }
-
-    const riskSuggestions = this.buildRiskSuggestions(intent);
-    if (riskSuggestions.length) {
-      suggestions.push(...riskSuggestions);
-    }
-
-    const normalized = this.dedupeSuggestions(suggestions);
-    if (!normalized.length) {
-      throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
-    }
+    const instructions = this.normalizeOptionalText(input.instructions);
+    const focusFields = this.normalizeCoachFields(input.focusFields);
+    const targetFields = focusFields.length ? focusFields : [...INTENT_COACH_FIELDS];
+    const summaryBlock = await this.generateSummaryBlock({
+      tenantId: input.orgId,
+      userId: input.actorUserId,
+      context: coachContext,
+      requestedLanguage,
+      instructions,
+    });
 
     const now = new Date();
+    await this.prisma.intentCoachRun.create({
+      data: {
+        id: coachRunId,
+        orgId: input.orgId,
+        intentId: intent.id,
+        createdByUserId: input.actorUserId ?? null,
+        summaryItems: summaryBlock,
+        instructions: instructions ?? null,
+        focusFields: focusFields.length ? focusFields : null,
+        createdAt: now,
+      },
+    });
+
+    const fieldSuggestions = await this.generateFieldSuggestions({
+      intent,
+      tenantId: input.orgId,
+      userId: input.actorUserId,
+      context: coachContext,
+      requestedLanguage,
+      instructions,
+      fields: targetFields,
+    });
+
     const created = await this.prisma.$transaction(
-      normalized.map((suggestion) =>
+      fieldSuggestions.map((suggestion) =>
         this.prisma.avatarSuggestion.create({
           data: {
             id: randomUUID(),
             orgId: input.orgId,
             intentId: intent.id,
+            coachRunId,
             avatarType: 'INTENT_COACH',
-            kind: suggestion.kind,
+            kind: 'rewrite',
+            targetField: suggestion.field,
             title: suggestion.title,
-            l1Text: suggestion.l1Text ?? null,
+            l1Text: suggestion.l1Text,
             evidenceRef: suggestion.evidenceRef ?? null,
             proposedPatch: suggestion.proposedPatch ?? undefined,
             status: 'ISSUED',
+            actionable: suggestion.actionable,
             createdAt: now,
           },
         }),
@@ -576,6 +523,7 @@ export class IntentService {
     return {
       coachRunId,
       intentId: intent.id,
+      summaryBlock,
       suggestions: created.map((suggestion) => ({
         id: suggestion.id,
         kind: suggestion.kind,
@@ -584,6 +532,28 @@ export class IntentService {
         evidenceRef: suggestion.evidenceRef,
         status: suggestion.status,
         proposedPatch: suggestion.proposedPatch,
+        actionable: suggestion.actionable,
+        targetField: suggestion.targetField,
+      })),
+    };
+  }
+
+  async getIntentCoachHistory(input: { orgId: string; intentId: string }) {
+    const runs = await this.prisma.intentCoachRun.findMany({
+      where: { orgId: input.orgId, intentId: input.intentId },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        createdAt: true,
+        summaryItems: true,
+      },
+    });
+    return {
+      intentId: input.intentId,
+      items: runs.map((run) => ({
+        id: run.id,
+        createdAt: run.createdAt,
+        summaryItems: Array.isArray(run.summaryItems) ? run.summaryItems : [],
       })),
     };
   }
@@ -599,6 +569,9 @@ export class IntentService {
 
     if (suggestion.status !== 'ISSUED') {
       return { suggestion, appliedFields: [] };
+    }
+    if (!suggestion.actionable) {
+      throw new HttpException('SUGGESTION_NOT_ACTIONABLE', HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     const appliedFields = await this.applySuggestionPatch({
@@ -690,14 +663,11 @@ export class IntentService {
   private buildIntentCoachContext(intent: {
     intentName: string;
     goal: string;
-    title?: string | null;
-    client?: string | null;
     language?: string | null;
     context?: string | null;
     scope?: string | null;
     kpi?: string | null;
     risks?: string | null;
-    deadlineAt?: Date | null;
     stage?: string | null;
   }): string | null {
     const lines: string[] = [];
@@ -711,16 +681,11 @@ export class IntentService {
 
     addLine('Intent name', intent.intentName);
     addLine('Goal', intent.goal);
-    addLine('Title', intent.title);
-    addLine('Client', intent.client);
     addLine('Language', intent.language);
     addLine('Context', intent.context);
     addLine('Scope', intent.scope);
     addLine('KPIs', intent.kpi);
     addLine('Risks', intent.risks);
-    if (intent.deadlineAt) {
-      lines.push(`Deadline: ${intent.deadlineAt.toISOString()}`);
-    }
     if (intent.stage) {
       lines.push(`Stage: ${intent.stage}`);
     }
@@ -731,26 +696,146 @@ export class IntentService {
     return lines.join('\n');
   }
 
-  private normalizeCoachTasks(tasks?: string[]): IntentCoachTask[] {
-    if (!tasks || tasks.length === 0) {
-      return [...INTENT_COACH_TASKS];
+  private normalizeCoachFields(fields?: string[] | null): IntentCoachField[] {
+    if (!fields || fields.length === 0) {
+      return [];
     }
-    const normalized = tasks
-      .map((task) => task.trim().toLowerCase())
+    const normalized = fields
+      .map((field) => field.trim().toLowerCase())
       .filter(Boolean);
-    const invalid = normalized.filter(
-      (task) => !INTENT_COACH_TASKS.includes(task as IntentCoachTask),
-    );
-    if (invalid.length > 0) {
-      throw new BadRequestException(`Invalid tasks: ${invalid.join(', ')}`);
+    const allowed = new Set(INTENT_COACH_FIELDS);
+    const selected = normalized.filter((field) => allowed.has(field as IntentCoachField));
+    return INTENT_COACH_FIELDS.filter((field) => selected.includes(field));
+  }
+
+  private async generateSummaryBlock(input: {
+    tenantId: string;
+    userId?: string;
+    context: string;
+    requestedLanguage: string;
+    instructions?: string | null;
+  }): Promise<string[]> {
+    const instructionLine = input.instructions
+      ? `User instructions: ${input.instructions}`
+      : null;
+    const prompt = [
+      'Write 4-10 bullet points with: summary, opinions, gaps, observations, and risks.',
+      'Be concise, business-neutral, and do not include names or emails.',
+    ].join(' ');
+    const context = instructionLine
+      ? `${input.context}\n\n${instructionLine}`
+      : input.context;
+
+    const bullets = await this.runCoachBulletTask({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      useCase: 'summary_internal',
+      prompt,
+      context,
+      requestedLanguage: input.requestedLanguage,
+    });
+
+    const normalized = bullets
+      .map((item) => this.truncateText(item, 260))
+      .filter(Boolean)
+      .slice(0, 10);
+
+    return normalized.length ? normalized : ['Brak wystarczających danych do podsumowania.'];
+  }
+
+  private async generateFieldSuggestions(input: {
+    intent: {
+      goal: string;
+      context?: string | null;
+      scope?: string | null;
+      kpi?: string | null;
+      risks?: string | null;
+    };
+    tenantId: string;
+    userId?: string;
+    context: string;
+    requestedLanguage: string;
+    instructions?: string | null;
+    fields: IntentCoachField[];
+  }): Promise<DraftFieldSuggestion[]> {
+    const fields = input.fields.length ? input.fields : [...INTENT_COACH_FIELDS];
+    const instructionLine = input.instructions
+      ? `User instructions: ${input.instructions}`
+      : null;
+    const prompt = [
+      'Return JSON only.',
+      'For each field, decide if an update is helpful.',
+      'If no change is needed, set action to "no_change".',
+      `Fields: ${fields.join(', ')}.`,
+      'JSON schema: {"items":[{"field":"goal","action":"update","value":"...","rationale":"..."},{"field":"goal","action":"no_change"}]}',
+      'Keep values concise and avoid names or emails.',
+    ].join(' ');
+    const context = instructionLine
+      ? `${input.context}\n\n${instructionLine}`
+      : input.context;
+
+    const data = await this.runCoachJsonTask({
+      tenantId: input.tenantId,
+      userId: input.userId,
+      useCase: 'intent_structuring',
+      prompt,
+      context,
+      requestedLanguage: input.requestedLanguage,
+    });
+
+    const items = Array.isArray((data as any)?.items) ? ((data as any).items as any[]) : [];
+    const suggestions: DraftFieldSuggestion[] = [];
+
+    for (const field of fields) {
+      const label = INTENT_COACH_FIELD_LABELS[field];
+      const currentValue = this.normalizeOptionalText(
+        (input.intent as Record<string, string | null | undefined>)[field],
+      );
+      const item = items.find(
+        (entry) => typeof entry?.field === 'string' && entry.field.toLowerCase() === field,
+      );
+      const action = typeof item?.action === 'string' ? item.action.toLowerCase() : 'no_change';
+      const rawValue = typeof item?.value === 'string' ? item.value.trim() : '';
+      const candidate = rawValue ? this.truncateText(rawValue, 800) : '';
+
+      if (action === 'update' && candidate) {
+        if (candidate === (currentValue ?? '').trim()) {
+          suggestions.push({
+            field,
+            title: label,
+            l1Text: 'Jest ok, brak zmian',
+            actionable: false,
+            evidenceRef: 'ai:intent_structuring',
+          });
+          continue;
+        }
+        suggestions.push({
+          field,
+          title: label,
+          l1Text: candidate,
+          actionable: true,
+          evidenceRef: 'ai:intent_structuring',
+          proposedPatch: { fields: { [field]: candidate } },
+        });
+        continue;
+      }
+
+      suggestions.push({
+        field,
+        title: label,
+        l1Text: 'Jest ok, brak zmian',
+        actionable: false,
+        evidenceRef: 'ai:intent_structuring',
+      });
     }
-    return normalized.length ? (normalized as IntentCoachTask[]) : [...INTENT_COACH_TASKS];
+
+    return suggestions;
   }
 
   private async runCoachBulletTask(input: {
     tenantId: string;
     userId?: string;
-    useCase: IntentCoachTask;
+    useCase: string;
     prompt: string;
     context: string;
     requestedLanguage: string;
@@ -787,14 +872,14 @@ export class IntentService {
       .filter((line) => line.length > 0);
   }
 
-  private async runCoachTextTask(input: {
+  private async runCoachJsonTask(input: {
     tenantId: string;
     userId?: string;
-    useCase: IntentCoachTask;
+    useCase: string;
     prompt: string;
     context: string;
     requestedLanguage: string;
-  }): Promise<string | null> {
+  }): Promise<unknown> {
     const messages: AiGatewayMessage[] = [
       {
         role: 'system',
@@ -802,7 +887,7 @@ export class IntentService {
           'You are an Intent Coach.',
           input.prompt,
           `Respond in ${input.requestedLanguage}.`,
-          'Avoid names or emails and keep it short.',
+          'Return JSON only.',
         ].join(' '),
       },
       { role: 'user', content: input.context },
@@ -815,125 +900,28 @@ export class IntentService {
       messages,
       inputClass: 'L1',
       containsL2: false,
-      maxOutputTokens: 512,
-      temperature: 0.3,
+      maxOutputTokens: 700,
+      temperature: 0.2,
     });
 
-    const trimmed = response.text.trim();
-    if (!trimmed) return null;
-    return trimmed.length > 1200 ? `${trimmed.slice(0, 1200)}...` : trimmed;
+    return this.parseJsonPayload(response.text);
   }
 
-  private buildMissingInfoSuggestions(intent: {
-    goal: string;
-    title?: string | null;
-    client?: string | null;
-    context?: string | null;
-    scope?: string | null;
-    kpi?: string | null;
-    risks?: string | null;
-    deadlineAt?: Date | null;
-  }): DraftCoachSuggestion[] {
-    const suggestions: DraftCoachSuggestion[] = [];
-    for (const field of COACH_REQUIRED_FIELDS) {
-      const value = (intent as Record<string, unknown>)[field.field];
-      const hasValue =
-        typeof value === 'string'
-          ? value.trim().length > 0
-          : value instanceof Date
-            ? true
-            : Boolean(value);
-      if (!hasValue) {
-        suggestions.push({
-          kind: 'missing_info',
-          title: `Missing ${field.label}`,
-          l1Text: field.question,
-          evidenceRef: `field:${field.field} empty`,
-        });
+  private parseJsonPayload(raw: string): unknown {
+    const trimmed = raw.trim();
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      const match = trimmed.match(/\{[\s\S]*\}/);
+      if (match) {
+        try {
+          return JSON.parse(match[0]);
+        } catch {
+          return null;
+        }
       }
     }
-    return suggestions;
-  }
-
-  private buildRiskSuggestions(intent: {
-    goal: string;
-    context?: string | null;
-    scope?: string | null;
-    kpi?: string | null;
-    risks?: string | null;
-    deadlineAt?: Date | null;
-  }): DraftCoachSuggestion[] {
-    const suggestions: DraftCoachSuggestion[] = [];
-    const scopeLength = intent.scope?.trim().length ?? 0;
-    const contextLength = intent.context?.trim().length ?? 0;
-    const hasRisks = Boolean(intent.risks && intent.risks.trim().length > 0);
-    const hasKpi = Boolean(intent.kpi && intent.kpi.trim().length > 0);
-
-    if (!hasRisks && (scopeLength > 120 || contextLength > 120)) {
-      suggestions.push({
-        kind: 'risk',
-        title: 'Risks not documented',
-        l1Text: 'Add a short list of key risks and mitigation ideas.',
-        evidenceRef: 'field:risks empty',
-      });
-    }
-
-    if (!hasKpi && intent.goal.trim().length > 0) {
-      suggestions.push({
-        kind: 'risk',
-        title: 'Success metrics missing',
-        l1Text: 'Define 1-3 KPIs to measure success.',
-        evidenceRef: 'field:kpi empty',
-      });
-    }
-
-    if (intent.deadlineAt && scopeLength > 120) {
-      const daysLeft = Math.floor(
-        (intent.deadlineAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24),
-      );
-      if (daysLeft >= 0 && daysLeft < 30) {
-        suggestions.push({
-          kind: 'risk',
-          title: 'Timeline may be aggressive',
-          l1Text: 'Confirm whether scope fits the current deadline or adjust milestones.',
-          evidenceRef: 'heuristic:deadline_scope',
-        });
-      }
-    }
-
-    return suggestions;
-  }
-
-  private dedupeSuggestions(items: DraftCoachSuggestion[]): DraftCoachSuggestion[] {
-    const seen = new Set<string>();
-    const result: DraftCoachSuggestion[] = [];
-
-    for (const item of items) {
-      const title = this.truncateText(item.title, 140);
-      const l1Text = item.l1Text ? this.truncateText(item.l1Text, 800) : undefined;
-      const signature = `${item.kind}:${(l1Text ?? title).toLowerCase().replace(/\s+/g, ' ')}`;
-      if (!signature.trim()) continue;
-      if (seen.has(signature)) continue;
-      seen.add(signature);
-      result.push({
-        ...item,
-        title,
-        l1Text,
-      });
-      if (result.length >= 20) {
-        break;
-      }
-    }
-
-    return result;
-  }
-
-  private buildSuggestionTitle(value: string, fallback: string): string {
-    const cleaned = value.replace(/^[^A-Za-z0-9]+/, '').trim();
-    if (!cleaned) {
-      return fallback;
-    }
-    return cleaned.length > 100 ? `${cleaned.slice(0, 100)}...` : cleaned;
+    return null;
   }
 
   private truncateText(value: string, maxLength: number): string {
@@ -943,7 +931,7 @@ export class IntentService {
 
   private normalizeProposedPatch(
     value: Prisma.JsonValue | null | undefined,
-  ): DraftCoachSuggestion['proposedPatch'] | null {
+  ): DraftFieldSuggestion['proposedPatch'] | null {
     if (!value || typeof value !== 'object' || Array.isArray(value)) {
       return null;
     }
@@ -984,9 +972,6 @@ export class IntentService {
         scope: true,
         kpi: true,
         risks: true,
-        client: true,
-        language: true,
-        deadlineAt: true,
         stage: true,
       },
     });
@@ -994,52 +979,18 @@ export class IntentService {
       throw new NotFoundException('Intent not found');
     }
 
-    const allowedFields = new Set([
-      'goal',
-      'context',
-      'scope',
-      'kpi',
-      'risks',
-      'client',
-      'language',
-      'deadlineAt',
-    ]);
+    const allowedFields = new Set(['goal', 'context', 'scope', 'kpi', 'risks']);
     const updates: Prisma.IntentUncheckedUpdateInput = {};
     const changedFields: string[] = [];
 
     for (const [field, rawValue] of Object.entries(patch.fields)) {
       if (!allowedFields.has(field)) continue;
 
-      if (field === 'deadlineAt') {
-        if (rawValue === null) {
-          if (intent.deadlineAt !== null) {
-            updates.deadlineAt = null;
-            changedFields.push('deadlineAt');
-          }
-        } else if (typeof rawValue === 'string') {
-          const trimmed = rawValue.trim();
-          if (!trimmed) continue;
-          const parsed = new Date(trimmed);
-          if (Number.isNaN(parsed.getTime())) {
-            continue;
-          }
-          const current = intent.deadlineAt ? intent.deadlineAt.getTime() : null;
-          if (current !== parsed.getTime()) {
-            updates.deadlineAt = parsed;
-            changedFields.push('deadlineAt');
-          }
-        }
-        continue;
-      }
-
       if (rawValue !== null && typeof rawValue !== 'string') {
         continue;
       }
       let normalized = rawValue === null ? null : this.normalizeOptionalText(rawValue);
-      if (field === 'language' && typeof normalized === 'string') {
-        normalized = normalized.toUpperCase();
-      }
-      if ((field === 'goal' || field === 'language') && !normalized) {
+      if (field === 'goal' && !normalized) {
         continue;
       }
       const intentValue = intent[field as keyof typeof intent];
