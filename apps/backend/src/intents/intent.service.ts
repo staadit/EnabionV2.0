@@ -791,6 +791,7 @@ export class IntentService {
       const currentValue = this.normalizeOptionalText(
         (input.intent as Record<string, string | null | undefined>)[field],
       );
+      const displayValue = currentValue ?? '';
       const item = items.find(
         (entry) => typeof entry?.field === 'string' && entry.field.toLowerCase() === field,
       );
@@ -803,7 +804,7 @@ export class IntentService {
           suggestions.push({
             field,
             title: label,
-            l1Text: 'Jest ok, brak zmian',
+            l1Text: displayValue,
             actionable: false,
             evidenceRef: 'ai:intent_structuring',
           });
@@ -823,7 +824,7 @@ export class IntentService {
       suggestions.push({
         field,
         title: label,
-        l1Text: 'Jest ok, brak zmian',
+        l1Text: displayValue,
         actionable: false,
         evidenceRef: 'ai:intent_structuring',
       });
