@@ -71,6 +71,16 @@ class StubAiGatewayService {
   }
 }
 
+class StubAiAccessService {
+  allowL2 = true;
+  async resolveAiDataAccess() {
+    return { allowL2: this.allowL2, reason: this.allowL2 ? undefined : 'NDA_NOT_ACCEPTED' };
+  }
+  async ensureToggleAllowed() {
+    return;
+  }
+}
+
 class MockPrismaService {
   organizations: any[] = [{ id: 'org-1', policyAiEnabled: true }];
   intents: any[] = [];
@@ -200,7 +210,8 @@ async function testInsufficientL1Data() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   const intentId = 'intent-1';
   prisma.intents.push({
@@ -229,7 +240,8 @@ async function testPolicyDisabled() {
   prisma.organizations = [{ id: 'org-1', policyAiEnabled: false }];
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   const intentId = 'intent-policy';
   prisma.intents.push({
@@ -255,11 +267,49 @@ async function testPolicyDisabled() {
   assert(threw, 'Policy disabled should block Intent Coach');
 }
 
+async function testL2AccessBlocked() {
+  const prisma = new MockPrismaService();
+  const events = new EventService(prisma as any);
+  const aiGateway = new StubAiGatewayService();
+  const aiAccess = new StubAiAccessService();
+  aiAccess.allowL2 = false;
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
+
+  const intentId = 'intent-l2-block';
+  prisma.intents.push({
+    id: intentId,
+    orgId: 'org-1',
+    intentName: 'Intent L2',
+    goal: 'Launch pilot with enough context to pass checks.',
+    context: 'Context is present.',
+    scope: 'Scope is defined.',
+    language: 'EN',
+    stage: 'NEW',
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    lastActivityAt: new Date(),
+  });
+
+  let threw = false;
+  try {
+    await service.suggestIntentCoach({
+      orgId: 'org-1',
+      intentId,
+      actorUserId: 'user-1',
+      requestedDataLevel: 'L2',
+    });
+  } catch (err) {
+    threw = err instanceof HttpException && err.getStatus() === 403;
+  }
+  assert(threw, 'L2 access without approval should return 403');
+}
+
 async function testSuggestAndDecideFlow() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   const intentId = 'intent-2';
   prisma.intents.push({
@@ -422,6 +472,7 @@ async function testSuggestAndDecideFlow() {
 async function run() {
   await testInsufficientL1Data();
   await testPolicyDisabled();
+  await testL2AccessBlocked();
   await testSuggestAndDecideFlow();
   // eslint-disable-next-line no-console
   console.log('Intent coach tests passed.');

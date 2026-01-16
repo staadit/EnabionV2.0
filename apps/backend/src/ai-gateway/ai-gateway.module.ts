@@ -6,11 +6,14 @@ import {
   OnModuleInit,
 } from '@nestjs/common';
 import { EventModule } from '../events/event.module';
+import { NdaModule } from '../nda/nda.module';
 import { PrismaService } from '../prisma.service';
+import { AiAccessService } from './ai-access.service';
 import { AiGatewayConfig, loadAiGatewayConfig } from './ai-gateway.config';
 import { AiGatewayService } from './ai-gateway.service';
 import { AI_GATEWAY_CONFIG, AI_RATE_LIMITER } from './ai-gateway.tokens';
 import { OpenAiProvider } from './openai.provider';
+import { PiiRedactionService } from './pii-redaction.service';
 import { MemoryRateLimiter, PostgresRateLimiter, RateLimiter } from './rate-limiter';
 
 @Injectable()
@@ -51,11 +54,13 @@ class AiRateLimitCleanupService implements OnModuleInit, OnModuleDestroy {
 }
 
 @Module({
-  imports: [EventModule],
+  imports: [EventModule, NdaModule],
   providers: [
     PrismaService,
     OpenAiProvider,
     AiGatewayService,
+    AiAccessService,
+    PiiRedactionService,
     AiRateLimitCleanupService,
     {
       provide: AI_GATEWAY_CONFIG,
@@ -72,6 +77,6 @@ class AiRateLimitCleanupService implements OnModuleInit, OnModuleDestroy {
       },
     },
   ],
-  exports: [AiGatewayService],
+  exports: [AiGatewayService, AiAccessService],
 })
 export class AiGatewayModule {}

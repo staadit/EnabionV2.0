@@ -1,14 +1,27 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import type { GetServerSideProps } from 'next';
 import { useEffect, useMemo, useState } from 'react';
 import OrgShell from '../../../../components/OrgShell';
 import { getXNavItems } from '../../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../../lib/org-context';
+import { fetchNdaStatus, type NdaStatus } from '../../../../lib/org-nda';
+
+const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 type IntentTabProps = {
   user: OrgUser;
   org: OrgInfo;
   intentId: string;
+  aiAllowL2: boolean;
+  hasL2: boolean;
+  ndaStatus: NdaStatus | null;
+};
+
+type IntentAccess = {
+  id: string;
+  aiAllowL2: boolean;
+  hasL2: boolean;
 };
 
 type CoachField = 'goal' | 'context' | 'scope' | 'kpi' | 'risks';
@@ -100,11 +113,19 @@ const FEEDBACK_REASON_LABELS: Record<CoachSuggestionFeedbackReasonCode, string> 
   OTHER: 'Other',
 };
 
-export default function Coach({ user, org, intentId }: IntentTabProps) {
+export default function Coach({
+  user,
+  org,
+  intentId,
+  aiAllowL2,
+  hasL2,
+  ndaStatus,
+}: IntentTabProps) {
   const [running, setRunning] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [coachRunId, setCoachRunId] = useState<string | null>(null);
   const [summaryItems, setSummaryItems] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
@@ -117,6 +138,8 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
   const [feedbackById, setFeedbackById] = useState<Record<string, SuggestionFeedbackDraft>>({});
   const isViewer = user.role === 'Viewer';
+  const dataLevel = aiAllowL2 ? 'L2' : 'L1';
+  const ndaAccepted = Boolean(ndaStatus?.accepted);
 
   const groupedSuggestions = useMemo(() => {
     const order = new Map(COACH_FIELDS.map((field, index) => [field, index]));
@@ -188,6 +211,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     setRunning(true);
     setMessage(null);
     setError(null);
+    setErrorCode(null);
     setCoachRunId(null);
     if (shouldReset) {
       if (includeSummary) {
@@ -199,6 +223,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     try {
       const body: Record<string, unknown> = {
         requestedLanguage: org.defaultLanguage ?? 'EN',
+        requestedDataLevel: dataLevel,
       };
       if (payload?.instructions) {
         body.instructions = payload.instructions;
@@ -213,8 +238,11 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(readApiError(data) || 'Intent Coach failed');
+        const apiError = readApiError(data);
+        setErrorCode(apiError);
+        throw new Error(formatCoachError(apiError) || 'Intent Coach failed');
       }
+      setErrorCode(null);
       setCoachRunId(data?.coachRunId ?? null);
       const summaryBlock = Array.isArray(data?.summaryBlock) ? data.summaryBlock : [];
       if (includeSummary) {
@@ -443,9 +471,34 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         {isViewer ? (
           <span style={helperStyle}>View-only access.</span>
         ) : (
-          <span style={helperStyle}>Uses L1 intent fields only (no raw/pasted text).</span>
+          <span style={helperStyle}>
+            Data level: {dataLevel}.{' '}
+            {aiAllowL2
+              ? 'Includes confidential source text when available.'
+              : 'L1-only fields (no raw/pasted text).'}
+          </span>
         )}
       </div>
+      {!isViewer && !aiAllowL2 ? (
+        <div style={helperMutedStyle}>
+          {ndaAccepted ? (
+            <span>
+              Enable L2 in Intent settings to include confidential data.{' '}
+              <Link href={`/${org.slug}/intents/${intentId}`}>Open intent</Link>
+            </span>
+          ) : (
+            <span>
+              Mutual NDA required to enable L2.{' '}
+              <Link href={`/${org.slug}/intents/${intentId}/nda`}>Sign NDA</Link>
+            </span>
+          )}
+        </div>
+      ) : null}
+      {!isViewer && aiAllowL2 && !hasL2 ? (
+        <div style={helperMutedStyle}>
+          L2 enabled, but no confidential source text detected yet.
+        </div>
+      ) : null}
       {message ? <p style={messageStyle}>{message}</p> : null}
       <div style={blockGridStyle}>
         <div style={blockCardStyle}>
@@ -718,7 +771,26 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
           </div>
         ) : null}
       </div>
-      {error ? <p style={errorStyle}>{error}</p> : null}
+      {error ? (
+        <div>
+          <p style={errorStyle}>{error}</p>
+          {errorCode && isL2AccessError(errorCode) ? (
+            <p style={helperMutedStyle}>
+              {ndaAccepted ? (
+                <span>
+                  Enable L2 in Intent settings.{' '}
+                  <Link href={`/${org.slug}/intents/${intentId}`}>Open intent</Link>
+                </span>
+              ) : (
+                <span>
+                  Mutual NDA required for L2 access.{' '}
+                  <Link href={`/${org.slug}/intents/${intentId}/nda`}>Sign NDA</Link>
+                </span>
+              )}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {historyPopupText ? (
         <div style={modalOverlayStyle} onClick={() => setHistoryPopupText(null)}>
           <div
@@ -753,10 +825,52 @@ function readApiError(data: any) {
   return data?.message || data?.error || null;
 }
 
+function formatCoachError(error: string | null) {
+  if (!error) return null;
+  if (error === 'AI_L2_NOT_ALLOWED' || error === 'NDA_REQUIRED_FOR_L2_AI') {
+    return 'L2 access requires Mutual NDA and explicit opt-in.';
+  }
+  if (error === 'TOGGLE_DISABLED' || error === 'NDA_NOT_ACCEPTED') {
+    return 'Enable L2 in Intent settings after completing Mutual NDA.';
+  }
+  return error;
+}
+
+function isL2AccessError(error: string) {
+  return [
+    'AI_L2_NOT_ALLOWED',
+    'NDA_REQUIRED_FOR_L2_AI',
+    'TOGGLE_DISABLED',
+    'NDA_NOT_ACCEPTED',
+  ].includes(error);
+}
+
 function formatPatchFields(fields: Record<string, string | null>) {
   return Object.entries(fields)
     .map(([key, value]) => `${key}=${value ?? 'null'}`)
     .join(', ');
+}
+
+async function fetchIntentAccess(
+  cookie: string | undefined,
+  intentId: string,
+): Promise<IntentAccess | null> {
+  const res = await fetch(`${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}`, {
+    headers: { cookie: cookie ?? '' },
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const data = (await res.json()) as { intent?: Record<string, any> } | null;
+  const intent = data?.intent;
+  if (!intent) {
+    return null;
+  }
+  return {
+    id: String(intent.id ?? ''),
+    aiAllowL2: Boolean(intent.aiAllowL2),
+    hasL2: Boolean(intent.hasL2),
+  };
 }
 
 const cardStyle = {
@@ -797,6 +911,12 @@ const secondaryButtonStyle = {
 const helperStyle = {
   color: 'var(--muted)',
   fontSize: '0.9rem',
+};
+
+const helperMutedStyle = {
+  marginTop: '0.5rem',
+  color: 'var(--muted)',
+  fontSize: '0.85rem',
 };
 
 const messageStyle = {
@@ -1062,11 +1182,20 @@ export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
+  const cookie = result.context!.cookie;
+  const intentAccess = await fetchIntentAccess(cookie, intentId);
+  if (!intentAccess) {
+    return { notFound: true };
+  }
+  const ndaStatus = await fetchNdaStatus(cookie);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
       intentId,
+      aiAllowL2: intentAccess.aiAllowL2,
+      hasL2: intentAccess.hasL2,
+      ndaStatus,
     },
   };
 };

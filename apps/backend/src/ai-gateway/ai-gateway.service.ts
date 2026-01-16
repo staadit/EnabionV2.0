@@ -12,12 +12,14 @@ import { PinoLogger } from 'nestjs-pino';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { AiAccessService } from './ai-access.service';
 import { AiGatewayConfig } from './ai-gateway.config';
 import { AI_GATEWAY_CONFIG, AI_RATE_LIMITER } from './ai-gateway.tokens';
 import type { AiGatewayRequest, AiGatewayResponse } from './ai-gateway.types';
 import { normalizeUseCase } from './use-cases';
 import { redactForLogs } from './redact';
 import { OpenAiProvider, OpenAiProviderError } from './openai.provider';
+import { PiiRedactionService } from './pii-redaction.service';
 import type { RateLimiter } from './rate-limiter';
 
 const MAX_TEMPERATURE = 1.2;
@@ -31,6 +33,8 @@ export class AiGatewayService {
     private readonly provider: OpenAiProvider,
     private readonly events: EventService,
     private readonly prisma: PrismaService,
+    private readonly aiAccess: AiAccessService,
+    private readonly redaction: PiiRedactionService,
     private readonly logger: PinoLogger,
   ) {
     this.logger.setContext(AiGatewayService.name);
@@ -107,16 +111,68 @@ export class AiGatewayService {
       throw new ForbiddenException('AI_POLICY_DISABLED');
     }
 
+    const requestedDataLevel = request.requestedDataLevel ?? request.inputClass;
+    if (requestedDataLevel !== 'L1' && requestedDataLevel !== 'L2') {
+      await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_FAILED, requestId, {
+        tenantId: request.tenantId,
+        userId: request.userId ?? null,
+        useCase,
+        model,
+        errorClass: 'REQUESTED_LEVEL_INVALID',
+      });
+      throw new BadRequestException('AI_REQUESTED_LEVEL_INVALID');
+    }
+
     const containsL2 = request.containsL2 ?? request.inputClass === 'L2';
-    if (request.inputClass === 'L2' || containsL2) {
+    if (containsL2 && request.inputClass !== 'L2') {
       await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_BLOCKED_POLICY, requestId, {
         tenantId: request.tenantId,
         userId: request.userId ?? null,
         useCase,
         model,
-        errorClass: 'INPUT_CLASS_L2',
+        errorClass: 'INPUT_CLASS_MISMATCH',
       });
-      throw new ForbiddenException('AI_INPUT_L2_BLOCKED');
+      throw new ForbiddenException('AI_INPUT_CLASS_MISMATCH');
+    }
+    if (requestedDataLevel === 'L1' && (request.inputClass === 'L2' || containsL2)) {
+      await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_BLOCKED_POLICY, requestId, {
+        tenantId: request.tenantId,
+        userId: request.userId ?? null,
+        useCase,
+        model,
+        errorClass: 'L2_NOT_REQUESTED',
+      });
+      throw new ForbiddenException('AI_L2_NOT_REQUESTED');
+    }
+
+    const requiresL2Access =
+      requestedDataLevel === 'L2' || request.inputClass === 'L2' || containsL2;
+    if (requiresL2Access) {
+      if (!request.intentId) {
+        await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_BLOCKED_POLICY, requestId, {
+          tenantId: request.tenantId,
+          userId: request.userId ?? null,
+          useCase,
+          model,
+          errorClass: 'INTENT_REQUIRED_FOR_L2',
+        });
+        throw new ForbiddenException('AI_L2_INTENT_REQUIRED');
+      }
+      const access = await this.aiAccess.resolveAiDataAccess({
+        orgId: request.tenantId,
+        intentId: request.intentId,
+        actorUserId: request.userId ?? null,
+      });
+      if (!access.allowL2) {
+        await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_BLOCKED_POLICY, requestId, {
+          tenantId: request.tenantId,
+          userId: request.userId ?? null,
+          useCase,
+          model,
+          errorClass: access.reason ?? 'L2_NOT_ALLOWED',
+        });
+        throw new ForbiddenException('AI_L2_NOT_ALLOWED');
+      }
     }
 
     await this.checkRateLimits(request, useCase, requestId, model);
@@ -131,6 +187,8 @@ export class AiGatewayService {
       MIN_TEMPERATURE,
       MAX_TEMPERATURE,
     );
+    const inputRedaction = this.redaction.redactInputMessages(request.messages);
+    const redactionVersion = this.redaction.getVersion();
 
     await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_REQUESTED, requestId, {
       tenantId: request.tenantId,
@@ -143,6 +201,21 @@ export class AiGatewayService {
       totalChars: redacted.totalChars,
       contentHash: redacted.contentHash,
     });
+
+    if (request.inputClass === 'L2') {
+      await this.emitGatewayEvent(EVENT_TYPES.AI_L2_USED, requestId, {
+        tenantId: request.tenantId,
+        userId: request.userId ?? null,
+        intentId: request.intentId,
+        useCase,
+        model,
+        effectiveDataLevel: 'L2',
+        requestedDataLevel,
+        redactionApplied: inputRedaction.applied,
+        redactionVersion,
+        findingsSummary: inputRedaction.summary,
+      });
+    }
 
     this.logger.info(
       {
@@ -160,11 +233,12 @@ export class AiGatewayService {
     try {
       const result = await this.provider.generateText({
         model,
-        messages: request.messages,
+        messages: inputRedaction.messages,
         maxOutputTokens,
         temperature,
       });
       const latencyMs = Date.now() - started;
+      const outputRedaction = this.redaction.redactOutputText(result.text);
 
       await this.emitGatewayEvent(EVENT_TYPES.AI_GATEWAY_SUCCEEDED, requestId, {
         tenantId: request.tenantId,
@@ -178,7 +252,7 @@ export class AiGatewayService {
       });
 
       return {
-        text: result.text,
+        text: outputRedaction.redactedText,
         model: result.model || model,
         provider: 'openai',
         usage: result.usage,

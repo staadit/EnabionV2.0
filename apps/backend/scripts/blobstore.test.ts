@@ -23,7 +23,10 @@ async function streamToBuffer(stream: NodeJS.ReadableStream) {
 }
 
 async function testLocalDriverRoundtrip() {
-  const root = path.resolve(process.cwd(), 'tmp', 'blobstore-test');
+  const baseRoot = process.env.BLOBSTORE_TEST_ROOT
+    ? path.resolve(process.env.BLOBSTORE_TEST_ROOT)
+    : path.resolve(process.cwd(), 'tmp');
+  const root = path.resolve(baseRoot, 'blobstore-test');
   await fs.promises.rm(root, { recursive: true, force: true });
   const store = new LocalBlobStore(root);
   const payload = Buffer.from('hello-blobstore');

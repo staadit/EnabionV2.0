@@ -40,6 +40,7 @@ export const CHANNELS = {
 export const EVENT_TYPES = {
   INTENT_CREATED: 'INTENT_CREATED',
   INTENT_UPDATED: 'INTENT_UPDATED',
+  INTENT_AI_ACCESS_UPDATED: 'INTENT_AI_ACCESS_UPDATED',
   INTENT_PIPELINE_STAGE_CHANGED: 'INTENT_PIPELINE_STAGE_CHANGED',
   NDA_PRESENTED: 'NDA_PRESENTED',
   NDA_ACCEPTED: 'NDA_ACCEPTED',
@@ -63,6 +64,7 @@ export const EVENT_TYPES = {
   AI_GATEWAY_FAILED: 'AI_GATEWAY_FAILED',
   AI_GATEWAY_BLOCKED_POLICY: 'AI_GATEWAY_BLOCKED_POLICY',
   AI_GATEWAY_RATE_LIMITED: 'AI_GATEWAY_RATE_LIMITED',
+  AI_L2_USED: 'AI_L2_USED',
   TRUSTSCORE_SNAPSHOT_CREATED: 'TRUSTSCORE_SNAPSHOT_CREATED',
   // Audit-critical coverage
   INTENT_VIEWED: 'INTENT_VIEWED',
@@ -91,6 +93,7 @@ export type PipelineStage = (typeof PIPELINE_STAGES)[keyof typeof PIPELINE_STAGE
 export type Channel = (typeof CHANNELS)[keyof typeof CHANNELS];
 
 const languageEnum = z.enum(['PL', 'DE', 'NL', 'EN', 'unknown']);
+const aiDataLevelEnum = z.enum(['L1', 'L2']);
 const aiGatewayUseCaseEnum = z.enum([
   'intent_structuring',
   'intent_gap_detection',
@@ -117,6 +120,14 @@ const pipelineEnum = z.enum(Object.values(PIPELINE_STAGES) as [PipelineStage, ..
 const channelEnum = z.enum(Object.values(CHANNELS) as [Channel, ...Channel[]]);
 const subjectEnum = z.enum(Object.values(SUBJECT_TYPES) as [SubjectType, ...SubjectType[]]);
 const eventTypeEnum = z.enum(Object.values(EVENT_TYPES) as [EventType, ...EventType[]]);
+const redactionSummarySchema = z.object({
+  email: z.number().int().nonnegative(),
+  phone: z.number().int().nonnegative(),
+  iban: z.number().int().nonnegative(),
+  pesel: z.number().int().nonnegative(),
+  nip: z.number().int().nonnegative(),
+  ssn: z.number().int().nonnegative(),
+});
 
 const basePayload = z.object({
   payloadVersion: z.number().int().positive(),
@@ -146,6 +157,11 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     changedFields: z.array(z.string().min(1)),
     changeSummary: z.string().min(1),
+  }),
+  [EVENT_TYPES.INTENT_AI_ACCESS_UPDATED]: basePayload.extend({
+    intentId: z.string().min(1),
+    allowL2: z.boolean(),
+    previousAllowL2: z.boolean().optional(),
   }),
   [EVENT_TYPES.INTENT_PIPELINE_STAGE_CHANGED]: basePayload.extend({
     intentId: z.string().min(1),
@@ -312,6 +328,19 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     useCase: aiGatewayUseCaseEnum,
     model: z.string().min(1),
     errorClass: z.string().min(1),
+  }),
+  [EVENT_TYPES.AI_L2_USED]: basePayload.extend({
+    requestId: z.string().min(1),
+    tenantId: z.string().min(1),
+    userId: z.string().min(1).nullable().optional(),
+    intentId: z.string().min(1),
+    useCase: aiGatewayUseCaseEnum,
+    model: z.string().min(1),
+    effectiveDataLevel: z.literal('L2'),
+    requestedDataLevel: aiDataLevelEnum.optional(),
+    redactionApplied: z.boolean(),
+    redactionVersion: z.string().min(1),
+    findingsSummary: redactionSummarySchema,
   }),
   [EVENT_TYPES.TRUSTSCORE_SNAPSHOT_CREATED]: basePayload.extend({
     orgId: z.string().min(1),

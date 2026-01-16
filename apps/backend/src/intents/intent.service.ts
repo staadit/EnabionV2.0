@@ -13,6 +13,7 @@ import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
 import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
+import { AiAccessService } from '../ai-gateway/ai-access.service';
 import type { AiGatewayMessage } from '../ai-gateway/ai-gateway.types';
 import { normalizeUseCase } from '../ai-gateway/use-cases';
 import { IntentStage } from './intent.types';
@@ -32,6 +33,8 @@ const COACH_TASKS_DEFAULT = [
 type CoachTask = (typeof COACH_TASKS_DEFAULT)[number];
 
 const COACH_TASKS_SUPPORTED = new Set<string>(COACH_TASKS_DEFAULT as readonly string[]);
+
+const MAX_L2_SOURCE_CHARS = 4000;
 
 type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
 type CoachSuggestionFeedbackSentiment = 'UP' | 'DOWN' | 'NEUTRAL';
@@ -80,6 +83,13 @@ type MissingInfoRule = {
   label: string;
   suggestion: string;
   question: string;
+};
+
+type CoachAiContext = {
+  intentId: string;
+  requestedDataLevel: 'L1' | 'L2';
+  inputClass: 'L1' | 'L2';
+  containsL2: boolean;
 };
 
 export type CreateIntentInput = {
@@ -141,6 +151,7 @@ export type SuggestIntentCoachInput = {
   intentId: string;
   actorUserId?: string;
   requestedLanguage?: string | null;
+  requestedDataLevel?: 'L1' | 'L2';
   tasks?: string[];
   instructions?: string | null;
   focusFields?: string[] | null;
@@ -167,12 +178,21 @@ export type UpdatePipelineStageInput = {
   pipelineStage: IntentStage;
 };
 
+export type UpdateIntentAiAccessInput = {
+  orgId: string;
+  actorUserId: string;
+  intentId: string;
+  allowL2: boolean;
+  channel?: 'ui' | 'api';
+};
+
 @Injectable()
 export class IntentService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
     private readonly aiGateway: AiGatewayService,
+    private readonly aiAccess: AiAccessService,
   ) {}
 
   async createIntent(input: CreateIntentInput) {
@@ -389,6 +409,9 @@ export class IntentService {
         kpi: true,
         risks: true,
         sourceTextRaw: true,
+        aiAllowL2: true,
+        aiAllowL2SetAt: true,
+        aiAllowL2SetByUserId: true,
         owner: {
           select: {
             id: true,
@@ -412,6 +435,57 @@ export class IntentService {
       shortId: buildIntentShortId(intent.intentNumber),
       hasL2,
     };
+  }
+
+  async updateIntentAiAccess(input: UpdateIntentAiAccessInput) {
+    const intent = await this.prisma.intent.findFirst({
+      where: { id: input.intentId, orgId: input.orgId },
+      select: { id: true, stage: true, aiAllowL2: true },
+    });
+    if (!intent) {
+      throw new NotFoundException('Intent not found');
+    }
+
+    if (input.allowL2) {
+      await this.aiAccess.ensureToggleAllowed({ orgId: input.orgId });
+    }
+
+    if (intent.aiAllowL2 === input.allowL2) {
+      return { intent };
+    }
+
+    const now = new Date();
+    const updated = await this.prisma.intent.update({
+      where: { id: intent.id },
+      data: {
+        aiAllowL2: input.allowL2,
+        aiAllowL2SetAt: now,
+        aiAllowL2SetByUserId: input.actorUserId,
+      },
+      select: { id: true, stage: true, aiAllowL2: true },
+    });
+
+    await this.events.emitEvent({
+      type: EVENT_TYPES.INTENT_AI_ACCESS_UPDATED,
+      occurredAt: now,
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      actorOrgId: input.orgId,
+      subjectType: 'INTENT',
+      subjectId: intent.id,
+      lifecycleStep: this.mapLifecycleStep((intent.stage as IntentStage) ?? 'NEW'),
+      pipelineStage: (intent.stage as IntentStage) ?? 'NEW',
+      channel: input.channel ?? 'ui',
+      correlationId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        intentId: intent.id,
+        allowL2: input.allowL2,
+        previousAllowL2: intent.aiAllowL2,
+      },
+    });
+
+    return { intent: updated };
   }
 
   async runIntentCoach(input: RunIntentCoachInput) {
@@ -449,10 +523,12 @@ export class IntentService {
     const response = await this.aiGateway.generateText({
       tenantId: input.orgId,
       userId: input.actorUserId ?? null,
+      intentId: intent.id,
       useCase: 'intent_gap_detection',
       messages,
       inputClass: 'L1',
       containsL2: false,
+      requestedDataLevel: 'L1',
     });
 
     return {
@@ -469,6 +545,7 @@ export class IntentService {
       where: { id: input.intentId, orgId: input.orgId },
       select: {
         id: true,
+        orgId: true,
         intentName: true,
         goal: true,
         language: true,
@@ -479,6 +556,8 @@ export class IntentService {
         risks: true,
         deadlineAt: true,
         stage: true,
+        sourceTextRaw: true,
+        aiAllowL2: true,
       },
     });
     if (!intent) {
@@ -486,13 +565,41 @@ export class IntentService {
     }
 
     await this.ensureAiPolicyEnabled(input.orgId);
-    if (!this.hasSufficientCoachData(intent)) {
+    const requestedDataLevel = this.normalizeRequestedDataLevel(input.requestedDataLevel);
+    let allowL2 = false;
+    if (requestedDataLevel === 'L2') {
+      const access = await this.aiAccess.resolveAiDataAccess({
+        orgId: input.orgId,
+        intentId: intent.id,
+        actorUserId: input.actorUserId ?? null,
+        intent: { id: intent.id, orgId: intent.orgId, aiAllowL2: intent.aiAllowL2 },
+      });
+      if (!access.allowL2) {
+        throw new ForbiddenException(access.reason ?? 'AI_L2_NOT_ALLOWED');
+      }
+      allowL2 = true;
+    }
+
+    const hasSufficientL1 = this.hasSufficientCoachData(intent);
+    if (!hasSufficientL1 && requestedDataLevel === 'L1') {
       throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
     }
-    const coachContext = this.buildIntentCoachContext(intent);
+
+    const l1Context = this.buildIntentCoachContext(intent);
+    const l2Context = allowL2 ? this.buildIntentL2Context(intent.sourceTextRaw) : null;
+    if (!hasSufficientL1 && !l2Context) {
+      throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+    const coachContext = this.combineCoachContext(l1Context, l2Context);
     if (!coachContext) {
       throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
     }
+    const aiContext: CoachAiContext = {
+      intentId: intent.id,
+      requestedDataLevel,
+      inputClass: l2Context ? 'L2' : 'L1',
+      containsL2: Boolean(l2Context),
+    };
 
     const requestedLanguage = (input.requestedLanguage || intent.language || 'EN').toUpperCase();
     const coachRunId = ulid();
@@ -509,12 +616,13 @@ export class IntentService {
 
     const summaryBlock = includeSummary
       ? await this.generateSummaryBlock({
-          tenantId: input.orgId,
-          userId: input.actorUserId,
-          context: coachContext,
-          requestedLanguage,
-          instructions,
-        })
+        tenantId: input.orgId,
+        userId: input.actorUserId,
+        context: coachContext,
+        requestedLanguage,
+        instructions,
+        aiContext,
+      })
       : [];
 
     const now = new Date();
@@ -541,6 +649,7 @@ export class IntentService {
         requestedLanguage,
         instructions,
         fields: targetFields,
+        aiContext,
       });
       suggestions.push(
         ...fieldSuggestions.map((suggestion) => ({
@@ -900,6 +1009,23 @@ export class IntentService {
     return lines.join('\n');
   }
 
+  private buildIntentL2Context(sourceTextRaw?: string | null): string | null {
+    const trimmed = this.normalizeOptionalText(sourceTextRaw);
+    if (!trimmed) return null;
+    const capped =
+      trimmed.length > MAX_L2_SOURCE_CHARS
+        ? `${trimmed.slice(0, MAX_L2_SOURCE_CHARS)}...`
+        : trimmed;
+    return `Confidential source text (L2):\n${capped}`;
+  }
+
+  private combineCoachContext(l1Context?: string | null, l2Context?: string | null): string | null {
+    if (l1Context && l2Context) {
+      return `${l1Context}\n\n${l2Context}`;
+    }
+    return l1Context ?? l2Context ?? null;
+  }
+
   private normalizeCoachFields(fields?: string[] | null): IntentCoachField[] {
     if (!fields || fields.length === 0) {
       return [];
@@ -932,6 +1058,13 @@ export class IntentService {
       }
     }
     return normalized.length ? normalized : [...COACH_TASKS_DEFAULT];
+  }
+
+  private normalizeRequestedDataLevel(value?: string | null): 'L1' | 'L2' {
+    if (value && value.toUpperCase() === 'L2') {
+      return 'L2';
+    }
+    return 'L1';
   }
 
   private async ensureAiPolicyEnabled(orgId: string) {
@@ -1212,6 +1345,7 @@ export class IntentService {
     context: string;
     requestedLanguage: string;
     instructions?: string | null;
+    aiContext: CoachAiContext;
   }): Promise<string[]> {
     const instructionLine = input.instructions
       ? `User instructions: ${input.instructions}`
@@ -1231,6 +1365,7 @@ export class IntentService {
       prompt,
       context,
       requestedLanguage: input.requestedLanguage,
+      aiContext: input.aiContext,
     });
 
     const normalized = bullets
@@ -1255,6 +1390,7 @@ export class IntentService {
     requestedLanguage: string;
     instructions?: string | null;
     fields: IntentCoachField[];
+    aiContext: CoachAiContext;
   }): Promise<DraftFieldSuggestion[]> {
     const fields = input.fields.length ? input.fields : [...INTENT_COACH_FIELDS];
     const instructionLine = input.instructions
@@ -1279,6 +1415,7 @@ export class IntentService {
       prompt,
       context,
       requestedLanguage: input.requestedLanguage,
+      aiContext: input.aiContext,
     });
 
     const items = Array.isArray((data as any)?.items) ? ((data as any).items as any[]) : [];
@@ -1338,6 +1475,7 @@ export class IntentService {
     prompt: string;
     context: string;
     requestedLanguage: string;
+    aiContext: CoachAiContext;
   }): Promise<string[]> {
     const messages: AiGatewayMessage[] = [
       {
@@ -1355,10 +1493,12 @@ export class IntentService {
     const response = await this.aiGateway.generateText({
       tenantId: input.tenantId,
       userId: input.userId ?? null,
+      intentId: input.aiContext.intentId,
       useCase: input.useCase,
       messages,
-      inputClass: 'L1',
-      containsL2: false,
+      inputClass: input.aiContext.inputClass,
+      containsL2: input.aiContext.containsL2,
+      requestedDataLevel: input.aiContext.requestedDataLevel,
       maxOutputTokens: 512,
       temperature: 0.3,
     });
@@ -1378,6 +1518,7 @@ export class IntentService {
     prompt: string;
     context: string;
     requestedLanguage: string;
+    aiContext: CoachAiContext;
   }): Promise<unknown> {
     const messages: AiGatewayMessage[] = [
       {
@@ -1395,10 +1536,12 @@ export class IntentService {
     const response = await this.aiGateway.generateText({
       tenantId: input.tenantId,
       userId: input.userId ?? null,
+      intentId: input.aiContext.intentId,
       useCase: input.useCase,
       messages,
-      inputClass: 'L1',
-      containsL2: false,
+      inputClass: input.aiContext.inputClass,
+      containsL2: input.aiContext.containsL2,
+      requestedDataLevel: input.aiContext.requestedDataLevel,
       maxOutputTokens: 700,
       temperature: 0.2,
     });

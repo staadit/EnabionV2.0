@@ -222,7 +222,10 @@ async function streamToBuffer(stream: NodeJS.ReadableStream): Promise<Buffer> {
 }
 
 async function run() {
-  const tmpRoot = path.resolve(process.cwd(), 'tmp', 'blobstore-int');
+  const baseRoot = process.env.BLOBSTORE_TEST_ROOT
+    ? path.resolve(process.env.BLOBSTORE_TEST_ROOT)
+    : path.resolve(process.cwd(), 'tmp');
+  const tmpRoot = path.resolve(baseRoot, 'blobstore-int');
   await fs.promises.rm(tmpRoot, { recursive: true, force: true });
   const prisma = new MockPrismaService();
   prisma.intents.push(

@@ -210,11 +210,21 @@ class StubAiGatewayService {
   }
 }
 
+class StubAiAccessService {
+  async resolveAiDataAccess() {
+    return { allowL2: true };
+  }
+  async ensureToggleAllowed() {
+    return;
+  }
+}
+
 async function testCreate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
 
@@ -254,7 +264,8 @@ async function testPasteCreate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   prisma.users = [{ id: 'user-2', email: 'owner2@example.com' }];
 
@@ -289,7 +300,8 @@ async function testValidation() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
   const controller = new IntentController(service);
 
   const req = {
@@ -331,7 +343,8 @@ async function testListFilters() {
   ];
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   const intentA = await service.createIntent({
     orgId: 'org-1',
@@ -504,7 +517,8 @@ async function testStageUpdate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any);
+  const aiAccess = new StubAiAccessService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
 
   prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
 

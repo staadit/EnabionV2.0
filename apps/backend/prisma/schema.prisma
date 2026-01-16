@@ -47,6 +47,7 @@ model User {
   ndaAcceptances NdaAcceptance[] @relation("NdaAcceptanceByUser")
   createdShareLinks IntentShareLink[] @relation("ShareLinkCreatedBy")
   revokedShareLinks IntentShareLink[] @relation("ShareLinkRevokedBy")
+  aiAccessIntents Intent[] @relation("IntentAiAllowL2SetBy")
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
   createdAt DateTime @default(now())
 }
@@ -367,6 +368,9 @@ model Intent {
   sourceTextRaw         String?
   sourceTextSha256      String?              @db.Char(64)
   sourceTextLength      Int?
+  aiAllowL2             Boolean             @default(false)
+  aiAllowL2SetAt         DateTime?
+  aiAllowL2SetByUserId   String?
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
   lastActivityAt       DateTime             @default(now())
@@ -374,6 +378,7 @@ model Intent {
   org            Organization @relation(fields: [orgId], references: [id])
   createdByUser  User         @relation("IntentCreatedBy", fields: [createdByUserId], references: [id])
   owner          User?        @relation("IntentOwner", fields: [ownerUserId], references: [id])
+  aiAllowL2SetByUser User?     @relation("IntentAiAllowL2SetBy", fields: [aiAllowL2SetByUserId], references: [id])
   shareLinks     IntentShareLink[]
   coachRuns      IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]

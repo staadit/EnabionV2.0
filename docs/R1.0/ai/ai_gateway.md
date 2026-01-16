@@ -42,17 +42,19 @@ Values must match the AI_Gateway_Avatars_R1.0_Spec.md task_type list:
 ## Calling the gateway
 
 Use AiGatewayService.generateText() from backend code. The request must include
-inputClass or containsL2 to enforce the L2 boundary.
+inputClass plus requestedDataLevel to enforce the L1/L2 boundary.
 
 ```ts
 const result = await aiGateway.generateText({
   tenantId: orgId,
   userId,
+  intentId,
   useCase: 'intent_gap_detection',
   messages: [
     { role: 'system', content: 'Identify missing fields.' },
     { role: 'user', content: 'Goal: Launch R1.0' },
   ],
+  requestedDataLevel: 'L1',
   inputClass: 'L1',
   containsL2: false,
 });
@@ -61,9 +63,12 @@ const result = await aiGateway.generateText({
 ## Guardrails
 
 - Only models in AI_GATEWAY_ALLOWED_MODELS are accepted.
-- inputClass=L2 or containsL2=true is blocked.
+- inputClass and containsL2 must match the actual data classification.
+- requestedDataLevel=L1 blocks any L2 content in the request.
+- requestedDataLevel=L2 requires NDA + explicit intent-level toggle (backend-enforced).
 - Requests over AI_GATEWAY_MAX_INPUT_CHARS are rejected.
 - Rate limits are enforced per tenant/user/useCase.
+- PII is redacted before sending to the provider and after receiving the response.
 
 ## Events
 
@@ -74,5 +79,6 @@ The gateway emits:
 - AI_GATEWAY_FAILED
 - AI_GATEWAY_BLOCKED_POLICY
 - AI_GATEWAY_RATE_LIMITED
+- AI_L2_USED
 
 Payloads include metadata only (no prompt/body).

@@ -178,6 +178,12 @@ function expectInvalid() {
 }
 
 cases.forEach((c) => expectValid(c.type, c.payload));
+expectValid(EVENT_TYPES.INTENT_AI_ACCESS_UPDATED, {
+  payloadVersion: 1,
+  intentId: 'intent_test',
+  allowL2: true,
+  previousAllowL2: false,
+});
 expectValid(
   EVENT_TYPES.USER_SIGNED_UP,
   {
@@ -230,6 +236,31 @@ expectValid(
     messageId: 'msg1',
   },
   { subjectType: 'USER', subjectId: 'user_test' },
+);
+expectValid(
+  EVENT_TYPES.AI_L2_USED,
+  {
+    payloadVersion: 1,
+    requestId: 'req_test',
+    tenantId: 'org_test',
+    userId: 'user_test',
+    intentId: 'intent_test',
+    useCase: 'summary_internal',
+    model: 'gpt-4o-mini',
+    effectiveDataLevel: 'L2',
+    requestedDataLevel: 'L2',
+    redactionApplied: true,
+    redactionVersion: 'v1',
+    findingsSummary: {
+      email: 1,
+      phone: 0,
+      iban: 0,
+      pesel: 0,
+      nip: 0,
+      ssn: 0,
+    },
+  },
+  { subjectType: 'AI_GATEWAY', subjectId: 'req_test', correlationId: 'req_test' },
 );
 expectValid(
   EVENT_TYPES.EMAIL_FAILED,

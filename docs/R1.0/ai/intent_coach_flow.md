@@ -22,6 +22,7 @@ Request body (optional):
 ```json
 {
   "requestedLanguage": "EN",
+  "requestedDataLevel": "L1",
   "tasks": ["intent_gap_detection", "clarifying_questions", "summary_internal"],
   "instructions": "Focus on KPIs and scope only.",
   "focusFields": ["kpi", "scope"],
@@ -140,11 +141,13 @@ Summary history is stored in IntentCoachRun:
 
 ## Data boundary
 
-R1.0 uses L1 fields only. Any L2 content (raw pasted text) is blocked by the AI
-Gateway and must not be sent to the provider.
+R1.0 defaults to L1-only. L2 can be requested explicitly by setting
+`requestedDataLevel: "L2"`, but only if Mutual NDA is accepted and the intent
+toggle is enabled. If L2 is requested without access, the API returns 403.
 
 If the Intent does not have enough L1 data, the API returns 422 with
-`INSUFFICIENT_L1_DATA` and does not call the AI Gateway.
+`INSUFFICIENT_L1_DATA` and does not call the AI Gateway (unless L2 is both
+requested and available).
 
 Feedback comments are L1-only, capped at 280 characters, and stripped if they
 look like names/emails/phones.
