@@ -2,14 +2,15 @@
 
 ## Overview
 
-Intent Coach generates a summary block plus field-level suggestions for an Intent
-using L1 fields only. It supports accept/reject decisions and emits
+Intent Coach generates a summary block plus suggestions for an Intent using L1
+fields only. Suggestions include rewrites, missing information, clarifying
+questions, and risk flags. It supports accept/reject decisions and emits
 AVATAR_SUGGESTION_* events.
 
 The UI is structured into three blocks:
 
 1) Summary and observations (stored in history, no accept/reject).
-2) Field suggestions (accept/reject per field).
+2) Suggestions (rewrites, missing info, questions, risks; accept/reject per item).
 3) Follow-up instructions + field focus for a new run.
 
 ## Endpoints
@@ -21,8 +22,11 @@ Request body (optional):
 ```json
 {
   "requestedLanguage": "EN",
+  "tasks": ["intent_gap_detection", "clarifying_questions", "summary_internal"],
   "instructions": "Focus on KPIs and scope only.",
-  "focusFields": ["kpi", "scope"]
+  "focusFields": ["kpi", "scope"],
+  "mode": "suggestion_only",
+  "channel": "ui"
 }
 ```
 
@@ -39,14 +43,13 @@ Response:
   "suggestions": [
     {
       "id": "uuid",
-      "kind": "rewrite",
-      "title": "KPIs",
-      "l1Text": "Add KPI targets with numeric thresholds.",
-      "evidenceRef": "ai:intent_structuring",
+      "kind": "missing_info",
+      "title": "Missing KPIs",
+      "l1Text": "Add success metrics or measurable outcomes.",
+      "evidenceRef": "field:kpi empty",
       "status": "ISSUED",
-      "actionable": true,
-      "targetField": "kpi",
-      "proposedPatch": { "fields": { "kpi": "..." } }
+      "actionable": false,
+      "targetField": "kpi"
     }
   ]
 }
@@ -105,9 +108,9 @@ Response:
 
 Suggestions are stored in the AvatarSuggestion table:
 
-- kind: rewrite
-- targetField: goal | context | scope | kpi | risks
-- actionable: true when a patch exists, false for "Jest ok, brak zmian"
+- kind: missing_info | question | risk | rewrite | summary
+- targetField: goal | context | scope | kpi | risks | deadlineAt | client (optional)
+- actionable: true when a patch exists, false for non-applying suggestions
 - l1Text: short, safe summary of the suggestion
 - evidenceRef: safe reference (field name or heuristic)
 - proposedPatch: optional JSON with fields to apply
@@ -123,6 +126,9 @@ Summary history is stored in IntentCoachRun:
 
 R1.0 uses L1 fields only. Any L2 content (raw pasted text) is blocked by the AI
 Gateway and must not be sent to the provider.
+
+If the Intent does not have enough L1 data, the API returns 422 with
+`INSUFFICIENT_L1_DATA` and does not call the AI Gateway.
 
 ## Events
 

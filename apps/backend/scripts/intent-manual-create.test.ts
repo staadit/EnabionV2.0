@@ -45,6 +45,20 @@ function matchesWhere(intent: any, where: any): boolean {
   }
   if (where.orgId && intent.orgId !== where.orgId) return false;
   if (where.ownerUserId && intent.ownerUserId !== where.ownerUserId) return false;
+  if (where.intentName) {
+    if (typeof where.intentName === 'string') {
+      if (intent.intentName !== where.intentName) return false;
+    } else if (where.intentName.equals || where.intentName.contains) {
+      if (where.intentName.equals) {
+        const expected = String(where.intentName.equals).toLowerCase();
+        const actual = String(intent.intentName ?? '').toLowerCase();
+        if (actual !== expected) return false;
+      }
+      if (where.intentName.contains) {
+        if (!includesText(intent.intentName, where.intentName.contains)) return false;
+      }
+    }
+  }
   if (where.language && intent.language !== where.language) return false;
   if (where.stage) {
     if (where.stage.in && !where.stage.in.includes(intent.stage)) return false;
@@ -186,16 +200,28 @@ class MockPrismaService {
   };
 }
 
+class StubAiGatewayService {
+  async generateText() {
+    return {
+      text: 'ok',
+      model: 'stub',
+      requestId: 'req-stub',
+    };
+  }
+}
+
 async function testCreate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
-  const service = new IntentService(prisma as any, events);
+  const aiGateway = new StubAiGatewayService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any);
 
   prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
 
   const intent = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-1',
+    intentName: 'intent-alpha',
     goal: 'Launch R1.0',
     context: 'Pilot context',
     scope: 'Scope notes',
@@ -219,7 +245,7 @@ async function testCreate() {
 
   const payload = event.payload as any;
   assert(payload.intentId === intent.id, 'Event payload should include intentId');
-  assert(payload.title === intent.goal, 'Event payload title should match goal');
+  assert(payload.title === intent.intentName, 'Event payload title should match intentName');
   assert(payload.goal === intent.goal, 'Event payload should include goal');
   assert(payload.source === 'manual', 'Event payload source should be manual');
 }
@@ -227,7 +253,8 @@ async function testCreate() {
 async function testPasteCreate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
-  const service = new IntentService(prisma as any, events);
+  const aiGateway = new StubAiGatewayService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any);
 
   prisma.users = [{ id: 'user-2', email: 'owner2@example.com' }];
 
@@ -237,6 +264,7 @@ async function testPasteCreate() {
   const intent = await service.createIntent({
     orgId: 'org-2',
     actorUserId: 'user-2',
+    intentName: 'intent-rfp',
     sourceTextRaw: raw,
     title: 'RFP Pilot',
   });
@@ -250,7 +278,7 @@ async function testPasteCreate() {
   assert(prisma.events.length === 1, 'INTENT_CREATED event should be emitted');
 
   const payload = prisma.events[0].payload as any;
-  assert(payload.title === 'RFP Pilot', 'Event payload should include title');
+  assert(payload.title === intent.intentName, 'Event payload should include intentName');
   assert(payload.source === 'paste', 'Event payload source should be paste');
   assert(payload.sourceText?.sha256 === sha, 'Event payload should include source text hash');
   assert(payload.sourceText?.length === raw.length, 'Event payload should include source text length');
@@ -260,7 +288,8 @@ async function testPasteCreate() {
 async function testValidation() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
-  const service = new IntentService(prisma as any, events);
+  const aiGateway = new StubAiGatewayService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any);
   const controller = new IntentController(service);
 
   const req = {
@@ -274,7 +303,7 @@ async function testValidation() {
 
   let threw = false;
   try {
-    await controller.createIntent(req, { goal: '  ' } as any);
+    await controller.createIntent(req, { intentName: 'intent-blank', goal: '  ' } as any);
   } catch (err) {
     if (err instanceof BadRequestException) {
       threw = true;
@@ -285,7 +314,7 @@ async function testValidation() {
   threw = false;
   const tooLong = 'a'.repeat(100001);
   try {
-    await controller.createIntent(req, { sourceTextRaw: tooLong } as any);
+    await controller.createIntent(req, { intentName: 'intent-long', sourceTextRaw: tooLong } as any);
   } catch (err) {
     if (err instanceof BadRequestException) {
       threw = true;
@@ -301,11 +330,13 @@ async function testListFilters() {
     { id: 'user-2', email: 'owner2@example.com' },
   ];
   const events = new EventService(prisma as any);
-  const service = new IntentService(prisma as any, events);
+  const aiGateway = new StubAiGatewayService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any);
 
   const intentA = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-1',
+    intentName: 'intent-alpha',
     goal: 'Alpha launch',
     client: 'Acme',
     language: 'EN',
@@ -313,6 +344,7 @@ async function testListFilters() {
   const intentB = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-2',
+    intentName: 'intent-beta',
     goal: 'Beta release',
     client: 'Bravo',
     language: 'PL',
@@ -320,6 +352,7 @@ async function testListFilters() {
   const intentC = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-1',
+    intentName: 'intent-gamma',
     goal: 'Gamma rollout',
     client: 'Contoso',
     language: 'EN',
@@ -470,13 +503,15 @@ async function testRolesGuard() {
 async function testStageUpdate() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
-  const service = new IntentService(prisma as any, events);
+  const aiGateway = new StubAiGatewayService();
+  const service = new IntentService(prisma as any, events as any, aiGateway as any);
 
   prisma.users = [{ id: 'user-1', email: 'owner@example.com' }];
 
   const intent = await service.createIntent({
     orgId: 'org-1',
     actorUserId: 'user-1',
+    intentName: 'intent-stage',
     goal: 'Pipeline update',
   });
 
@@ -490,12 +525,12 @@ async function testStageUpdate() {
   });
 
   assert(updated.stage === 'MATCH', 'Pipeline stage should update to MATCH');
-  assert(prisma.events.length === 2, 'INTENT_UPDATED event should be emitted');
+  assert(prisma.events.length === 2, 'Stage change event should be emitted');
 
   const updateEvent = prisma.events[1];
   assert(
-    updateEvent.type === EVENT_TYPES.INTENT_UPDATED,
-    'Update event type should be INTENT_UPDATED',
+    updateEvent.type === EVENT_TYPES.INTENT_PIPELINE_STAGE_CHANGED,
+    'Update event type should be INTENT_PIPELINE_STAGE_CHANGED',
   );
   assert(
     updateEvent.pipelineStage === 'MATCH',
@@ -506,14 +541,8 @@ async function testStageUpdate() {
     'Lifecycle step should map to MATCH_ALIGN',
   );
   const payload = updateEvent.payload as any;
-  assert(
-    payload.changedFields?.includes('pipelineStage'),
-    'Update payload should include pipelineStage in changedFields',
-  );
-  assert(
-    payload.changeSummary?.includes('Pipeline stage changed'),
-    'Update payload should include changeSummary',
-  );
+  assert(payload.fromStage === 'NEW', 'Update payload should include fromStage');
+  assert(payload.toStage === 'MATCH', 'Update payload should include toStage');
 
   const after = prisma.intents.find((row) => row.id === intent.id)!.lastActivityAt;
   assert(

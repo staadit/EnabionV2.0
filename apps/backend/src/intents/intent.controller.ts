@@ -54,13 +54,15 @@ const suggestIntentCoachSchema = z
     tasks: z.array(z.string()).optional(),
     instructions: z.string().optional().nullable(),
     focusFields: z.array(z.string()).optional().nullable(),
-    mode: z.enum(['initial', 'refine']).optional(),
+    mode: z.enum(['initial', 'refine', 'suggestion_only']).optional(),
+    channel: z.enum(['ui', 'api']).optional(),
   })
   .default({});
 
 const decideSuggestionSchema = z
   .object({
     reasonCode: z.string().optional().nullable(),
+    channel: z.enum(['ui', 'api']).optional(),
   })
   .default({});
 
@@ -139,6 +141,7 @@ export class IntentController {
       instructions: this.normalizeOptionalText(parsed.instructions),
       focusFields: parsed.focusFields ?? null,
       mode: parsed.mode,
+      channel: parsed.channel,
     });
   }
 
@@ -164,12 +167,13 @@ export class IntentController {
     @Body() body: unknown,
   ) {
     const user = this.requireUser(req);
-    this.parseBody(decideSuggestionSchema, body);
+    const parsed = this.parseBody(decideSuggestionSchema, body);
     return this.intentService.acceptIntentCoachSuggestion({
       orgId: user.orgId,
       intentId,
       suggestionId,
       actorUserId: user.id,
+      channel: parsed.channel,
     });
   }
 
@@ -189,6 +193,7 @@ export class IntentController {
       suggestionId,
       actorUserId: user.id,
       reasonCode: this.normalizeOptionalText(parsed.reasonCode) ?? undefined,
+      channel: parsed.channel,
     });
   }
 

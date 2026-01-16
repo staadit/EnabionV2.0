@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 import {
   BadRequestException,
+  ForbiddenException,
   HttpException,
   HttpStatus,
   Injectable,
@@ -13,6 +14,7 @@ import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
 import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
 import type { AiGatewayMessage } from '../ai-gateway/ai-gateway.types';
+import { normalizeUseCase } from '../ai-gateway/use-cases';
 import { IntentStage } from './intent.types';
 import { buildIntentShortId, normalizeIntentName } from './intent.utils';
 
@@ -20,12 +22,37 @@ const INTENT_COACH_FIELDS = ['goal', 'context', 'scope', 'kpi', 'risks'] as cons
 
 type IntentCoachField = (typeof INTENT_COACH_FIELDS)[number];
 
+const COACH_TASKS_DEFAULT = [
+  'intent_structuring',
+  'intent_gap_detection',
+  'clarifying_questions',
+  'summary_internal',
+] as const;
+
+type CoachTask = (typeof COACH_TASKS_DEFAULT)[number];
+
+const COACH_TASKS_SUPPORTED = new Set<string>(COACH_TASKS_DEFAULT as readonly string[]);
+
+type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
+
 const INTENT_COACH_FIELD_LABELS: Record<IntentCoachField, string> = {
   goal: 'Goal',
   context: 'Context',
   scope: 'Scope',
   kpi: 'KPIs',
   risks: 'Risks',
+};
+
+type CoachSuggestionDraft = {
+  kind: CoachSuggestionKind;
+  title: string;
+  l1Text: string;
+  actionable: boolean;
+  evidenceRef?: string;
+  proposedPatch?: {
+    fields: Record<string, string | null>;
+  };
+  targetField?: string | null;
 };
 
 type DraftFieldSuggestion = {
@@ -37,6 +64,13 @@ type DraftFieldSuggestion = {
   proposedPatch?: {
     fields: Record<string, string | null>;
   };
+};
+
+type MissingInfoRule = {
+  field: string;
+  label: string;
+  suggestion: string;
+  question: string;
 };
 
 export type CreateIntentInput = {
@@ -101,7 +135,8 @@ export type SuggestIntentCoachInput = {
   tasks?: string[];
   instructions?: string | null;
   focusFields?: string[] | null;
-  mode?: 'initial' | 'refine';
+  mode?: 'initial' | 'refine' | 'suggestion_only';
+  channel?: 'ui' | 'api';
 };
 
 export type DecideIntentCoachSuggestionInput = {
@@ -110,6 +145,7 @@ export type DecideIntentCoachSuggestionInput = {
   suggestionId: string;
   actorUserId?: string;
   reasonCode?: string;
+  channel?: 'ui' | 'api';
 };
 
 export type UpdatePipelineStageInput = {
@@ -388,9 +424,14 @@ export class IntentService {
       throw new NotFoundException('Intent not found');
     }
 
+    await this.ensureAiPolicyEnabled(input.orgId);
+    if (!this.hasSufficientCoachData(intent)) {
+      throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
+    }
+
     const messages = this.buildIntentCoachMessages(intent);
     if (!messages) {
-      throw new BadRequestException('INSUFFICIENT_L1_DATA');
+      throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
     }
 
     const response = await this.aiGateway.generateText({
@@ -419,10 +460,12 @@ export class IntentService {
         intentName: true,
         goal: true,
         language: true,
+        client: true,
         context: true,
         scope: true,
         kpi: true,
         risks: true,
+        deadlineAt: true,
         stage: true,
       },
     });
@@ -430,6 +473,10 @@ export class IntentService {
       throw new NotFoundException('Intent not found');
     }
 
+    await this.ensureAiPolicyEnabled(input.orgId);
+    if (!this.hasSufficientCoachData(intent)) {
+      throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
+    }
     const coachContext = this.buildIntentCoachContext(intent);
     if (!coachContext) {
       throw new HttpException('INSUFFICIENT_L1_DATA', HttpStatus.UNPROCESSABLE_ENTITY);
@@ -440,13 +487,23 @@ export class IntentService {
     const instructions = this.normalizeOptionalText(input.instructions);
     const focusFields = this.normalizeCoachFields(input.focusFields);
     const targetFields = focusFields.length ? focusFields : [...INTENT_COACH_FIELDS];
-    const summaryBlock = await this.generateSummaryBlock({
-      tenantId: input.orgId,
-      userId: input.actorUserId,
-      context: coachContext,
-      requestedLanguage,
-      instructions,
-    });
+    const focusFieldSet = focusFields.length ? new Set<string>(focusFields) : null;
+    const tasks = this.normalizeCoachTasks(input.tasks);
+    const includeSummary = tasks.includes('summary_internal');
+    const includeStructuring = tasks.includes('intent_structuring');
+    const includeGapDetection = tasks.includes('intent_gap_detection');
+    const includeQuestions = tasks.includes('clarifying_questions');
+    const channel = input.channel ?? 'ui';
+
+    const summaryBlock = includeSummary
+      ? await this.generateSummaryBlock({
+          tenantId: input.orgId,
+          userId: input.actorUserId,
+          context: coachContext,
+          requestedLanguage,
+          instructions,
+        })
+      : [];
 
     const now = new Date();
     await this.prisma.intentCoachRun.create({
@@ -462,40 +519,65 @@ export class IntentService {
       },
     });
 
-    const fieldSuggestions = await this.generateFieldSuggestions({
-      intent,
-      tenantId: input.orgId,
-      userId: input.actorUserId,
-      context: coachContext,
-      requestedLanguage,
-      instructions,
-      fields: targetFields,
-    });
+    const suggestions: CoachSuggestionDraft[] = [];
+    if (includeStructuring) {
+      const fieldSuggestions = await this.generateFieldSuggestions({
+        intent,
+        tenantId: input.orgId,
+        userId: input.actorUserId,
+        context: coachContext,
+        requestedLanguage,
+        instructions,
+        fields: targetFields,
+      });
+      suggestions.push(
+        ...fieldSuggestions.map((suggestion) => ({
+          kind: 'rewrite' as const,
+          title: suggestion.title,
+          l1Text: suggestion.l1Text,
+          actionable: suggestion.actionable,
+          evidenceRef: suggestion.evidenceRef,
+          proposedPatch: suggestion.proposedPatch,
+          targetField: suggestion.field,
+        })),
+      );
+    }
+    if (includeGapDetection) {
+      suggestions.push(...this.generateMissingInfoSuggestions(intent, focusFieldSet));
+      suggestions.push(...this.generateRiskSuggestions(intent, focusFieldSet));
+    }
+    if (includeQuestions) {
+      suggestions.push(...this.generateQuestionSuggestions(intent, focusFieldSet));
+    }
 
-    const created = await this.prisma.$transaction(
-      fieldSuggestions.map((suggestion) =>
-        this.prisma.avatarSuggestion.create({
-          data: {
-            id: randomUUID(),
-            orgId: input.orgId,
-            intentId: intent.id,
-            coachRunId,
-            avatarType: 'INTENT_COACH',
-            kind: 'rewrite',
-            targetField: suggestion.field,
-            title: suggestion.title,
-            l1Text: suggestion.l1Text,
-            evidenceRef: suggestion.evidenceRef ?? null,
-            proposedPatch: suggestion.proposedPatch ?? undefined,
-            status: 'ISSUED',
-            actionable: suggestion.actionable,
-            createdAt: now,
-          },
-        }),
-      ),
-    );
+    const created = suggestions.length
+      ? await this.prisma.$transaction(
+          suggestions.map((suggestion) =>
+            this.prisma.avatarSuggestion.create({
+              data: {
+                id: randomUUID(),
+                orgId: input.orgId,
+                intentId: intent.id,
+                coachRunId,
+                avatarType: 'INTENT_COACH',
+                kind: suggestion.kind,
+                targetField: suggestion.targetField ?? null,
+                title: suggestion.title,
+                l1Text: suggestion.l1Text,
+                evidenceRef: suggestion.evidenceRef ?? null,
+                proposedPatch: suggestion.proposedPatch ?? undefined,
+                status: 'ISSUED',
+                actionable: suggestion.actionable,
+                createdAt: now,
+              },
+            }),
+          ),
+        )
+      : [];
 
     for (const suggestion of created) {
+      const l1Text = this.normalizeOptionalText(suggestion.l1Text);
+      const suggestionRef = this.normalizeOptionalText(suggestion.evidenceRef);
       await this.events.emitEvent({
         type: EVENT_TYPES.AVATAR_SUGGESTION_ISSUED,
         occurredAt: now,
@@ -506,7 +588,7 @@ export class IntentService {
         subjectId: intent.id,
         lifecycleStep: this.mapLifecycleStep(intent.stage as IntentStage),
         pipelineStage: intent.stage as IntentStage,
-        channel: 'ui',
+        channel,
         correlationId: coachRunId,
         payload: {
           payloadVersion: 1,
@@ -514,8 +596,8 @@ export class IntentService {
           avatarType: 'INTENT_COACH',
           suggestionId: suggestion.id,
           suggestionKind: suggestion.kind,
-          suggestionL1Text: suggestion.l1Text ?? undefined,
-          suggestionRef: suggestion.evidenceRef ?? undefined,
+          suggestionL1Text: l1Text ?? undefined,
+          suggestionRef: suggestionRef ?? undefined,
         },
       });
     }
@@ -570,16 +652,17 @@ export class IntentService {
     if (suggestion.status !== 'ISSUED') {
       return { suggestion, appliedFields: [] };
     }
-    if (!suggestion.actionable) {
-      throw new HttpException('SUGGESTION_NOT_ACTIONABLE', HttpStatus.UNPROCESSABLE_ENTITY);
-    }
 
-    const appliedFields = await this.applySuggestionPatch({
-      orgId: input.orgId,
-      intentId: input.intentId,
-      actorUserId: input.actorUserId,
-      proposedPatch: suggestion.proposedPatch,
-    });
+    const channel = input.channel ?? 'ui';
+    const appliedFields = suggestion.actionable
+      ? await this.applySuggestionPatch({
+          orgId: input.orgId,
+          intentId: input.intentId,
+          actorUserId: input.actorUserId,
+          proposedPatch: suggestion.proposedPatch,
+          channel,
+        })
+      : [];
 
     const now = new Date();
     const updated = await this.prisma.avatarSuggestion.update({
@@ -591,6 +674,7 @@ export class IntentService {
       },
     });
 
+    const correlationId = suggestion.coachRunId ?? ulid();
     await this.events.emitEvent({
       type: EVENT_TYPES.AVATAR_SUGGESTION_ACCEPTED,
       occurredAt: now,
@@ -601,8 +685,8 @@ export class IntentService {
       subjectId: input.intentId,
       lifecycleStep: this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW'),
       pipelineStage: (suggestion.intent?.stage as IntentStage) ?? 'NEW',
-      channel: 'ui',
-      correlationId: ulid(),
+      channel,
+      correlationId,
       payload: {
         payloadVersion: 1,
         suggestionId: suggestion.id,
@@ -637,6 +721,8 @@ export class IntentService {
       },
     });
 
+    const channel = input.channel ?? 'ui';
+    const correlationId = suggestion.coachRunId ?? ulid();
     await this.events.emitEvent({
       type: EVENT_TYPES.AVATAR_SUGGESTION_REJECTED,
       occurredAt: now,
@@ -647,8 +733,8 @@ export class IntentService {
       subjectId: input.intentId,
       lifecycleStep: this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW'),
       pipelineStage: (suggestion.intent?.stage as IntentStage) ?? 'NEW',
-      channel: 'ui',
-      correlationId: ulid(),
+      channel,
+      correlationId,
       payload: {
         payloadVersion: 1,
         suggestionId: suggestion.id,
@@ -664,10 +750,12 @@ export class IntentService {
     intentName: string;
     goal: string;
     language?: string | null;
+    client?: string | null;
     context?: string | null;
     scope?: string | null;
     kpi?: string | null;
     risks?: string | null;
+    deadlineAt?: Date | null;
     stage?: string | null;
   }): string | null {
     const lines: string[] = [];
@@ -682,10 +770,14 @@ export class IntentService {
     addLine('Intent name', intent.intentName);
     addLine('Goal', intent.goal);
     addLine('Language', intent.language);
+    addLine('Client', intent.client);
     addLine('Context', intent.context);
     addLine('Scope', intent.scope);
     addLine('KPIs', intent.kpi);
     addLine('Risks', intent.risks);
+    if (intent.deadlineAt) {
+      lines.push(`Deadline: ${intent.deadlineAt.toISOString()}`);
+    }
     if (intent.stage) {
       lines.push(`Stage: ${intent.stage}`);
     }
@@ -706,6 +798,300 @@ export class IntentService {
     const allowed = new Set(INTENT_COACH_FIELDS);
     const selected = normalized.filter((field) => allowed.has(field as IntentCoachField));
     return INTENT_COACH_FIELDS.filter((field) => selected.includes(field));
+  }
+
+  private normalizeCoachTasks(tasks?: string[] | null): CoachTask[] {
+    if (!tasks || tasks.length === 0) {
+      return [...COACH_TASKS_DEFAULT];
+    }
+    const normalized: CoachTask[] = [];
+    for (const rawTask of tasks) {
+      let useCase: string;
+      try {
+        useCase = normalizeUseCase(rawTask);
+      } catch {
+        throw new BadRequestException('COACH_TASK_INVALID');
+      }
+      if (!COACH_TASKS_SUPPORTED.has(useCase)) {
+        throw new BadRequestException('COACH_TASK_UNSUPPORTED');
+      }
+      if (!normalized.includes(useCase as CoachTask)) {
+        normalized.push(useCase as CoachTask);
+      }
+    }
+    return normalized.length ? normalized : [...COACH_TASKS_DEFAULT];
+  }
+
+  private async ensureAiPolicyEnabled(orgId: string) {
+    const org = await this.prisma.organization.findUnique({
+      where: { id: orgId },
+      select: { policyAiEnabled: true },
+    });
+    if (!org || !org.policyAiEnabled) {
+      throw new ForbiddenException('AI_POLICY_DISABLED');
+    }
+  }
+
+  private hasSufficientCoachData(intent: {
+    goal: string;
+    client?: string | null;
+    context?: string | null;
+    scope?: string | null;
+    kpi?: string | null;
+    risks?: string | null;
+    deadlineAt?: Date | null;
+  }): boolean {
+    const textFields = [
+      intent.goal,
+      intent.client,
+      intent.context,
+      intent.scope,
+      intent.kpi,
+      intent.risks,
+    ];
+    let filled = 0;
+    let totalChars = 0;
+    for (const value of textFields) {
+      const trimmed = this.normalizeOptionalText(value);
+      if (trimmed) {
+        filled += 1;
+        totalChars += trimmed.length;
+      }
+    }
+    if (intent.deadlineAt) {
+      filled += 1;
+    }
+    return filled >= 2 || totalChars >= 120;
+  }
+
+  private shouldIncludeForFocus(
+    targetField: string | null | undefined,
+    focusFields?: Set<string> | null,
+  ): boolean {
+    if (!focusFields || focusFields.size === 0) {
+      return true;
+    }
+    if (!targetField) {
+      return false;
+    }
+    return focusFields.has(targetField);
+  }
+
+  private generateMissingInfoSuggestions(
+    intent: {
+      client?: string | null;
+      context?: string | null;
+      scope?: string | null;
+      kpi?: string | null;
+      risks?: string | null;
+      deadlineAt?: Date | null;
+    },
+    focusFields?: Set<string> | null,
+  ): CoachSuggestionDraft[] {
+    const rules: MissingInfoRule[] = [];
+    if (!this.normalizeOptionalText(intent.context)) {
+      rules.push({
+        field: 'context',
+        label: 'Context',
+        suggestion: 'Add business background and key constraints.',
+        question: 'What is the business context and background?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.scope)) {
+      rules.push({
+        field: 'scope',
+        label: 'Scope',
+        suggestion: 'Add scope boundaries, deliverables, or exclusions.',
+        question: 'What is in scope and what is explicitly out of scope?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.kpi)) {
+      rules.push({
+        field: 'kpi',
+        label: 'KPIs',
+        suggestion: 'Add success metrics or measurable outcomes.',
+        question: 'Which KPIs define success for this intent?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.risks)) {
+      rules.push({
+        field: 'risks',
+        label: 'Risks',
+        suggestion: 'Add known risks or dependencies that could affect delivery.',
+        question: 'What are the known risks or dependencies?',
+      });
+    }
+    if (!intent.deadlineAt) {
+      rules.push({
+        field: 'deadlineAt',
+        label: 'Timeline',
+        suggestion: 'Add a target start date and deadline or timeline window.',
+        question: 'What is the target start date and deadline?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.client)) {
+      rules.push({
+        field: 'client',
+        label: 'Client',
+        suggestion: 'Specify the client or counterpart organization.',
+        question: 'Who is the client or counterpart for this intent?',
+      });
+    }
+
+    return rules
+      .filter((rule) => this.shouldIncludeForFocus(rule.field, focusFields))
+      .map((rule) => ({
+        kind: 'missing_info',
+        title: `Missing ${rule.label}`,
+        l1Text: rule.suggestion,
+        actionable: false,
+        evidenceRef: `field:${rule.field} empty`,
+        targetField: rule.field,
+      }));
+  }
+
+  private generateQuestionSuggestions(
+    intent: {
+      client?: string | null;
+      context?: string | null;
+      scope?: string | null;
+      kpi?: string | null;
+      risks?: string | null;
+      deadlineAt?: Date | null;
+    },
+    focusFields?: Set<string> | null,
+  ): CoachSuggestionDraft[] {
+    const rules: MissingInfoRule[] = [];
+    if (!this.normalizeOptionalText(intent.context)) {
+      rules.push({
+        field: 'context',
+        label: 'Context',
+        suggestion: '',
+        question: 'What is the business context and background?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.scope)) {
+      rules.push({
+        field: 'scope',
+        label: 'Scope',
+        suggestion: '',
+        question: 'What is in scope and what is explicitly out of scope?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.kpi)) {
+      rules.push({
+        field: 'kpi',
+        label: 'KPIs',
+        suggestion: '',
+        question: 'Which KPIs define success for this intent?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.risks)) {
+      rules.push({
+        field: 'risks',
+        label: 'Risks',
+        suggestion: '',
+        question: 'What are the known risks or dependencies?',
+      });
+    }
+    if (!intent.deadlineAt) {
+      rules.push({
+        field: 'deadlineAt',
+        label: 'Timeline',
+        suggestion: '',
+        question: 'What is the target start date and deadline?',
+      });
+    }
+    if (!this.normalizeOptionalText(intent.client)) {
+      rules.push({
+        field: 'client',
+        label: 'Client',
+        suggestion: '',
+        question: 'Who is the client or counterpart for this intent?',
+      });
+    }
+
+    return rules
+      .filter((rule) => this.shouldIncludeForFocus(rule.field, focusFields))
+      .map((rule) => ({
+        kind: 'question',
+        title: `Clarify ${rule.label}`,
+        l1Text: rule.question,
+        actionable: false,
+        evidenceRef: `field:${rule.field} empty`,
+        targetField: rule.field,
+      }));
+  }
+
+  private generateRiskSuggestions(
+    intent: {
+      goal: string;
+      context?: string | null;
+      scope?: string | null;
+      kpi?: string | null;
+      risks?: string | null;
+      deadlineAt?: Date | null;
+    },
+    focusFields?: Set<string> | null,
+  ): CoachSuggestionDraft[] {
+    const suggestions: CoachSuggestionDraft[] = [];
+    const seen = new Set<string>();
+    const addRisk = (suggestion: CoachSuggestionDraft) => {
+      if (seen.has(suggestion.title)) return;
+      if (!this.shouldIncludeForFocus(suggestion.targetField, focusFields)) return;
+      seen.add(suggestion.title);
+      suggestions.push(suggestion);
+    };
+
+    const goal = this.normalizeOptionalText(intent.goal) ?? '';
+    const hasContext = Boolean(this.normalizeOptionalText(intent.context));
+    const hasScope = Boolean(this.normalizeOptionalText(intent.scope));
+    const hasKpi = Boolean(this.normalizeOptionalText(intent.kpi));
+    const hasRisks = Boolean(this.normalizeOptionalText(intent.risks));
+    const hasDeadline = Boolean(intent.deadlineAt);
+
+    if (hasScope && !hasDeadline) {
+      addRisk({
+        kind: 'risk',
+        title: 'Scope without timeline',
+        l1Text: 'Scope is defined but the timeline/deadline is missing.',
+        actionable: false,
+        evidenceRef: 'heuristic:scope_without_deadline',
+        targetField: 'deadlineAt',
+      });
+    }
+    if (hasScope && !hasKpi) {
+      addRisk({
+        kind: 'risk',
+        title: 'Scope without success metrics',
+        l1Text: 'Scope is defined but KPIs are missing, which increases alignment risk.',
+        actionable: false,
+        evidenceRef: 'heuristic:scope_without_kpi',
+        targetField: 'kpi',
+      });
+    }
+    if (!hasRisks && (hasScope || hasContext)) {
+      addRisk({
+        kind: 'risk',
+        title: 'Risks not assessed',
+        l1Text: 'Risks section is empty despite defined scope/context.',
+        actionable: false,
+        evidenceRef: 'field:risks empty',
+        targetField: 'risks',
+      });
+    }
+    if (goal.length > 0 && goal.length < 20 && !hasContext) {
+      addRisk({
+        kind: 'risk',
+        title: 'Very short goal with missing context',
+        l1Text: 'Goal is brief and context is missing, which may reduce clarity.',
+        actionable: false,
+        evidenceRef: 'heuristic:goal_short_context_missing',
+        targetField: 'context',
+      });
+    }
+
+    return suggestions;
   }
 
   private async generateSummaryBlock(input: {
@@ -959,6 +1345,7 @@ export class IntentService {
     intentId: string;
     actorUserId?: string;
     proposedPatch?: Prisma.JsonValue | null;
+    channel?: 'ui' | 'api';
   }): Promise<string[]> {
     const patch = this.normalizeProposedPatch(input.proposedPatch);
     if (!patch) return [];
@@ -1022,7 +1409,7 @@ export class IntentService {
       subjectId: intent.id,
       lifecycleStep: this.mapLifecycleStep(intent.stage as IntentStage),
       pipelineStage: intent.stage as IntentStage,
-      channel: 'ui',
+      channel: input.channel ?? 'ui',
       correlationId: ulid(),
       payload: {
         payloadVersion: 1,

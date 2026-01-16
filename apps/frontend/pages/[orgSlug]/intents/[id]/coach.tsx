@@ -12,9 +12,11 @@ type IntentTabProps = {
 };
 
 type CoachField = 'goal' | 'context' | 'scope' | 'kpi' | 'risks';
+type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
 
 type CoachSuggestion = {
   id: string;
+  kind: CoachSuggestionKind;
   title: string;
   l1Text?: string | null;
   evidenceRef?: string | null;
@@ -22,7 +24,7 @@ type CoachSuggestion = {
   proposedPatch?: { fields?: Record<string, string | null> } | null;
   appliedFields?: string[];
   actionable?: boolean;
-  targetField?: CoachField | null;
+  targetField?: string | null;
 };
 
 type CoachHistoryItem = {
@@ -39,6 +41,22 @@ const COACH_FIELD_LABELS: Record<CoachField, string> = {
   scope: 'Scope',
   kpi: 'KPIs',
   risks: 'Risks',
+};
+
+const SUGGESTION_KIND_ORDER: CoachSuggestionKind[] = [
+  'missing_info',
+  'question',
+  'risk',
+  'rewrite',
+  'summary',
+];
+
+const SUGGESTION_KIND_LABELS: Record<CoachSuggestionKind, string> = {
+  missing_info: 'Missing information',
+  question: 'Clarifying questions',
+  risk: 'Risks',
+  rewrite: 'Rewrite suggestions',
+  summary: 'Summary',
 };
 
 export default function Coach({ user, org, intentId }: IntentTabProps) {
@@ -58,13 +76,38 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
   const isViewer = user.role === 'Viewer';
 
-  const orderedSuggestions = useMemo(() => {
+  const groupedSuggestions = useMemo(() => {
     const order = new Map(COACH_FIELDS.map((field, index) => [field, index]));
-    return [...suggestions].sort((a, b) => {
-      const aIndex = a.targetField ? order.get(a.targetField) ?? 999 : 999;
-      const bIndex = b.targetField ? order.get(b.targetField) ?? 999 : 999;
-      return aIndex - bIndex;
-    });
+    const groups = new Map<CoachSuggestionKind, CoachSuggestion[]>();
+    for (const suggestion of suggestions) {
+      const kind = suggestion.kind ?? 'rewrite';
+      const bucket = groups.get(kind);
+      if (bucket) {
+        bucket.push(suggestion);
+      } else {
+        groups.set(kind, [suggestion]);
+      }
+    }
+
+    const orderedGroups: { kind: CoachSuggestionKind; items: CoachSuggestion[] }[] = [];
+    for (const kind of SUGGESTION_KIND_ORDER) {
+      const items = groups.get(kind);
+      if (!items || items.length === 0) continue;
+      const sorted =
+        kind === 'rewrite'
+          ? [...items].sort((a, b) => {
+              const aIndex = a.targetField
+                ? order.get(a.targetField as CoachField) ?? 999
+                : 999;
+              const bIndex = b.targetField
+                ? order.get(b.targetField as CoachField) ?? 999
+                : 999;
+              return aIndex - bIndex;
+            })
+          : items;
+      orderedGroups.push({ kind, items: sorted });
+    }
+    return orderedGroups;
   }, [suggestions]);
 
   const hasRun = summaryItems.length > 0 || suggestions.length > 0 || coachRunId !== null;
@@ -257,7 +300,11 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
 
   const askCoachAgain = async (suggestion: CoachSuggestion) => {
     if (running || isViewer) return;
-    if (!suggestion.targetField) {
+    const targetField =
+      suggestion.targetField && COACH_FIELDS.includes(suggestion.targetField as CoachField)
+        ? (suggestion.targetField as CoachField)
+        : null;
+    if (!targetField) {
       setError('Missing target field for suggestion.');
       return;
     }
@@ -266,9 +313,9 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     try {
       await runCoach({
         instructions: trimmedInstructions ? trimmedInstructions : undefined,
-        focusFields: [suggestion.targetField],
+        focusFields: [targetField],
         includeSummary: false,
-        replaceField: suggestion.targetField,
+        replaceField: targetField,
       });
     } finally {
       setRerunSuggestionId(null);
@@ -336,80 +383,103 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         </div>
         <div style={blockCardStyle}>
           <div style={blockHeaderStyle}>
-            <p style={blockTitleStyle}>Field suggestions</p>
+            <p style={blockTitleStyle}>Suggestions</p>
           </div>
-          {orderedSuggestions.length ? (
-            <div style={suggestionListStyle}>
-              {orderedSuggestions.map((item) => {
-                const actionable = item.actionable !== false;
-                const isRerunActive = running && rerunSuggestionId === item.id;
-                return (
-                  <div key={item.id} style={suggestionCardStyle}>
-                    <div style={suggestionHeaderStyle}>
-                      <span style={{ fontWeight: 600 }}>{item.title}</span>
-                      <div style={statusColumnStyle}>
-                        <span style={statusBadgeStyle}>{item.status}</span>
-                        {!actionable ? (
-                          <span style={statusNoteStyle}>Jest ok, brak zmian</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    {item.l1Text ? <p style={suggestionTextStyle}>{item.l1Text}</p> : null}
-                    {item.evidenceRef ? (
-                      <div style={suggestionMetaStyle}>Evidence: {item.evidenceRef}</div>
-                    ) : null}
-                    {item.proposedPatch?.fields ? (
-                      <div style={suggestionMetaStyle}>
-                        Patch: {formatPatchFields(item.proposedPatch.fields)}
-                      </div>
-                    ) : null}
-                    {item.appliedFields && item.appliedFields.length > 0 ? (
-                      <div style={suggestionMetaStyle}>
-                        Applied fields: {item.appliedFields.join(', ')}
-                      </div>
-                    ) : null}
-                    {actionable && item.status === 'ISSUED' ? (
-                      <div style={suggestionActionsStyle}>
-                        <button
-                          type="button"
-                          style={acceptButtonStyle}
-                          onClick={() => acceptSuggestion(item.id)}
-                          disabled={
-                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                          }
-                        >
-                          Accept
-                        </button>
-                        <button
-                          type="button"
-                          style={rejectButtonStyle}
-                          onClick={() => rejectSuggestion(item.id)}
-                          disabled={
-                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                          }
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    ) : null}
-                    {item.status === 'REJECTED' ? (
-                      <div style={suggestionActionsStyle}>
-                        <button
-                          type="button"
-                          style={secondaryButtonStyle}
-                          onClick={() => askCoachAgain(item)}
-                          disabled={isViewer || running}
-                        >
-                          {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
-                        </button>
-                      </div>
-                    ) : null}
+          {groupedSuggestions.length ? (
+            <div style={suggestionGroupListStyle}>
+              {groupedSuggestions.map((group) => (
+                <div key={group.kind}>
+                  <p style={suggestionGroupTitleStyle}>
+                    {SUGGESTION_KIND_LABELS[group.kind]}
+                  </p>
+                  <div style={suggestionListStyle}>
+                    {group.items.map((item) => {
+                      const actionable = item.actionable !== false;
+                      const isRerunActive = running && rerunSuggestionId === item.id;
+                      const canRerun =
+                        item.kind === 'rewrite' &&
+                        typeof item.targetField === 'string' &&
+                        COACH_FIELDS.includes(item.targetField as CoachField);
+                      return (
+                        <div key={item.id} style={suggestionCardStyle}>
+                          <div style={suggestionHeaderStyle}>
+                            <span style={{ fontWeight: 600 }}>{item.title}</span>
+                            <div style={statusColumnStyle}>
+                              <span style={statusBadgeStyle}>{item.status}</span>
+                              {!actionable ? (
+                                <span style={statusNoteStyle}>
+                                  {item.kind === 'rewrite'
+                                    ? 'No change suggested'
+                                    : 'Manual follow-up'}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {item.l1Text ? <p style={suggestionTextStyle}>{item.l1Text}</p> : null}
+                          {item.evidenceRef ? (
+                            <div style={suggestionMetaStyle}>Evidence: {item.evidenceRef}</div>
+                          ) : null}
+                          {item.proposedPatch?.fields ? (
+                            <div style={suggestionMetaStyle}>
+                              Patch: {formatPatchFields(item.proposedPatch.fields)}
+                            </div>
+                          ) : null}
+                          {item.appliedFields && item.appliedFields.length > 0 ? (
+                            <div style={suggestionMetaStyle}>
+                              Applied fields: {item.appliedFields.join(', ')}
+                            </div>
+                          ) : null}
+                          {item.status === 'ISSUED' ? (
+                            <div style={suggestionActionsStyle}>
+                              <button
+                                type="button"
+                                style={acceptButtonStyle}
+                                onClick={() => acceptSuggestion(item.id)}
+                                disabled={
+                                  isViewer ||
+                                  pendingId !== null ||
+                                  item.status !== 'ISSUED' ||
+                                  running
+                                }
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                style={rejectButtonStyle}
+                                onClick={() => rejectSuggestion(item.id)}
+                                disabled={
+                                  isViewer ||
+                                  pendingId !== null ||
+                                  item.status !== 'ISSUED' ||
+                                  running
+                                }
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : null}
+                          {item.status === 'REJECTED' && canRerun ? (
+                            <div style={suggestionActionsStyle}>
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => askCoachAgain(item)}
+                                disabled={isViewer || running}
+                              >
+                                {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
-            <p style={placeholderStyle}>Run Intent Coach to see field suggestions.</p>
+            <p style={placeholderStyle}>Run Intent Coach to see suggestions.</p>
           )}
         </div>
         {hasRun ? (
@@ -588,6 +658,18 @@ const suggestionListStyle = {
   display: 'grid',
   gap: '0.75rem',
   marginTop: '0.75rem',
+};
+
+const suggestionGroupListStyle = {
+  display: 'grid',
+  gap: '1rem',
+  marginTop: '0.75rem',
+};
+
+const suggestionGroupTitleStyle = {
+  margin: 0,
+  fontWeight: 600,
+  color: 'var(--text)',
 };
 
 const suggestionCardStyle = {
