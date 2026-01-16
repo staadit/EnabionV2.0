@@ -20,6 +20,16 @@ import { IntentService } from './intent.service';
 import { INTENT_STAGES, IntentStage } from './intent.types';
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+const SUGGESTION_FEEDBACK_SENTIMENTS = ['UP', 'DOWN', 'NEUTRAL'] as const;
+const SUGGESTION_FEEDBACK_REASON_CODES = [
+  'HELPFUL_STRUCTURING',
+  'TOO_GENERIC',
+  'INCORRECT_ASSUMPTION',
+  'MISSING_CONTEXT',
+  'NOT_RELEVANT',
+  'ALREADY_KNOWN',
+  'OTHER',
+] as const;
 
 const createIntentSchema = z.object({
   intentName: z.string().min(1),
@@ -61,7 +71,10 @@ const suggestIntentCoachSchema = z
 
 const decideSuggestionSchema = z
   .object({
-    reasonCode: z.string().optional().nullable(),
+    rating: z.number().int().min(1).max(5).optional(),
+    sentiment: z.enum(SUGGESTION_FEEDBACK_SENTIMENTS).optional(),
+    reasonCode: z.enum(SUGGESTION_FEEDBACK_REASON_CODES).optional().nullable(),
+    commentL1: z.string().max(280).optional().nullable(),
     channel: z.enum(['ui', 'api']).optional(),
   })
   .default({});
@@ -173,6 +186,10 @@ export class IntentController {
       intentId,
       suggestionId,
       actorUserId: user.id,
+      rating: parsed.rating,
+      sentiment: parsed.sentiment,
+      reasonCode: parsed.reasonCode ?? undefined,
+      commentL1: this.normalizeOptionalText(parsed.commentL1),
       channel: parsed.channel,
     });
   }
@@ -192,7 +209,10 @@ export class IntentController {
       intentId,
       suggestionId,
       actorUserId: user.id,
-      reasonCode: this.normalizeOptionalText(parsed.reasonCode) ?? undefined,
+      rating: parsed.rating,
+      sentiment: parsed.sentiment,
+      reasonCode: parsed.reasonCode ?? undefined,
+      commentL1: this.normalizeOptionalText(parsed.commentL1),
       channel: parsed.channel,
     });
   }

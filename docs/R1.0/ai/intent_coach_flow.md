@@ -79,6 +79,17 @@ Response:
 Marks the suggestion as ACCEPTED. If a proposedPatch is present, applies it to the
 Intent and emits INTENT_UPDATED.
 
+Request body (optional):
+
+```json
+{
+  "rating": 5,
+  "sentiment": "UP",
+  "reasonCode": "HELPFUL_STRUCTURING",
+  "commentL1": "Clear and actionable."
+}
+```
+
 Response:
 
 ```json
@@ -93,7 +104,12 @@ Response:
 Request body (optional):
 
 ```json
-{ "reasonCode": "NOT_RELEVANT" }
+{
+  "rating": 2,
+  "sentiment": "DOWN",
+  "reasonCode": "NOT_RELEVANT",
+  "commentL1": "Missing key constraints."
+}
 ```
 
 Response:
@@ -130,6 +146,9 @@ Gateway and must not be sent to the provider.
 If the Intent does not have enough L1 data, the API returns 422 with
 `INSUFFICIENT_L1_DATA` and does not call the AI Gateway.
 
+Feedback comments are L1-only, capped at 280 characters, and stripped if they
+look like names/emails/phones.
+
 ## Events
 
 The flow emits:
@@ -137,5 +156,6 @@ The flow emits:
 - AVATAR_SUGGESTION_ISSUED
 - AVATAR_SUGGESTION_ACCEPTED
 - AVATAR_SUGGESTION_REJECTED
+- AVATAR_SUGGESTION_FEEDBACK
 
 Payloads include metadata only and never include raw prompt content.

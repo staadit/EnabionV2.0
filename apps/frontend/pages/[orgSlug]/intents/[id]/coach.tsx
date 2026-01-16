@@ -13,6 +13,15 @@ type IntentTabProps = {
 
 type CoachField = 'goal' | 'context' | 'scope' | 'kpi' | 'risks';
 type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
+type CoachSuggestionFeedbackSentiment = 'UP' | 'DOWN' | 'NEUTRAL';
+type CoachSuggestionFeedbackReasonCode =
+  | 'HELPFUL_STRUCTURING'
+  | 'TOO_GENERIC'
+  | 'INCORRECT_ASSUMPTION'
+  | 'MISSING_CONTEXT'
+  | 'NOT_RELEVANT'
+  | 'ALREADY_KNOWN'
+  | 'OTHER';
 
 type CoachSuggestion = {
   id: string;
@@ -31,6 +40,13 @@ type CoachHistoryItem = {
   id: string;
   createdAt: string;
   summaryItems: string[];
+};
+
+type SuggestionFeedbackDraft = {
+  rating?: number;
+  sentiment?: CoachSuggestionFeedbackSentiment;
+  reasonCode?: CoachSuggestionFeedbackReasonCode;
+  commentL1?: string;
 };
 
 const COACH_FIELDS: CoachField[] = ['goal', 'context', 'scope', 'kpi', 'risks'];
@@ -59,6 +75,31 @@ const SUGGESTION_KIND_LABELS: Record<CoachSuggestionKind, string> = {
   summary: 'Summary',
 };
 
+const FEEDBACK_RATINGS = [1, 2, 3, 4, 5] as const;
+const FEEDBACK_SENTIMENT_LABELS: Record<CoachSuggestionFeedbackSentiment, string> = {
+  UP: 'Up',
+  DOWN: 'Down',
+  NEUTRAL: 'Neutral',
+};
+const FEEDBACK_REASON_CODES: CoachSuggestionFeedbackReasonCode[] = [
+  'HELPFUL_STRUCTURING',
+  'TOO_GENERIC',
+  'INCORRECT_ASSUMPTION',
+  'MISSING_CONTEXT',
+  'NOT_RELEVANT',
+  'ALREADY_KNOWN',
+  'OTHER',
+];
+const FEEDBACK_REASON_LABELS: Record<CoachSuggestionFeedbackReasonCode, string> = {
+  HELPFUL_STRUCTURING: 'Helpful structuring',
+  TOO_GENERIC: 'Too generic',
+  INCORRECT_ASSUMPTION: 'Incorrect assumption',
+  MISSING_CONTEXT: 'Missing context',
+  NOT_RELEVANT: 'Not relevant',
+  ALREADY_KNOWN: 'Already known',
+  OTHER: 'Other',
+};
+
 export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [running, setRunning] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -74,6 +115,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [hasHistory, setHasHistory] = useState(false);
   const [historyPopupText, setHistoryPopupText] = useState<string | null>(null);
   const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
+  const [feedbackById, setFeedbackById] = useState<Record<string, SuggestionFeedbackDraft>>({});
   const isViewer = user.role === 'Viewer';
 
   const groupedSuggestions = useMemo(() => {
@@ -152,6 +194,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         setSummaryItems([]);
       }
       setSuggestions([]);
+      setFeedbackById({});
     }
     try {
       const body: Record<string, unknown> = {
@@ -251,14 +294,58 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     );
   };
 
+  const updateFeedback = (suggestionId: string, patch: Partial<SuggestionFeedbackDraft>) => {
+    setFeedbackById((prev) => ({
+      ...prev,
+      [suggestionId]: {
+        ...prev[suggestionId],
+        ...patch,
+      },
+    }));
+  };
+
+  const buildFeedbackPayload = (suggestionId: string) => {
+    const feedback = feedbackById[suggestionId];
+    if (!feedback) return {};
+    const payload: Record<string, unknown> = {};
+    if (typeof feedback.rating === 'number') {
+      payload.rating = feedback.rating;
+    }
+    if (feedback.sentiment) {
+      payload.sentiment = feedback.sentiment;
+    }
+    if (feedback.reasonCode) {
+      payload.reasonCode = feedback.reasonCode;
+    }
+    const comment = feedback.commentL1?.trim();
+    if (comment) {
+      payload.commentL1 = comment.length > 280 ? comment.slice(0, 280) : comment;
+    }
+    return payload;
+  };
+
+  const clearFeedback = (suggestionId: string) => {
+    setFeedbackById((prev) => {
+      if (!prev[suggestionId]) return prev;
+      const next = { ...prev };
+      delete next[suggestionId];
+      return next;
+    });
+  };
+
   const acceptSuggestion = async (suggestionId: string) => {
     if (pendingId || isViewer) return;
     setPendingId(suggestionId);
     setError(null);
     try {
+      const payload = buildFeedbackPayload(suggestionId);
       const res = await fetch(
         `/api/intents/${intentId}/coach/suggestions/${suggestionId}/accept`,
-        { method: 'POST', headers: { 'content-type': 'application/json' } },
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
       );
       const data = await res.json();
       if (!res.ok) {
@@ -268,6 +355,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         status: data?.suggestion?.status ?? 'ACCEPTED',
         appliedFields: data?.appliedFields ?? [],
       });
+      clearFeedback(suggestionId);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to accept suggestion');
     } finally {
@@ -280,9 +368,14 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     setPendingId(suggestionId);
     setError(null);
     try {
+      const payload = buildFeedbackPayload(suggestionId);
       const res = await fetch(
         `/api/intents/${intentId}/coach/suggestions/${suggestionId}/reject`,
-        { method: 'POST', headers: { 'content-type': 'application/json' } },
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
       );
       const data = await res.json();
       if (!res.ok) {
@@ -291,6 +384,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       updateSuggestion(suggestionId, {
         status: data?.suggestion?.status ?? 'REJECTED',
       });
+      clearFeedback(suggestionId);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to reject suggestion');
     } finally {
@@ -396,6 +490,9 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
                     {group.items.map((item) => {
                       const actionable = item.actionable !== false;
                       const isRerunActive = running && rerunSuggestionId === item.id;
+                      const feedback = feedbackById[item.id] ?? {};
+                      const feedbackDisabled =
+                        isViewer || pendingId !== null || running || item.status !== 'ISSUED';
                       const canRerun =
                         item.kind === 'rewrite' &&
                         typeof item.targetField === 'string' &&
@@ -427,6 +524,95 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
                           {item.appliedFields && item.appliedFields.length > 0 ? (
                             <div style={suggestionMetaStyle}>
                               Applied fields: {item.appliedFields.join(', ')}
+                            </div>
+                          ) : null}
+                          {item.status === 'ISSUED' ? (
+                            <div style={feedbackSectionStyle}>
+                              <div style={feedbackRowStyle}>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Sentiment</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.sentiment ?? ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        sentiment: value
+                                          ? (value as CoachSuggestionFeedbackSentiment)
+                                          : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No sentiment</option>
+                                    {Object.entries(FEEDBACK_SENTIMENT_LABELS).map(
+                                      ([value, label]) => (
+                                        <option key={value} value={value}>
+                                          {label}
+                                        </option>
+                                      ),
+                                    )}
+                                  </select>
+                                </label>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Rating</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.rating ? String(feedback.rating) : ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        rating: value ? Number(value) : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No rating</option>
+                                    {FEEDBACK_RATINGS.map((value) => (
+                                      <option key={value} value={value}>
+                                        {value}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Reason</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.reasonCode ?? ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        reasonCode: value
+                                          ? (value as CoachSuggestionFeedbackReasonCode)
+                                          : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No reason</option>
+                                    {FEEDBACK_REASON_CODES.map((value) => (
+                                      <option key={value} value={value}>
+                                        {FEEDBACK_REASON_LABELS[value]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
+                              <label style={feedbackFieldStyle}>
+                                <span style={feedbackLabelStyle}>Comment (L1 only)</span>
+                                <textarea
+                                  style={feedbackTextareaStyle}
+                                  rows={2}
+                                  maxLength={280}
+                                  value={feedback.commentL1 ?? ''}
+                                  onChange={(event) =>
+                                    updateFeedback(item.id, { commentL1: event.target.value })
+                                  }
+                                  placeholder="Optional note (max 280 chars, avoid names/emails)."
+                                  disabled={feedbackDisabled}
+                                />
+                              </label>
                             </div>
                           ) : null}
                           {item.status === 'ISSUED' ? (
@@ -716,6 +902,48 @@ const suggestionMetaStyle = {
   marginTop: '0.35rem',
   color: 'var(--muted)',
   fontSize: '0.85rem',
+};
+
+const feedbackSectionStyle = {
+  marginTop: '0.75rem',
+  display: 'grid',
+  gap: '0.5rem',
+};
+
+const feedbackRowStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  gap: '0.5rem',
+};
+
+const feedbackFieldStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '0.25rem',
+};
+
+const feedbackLabelStyle = {
+  fontSize: '0.75rem',
+  color: 'var(--muted)',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.04em',
+};
+
+const feedbackSelectStyle = {
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  padding: '0.4rem 0.6rem',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+};
+
+const feedbackTextareaStyle = {
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  padding: '0.5rem 0.6rem',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+  resize: 'vertical' as const,
 };
 
 const suggestionActionsStyle = {

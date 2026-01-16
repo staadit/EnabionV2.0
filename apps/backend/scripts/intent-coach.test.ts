@@ -76,6 +76,7 @@ class MockPrismaService {
   intents: any[] = [];
   intentCoachRuns: any[] = [];
   avatarSuggestions: any[] = [];
+  avatarSuggestionFeedbacks: any[] = [];
   events: any[] = [];
 
   organization = {
@@ -171,6 +172,17 @@ class MockPrismaService {
         return updated;
       });
       return updated;
+    },
+  };
+
+  avatarSuggestionFeedback = {
+    create: async (args: any) => {
+      const record = {
+        ...args.data,
+        createdAt: args.data.createdAt ?? new Date(),
+      };
+      this.avatarSuggestionFeedbacks.push(record);
+      return record;
     },
   };
 
@@ -316,6 +328,10 @@ async function testSuggestAndDecideFlow() {
     intentId,
     suggestionId: actionable.id,
     actorUserId: 'user-1',
+    rating: 5,
+    sentiment: 'UP',
+    reasonCode: 'HELPFUL_STRUCTURING',
+    commentL1: 'Clear and actionable.',
   });
   assert(
     acceptActionable.appliedFields.includes('goal'),
@@ -345,8 +361,33 @@ async function testSuggestAndDecideFlow() {
     suggestionId: question.id,
     actorUserId: 'user-1',
     reasonCode: 'NOT_RELEVANT',
+    sentiment: 'DOWN',
   });
   assert(rejectResult.suggestion.status === 'REJECTED', 'Rejected suggestion should update status');
+
+  const extraSuggestionId = 'suggestion-extra';
+  prisma.avatarSuggestions.push({
+    id: extraSuggestionId,
+    orgId: 'org-1',
+    intentId,
+    coachRunId: result.coachRunId,
+    avatarType: 'INTENT_COACH',
+    kind: 'question',
+    title: 'Extra question',
+    l1Text: 'Extra question text',
+    evidenceRef: null,
+    proposedPatch: null,
+    status: 'ISSUED',
+    actionable: false,
+  });
+
+  await service.rejectIntentCoachSuggestion({
+    orgId: 'org-1',
+    intentId,
+    suggestionId: extraSuggestionId,
+    actorUserId: 'user-1',
+    commentL1: 'Please ask john.doe@example.com',
+  });
 
   const acceptEvents = prisma.events.filter(
     (event) => event.type === EVENT_TYPES.AVATAR_SUGGESTION_ACCEPTED,
@@ -354,8 +395,12 @@ async function testSuggestAndDecideFlow() {
   const rejectEvents = prisma.events.filter(
     (event) => event.type === EVENT_TYPES.AVATAR_SUGGESTION_REJECTED,
   );
+  const feedbackEvents = prisma.events.filter(
+    (event) => event.type === EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK,
+  );
   assert(acceptEvents.length >= 2, 'Accept events should be emitted');
   assert(rejectEvents.length >= 1, 'Reject events should be emitted');
+  assert(feedbackEvents.length === 2, 'Feedback events should be emitted when feedback is provided');
   acceptEvents.forEach((event) => {
     assert(
       event.correlationId === result.coachRunId,
@@ -368,6 +413,10 @@ async function testSuggestAndDecideFlow() {
       'Reject events should use coachRunId as correlationId',
     );
   });
+  assert(
+    prisma.avatarSuggestionFeedbacks.length === 2,
+    'Feedback records should be stored when feedback is provided',
+  );
 }
 
 async function run() {

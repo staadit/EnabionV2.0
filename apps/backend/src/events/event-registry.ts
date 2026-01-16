@@ -47,6 +47,7 @@ export const EVENT_TYPES = {
   AVATAR_SUGGESTION_ISSUED: 'AVATAR_SUGGESTION_ISSUED',
   AVATAR_SUGGESTION_ACCEPTED: 'AVATAR_SUGGESTION_ACCEPTED',
   AVATAR_SUGGESTION_REJECTED: 'AVATAR_SUGGESTION_REJECTED',
+  AVATAR_SUGGESTION_FEEDBACK: 'AVATAR_SUGGESTION_FEEDBACK',
   AVATAR_FEEDBACK_RECORDED: 'AVATAR_FEEDBACK_RECORDED',
   MATCH_LIST_CREATED: 'MATCH_LIST_CREATED',
   PARTNER_INVITED: 'PARTNER_INVITED',
@@ -97,6 +98,18 @@ const aiGatewayUseCaseEnum = z.enum([
   'fit_scoring',
   'summary_internal',
   'help_explanation',
+]);
+const suggestionKindEnum = z.enum(['missing_info', 'risk', 'question', 'rewrite', 'summary']);
+const suggestionDecisionEnum = z.enum(['ACCEPTED', 'REJECTED']);
+const feedbackSentimentEnum = z.enum(['UP', 'DOWN', 'NEUTRAL']);
+const feedbackReasonCodeEnum = z.enum([
+  'HELPFUL_STRUCTURING',
+  'TOO_GENERIC',
+  'INCORRECT_ASSUMPTION',
+  'MISSING_CONTEXT',
+  'NOT_RELEVANT',
+  'ALREADY_KNOWN',
+  'OTHER',
 ]);
 const inputClassEnum = z.enum(['L1', 'L2']);
 const lifecycleEnum = z.enum(Object.values(LIFECYCLE_STEPS) as [LifecycleStep, ...LifecycleStep[]]);
@@ -167,7 +180,7 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     avatarType: z.enum(['SYSTEM', 'ORG_X', 'INTENT_COACH']),
     suggestionId: z.string().min(1),
-    suggestionKind: z.enum(['missing_info', 'risk', 'question', 'rewrite', 'summary']),
+    suggestionKind: suggestionKindEnum,
     suggestionL1Text: z.string().min(1).optional(),
     suggestionRef: z.string().min(1).optional(),
   }),
@@ -179,7 +192,19 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
   [EVENT_TYPES.AVATAR_SUGGESTION_REJECTED]: basePayload.extend({
     suggestionId: z.string().min(1),
     intentId: z.string().min(1),
-    reasonCode: z.string().min(1).optional(),
+    reasonCode: feedbackReasonCodeEnum.optional(),
+  }),
+  [EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK]: basePayload.extend({
+    orgId: z.string().min(1),
+    intentId: z.string().min(1),
+    suggestionId: z.string().min(1),
+    avatarType: z.enum(['SYSTEM', 'ORG_X', 'INTENT_COACH']),
+    suggestionKind: suggestionKindEnum,
+    decision: suggestionDecisionEnum,
+    rating: z.number().int().min(1).max(5).optional(),
+    sentiment: feedbackSentimentEnum.optional(),
+    reasonCode: feedbackReasonCodeEnum.optional(),
+    commentL1: z.string().min(1).max(280).optional(),
   }),
   [EVENT_TYPES.AVATAR_FEEDBACK_RECORDED]: basePayload.extend({
     avatarType: z.enum(['SYSTEM', 'ORG_X', 'INTENT_COACH']),

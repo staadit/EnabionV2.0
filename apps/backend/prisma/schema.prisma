@@ -22,6 +22,7 @@ model Organization {
   events    Event[]
   coachRuns IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
+  avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
   blobs     Blob[]
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
@@ -46,6 +47,7 @@ model User {
   ndaAcceptances NdaAcceptance[] @relation("NdaAcceptanceByUser")
   createdShareLinks IntentShareLink[] @relation("ShareLinkCreatedBy")
   revokedShareLinks IntentShareLink[] @relation("ShareLinkRevokedBy")
+  avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
   createdAt DateTime @default(now())
 }
 
@@ -141,6 +143,27 @@ enum AvatarSuggestionStatus {
   REJECTED
 }
 
+enum AvatarSuggestionDecision {
+  ACCEPTED
+  REJECTED
+}
+
+enum AvatarSuggestionFeedbackSentiment {
+  UP
+  DOWN
+  NEUTRAL
+}
+
+enum AvatarSuggestionFeedbackReasonCode {
+  HELPFUL_STRUCTURING
+  TOO_GENERIC
+  INCORRECT_ASSUMPTION
+  MISSING_CONTEXT
+  NOT_RELEVANT
+  ALREADY_KNOWN
+  OTHER
+}
+
 model Event {
   id             String   @id
   schemaVersion  Int
@@ -215,10 +238,33 @@ model AvatarSuggestion {
   org    Organization @relation(fields: [orgId], references: [id])
   intent Intent       @relation(fields: [intentId], references: [id])
   coachRun IntentCoachRun? @relation(fields: [coachRunId], references: [id])
+  feedback AvatarSuggestionFeedback[]
 
   @@index([orgId, intentId, createdAt])
   @@index([intentId, status])
   @@index([orgId, status])
+}
+
+model AvatarSuggestionFeedback {
+  id           String                             @id @default(uuid())
+  orgId        String
+  intentId     String
+  suggestionId String
+  userId       String?
+  decision     AvatarSuggestionDecision
+  rating       Int?
+  sentiment    AvatarSuggestionFeedbackSentiment?
+  reasonCode   AvatarSuggestionFeedbackReasonCode?
+  commentL1    String?
+  createdAt    DateTime                           @default(now())
+
+  org        Organization   @relation(fields: [orgId], references: [id])
+  intent     Intent         @relation(fields: [intentId], references: [id])
+  suggestion AvatarSuggestion @relation(fields: [suggestionId], references: [id])
+  user       User?          @relation(fields: [userId], references: [id])
+
+  @@index([orgId, intentId, createdAt])
+  @@index([suggestionId, createdAt])
 }
 
 model Blob {
@@ -331,6 +377,7 @@ model Intent {
   shareLinks     IntentShareLink[]
   coachRuns      IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
+  avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
 
   @@index([orgId])
   @@index([orgId, stage])

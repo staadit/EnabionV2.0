@@ -34,6 +34,15 @@ type CoachTask = (typeof COACH_TASKS_DEFAULT)[number];
 const COACH_TASKS_SUPPORTED = new Set<string>(COACH_TASKS_DEFAULT as readonly string[]);
 
 type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
+type CoachSuggestionFeedbackSentiment = 'UP' | 'DOWN' | 'NEUTRAL';
+type CoachSuggestionFeedbackReasonCode =
+  | 'HELPFUL_STRUCTURING'
+  | 'TOO_GENERIC'
+  | 'INCORRECT_ASSUMPTION'
+  | 'MISSING_CONTEXT'
+  | 'NOT_RELEVANT'
+  | 'ALREADY_KNOWN'
+  | 'OTHER';
 
 const INTENT_COACH_FIELD_LABELS: Record<IntentCoachField, string> = {
   goal: 'Goal',
@@ -144,7 +153,10 @@ export type DecideIntentCoachSuggestionInput = {
   intentId: string;
   suggestionId: string;
   actorUserId?: string;
-  reasonCode?: string;
+  rating?: number;
+  sentiment?: CoachSuggestionFeedbackSentiment;
+  reasonCode?: CoachSuggestionFeedbackReasonCode;
+  commentL1?: string | null;
   channel?: 'ui' | 'api';
 };
 
@@ -665,6 +677,14 @@ export class IntentService {
       : [];
 
     const now = new Date();
+    const lifecycleStep = this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW');
+    const pipelineStage = (suggestion.intent?.stage as IntentStage) ?? 'NEW';
+    const feedback = this.normalizeSuggestionFeedback({
+      rating: input.rating,
+      sentiment: input.sentiment,
+      reasonCode: input.reasonCode,
+      commentL1: input.commentL1,
+    });
     const updated = await this.prisma.avatarSuggestion.update({
       where: { id: suggestion.id },
       data: {
@@ -683,8 +703,8 @@ export class IntentService {
       actorOrgId: input.orgId,
       subjectType: 'INTENT',
       subjectId: input.intentId,
-      lifecycleStep: this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW'),
-      pipelineStage: (suggestion.intent?.stage as IntentStage) ?? 'NEW',
+      lifecycleStep,
+      pipelineStage,
       channel,
       correlationId,
       payload: {
@@ -694,6 +714,48 @@ export class IntentService {
         appliedFields,
       },
     });
+
+    if (feedback) {
+      await this.prisma.avatarSuggestionFeedback.create({
+        data: {
+          orgId: input.orgId,
+          intentId: input.intentId,
+          suggestionId: suggestion.id,
+          userId: input.actorUserId ?? null,
+          decision: 'ACCEPTED',
+          rating: feedback.rating ?? undefined,
+          sentiment: feedback.sentiment ?? undefined,
+          reasonCode: feedback.reasonCode ?? undefined,
+          commentL1: feedback.commentL1 ?? undefined,
+        },
+      });
+      await this.events.emitEvent({
+        type: EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK,
+        occurredAt: now,
+        orgId: input.orgId,
+        actorUserId: input.actorUserId,
+        actorOrgId: input.orgId,
+        subjectType: 'INTENT',
+        subjectId: input.intentId,
+        lifecycleStep,
+        pipelineStage,
+        channel,
+        correlationId: suggestion.coachRunId ?? suggestion.id,
+        payload: {
+          payloadVersion: 1,
+          orgId: input.orgId,
+          intentId: input.intentId,
+          suggestionId: suggestion.id,
+          avatarType: suggestion.avatarType,
+          suggestionKind: suggestion.kind,
+          decision: 'ACCEPTED',
+          ...(feedback.rating !== undefined ? { rating: feedback.rating } : {}),
+          ...(feedback.sentiment ? { sentiment: feedback.sentiment } : {}),
+          ...(feedback.reasonCode ? { reasonCode: feedback.reasonCode } : {}),
+          ...(feedback.commentL1 ? { commentL1: feedback.commentL1 } : {}),
+        },
+      });
+    }
 
     return { suggestion: updated, appliedFields };
   }
@@ -712,6 +774,14 @@ export class IntentService {
     }
 
     const now = new Date();
+    const lifecycleStep = this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW');
+    const pipelineStage = (suggestion.intent?.stage as IntentStage) ?? 'NEW';
+    const feedback = this.normalizeSuggestionFeedback({
+      rating: input.rating,
+      sentiment: input.sentiment,
+      reasonCode: input.reasonCode,
+      commentL1: input.commentL1,
+    });
     const updated = await this.prisma.avatarSuggestion.update({
       where: { id: suggestion.id },
       data: {
@@ -731,8 +801,8 @@ export class IntentService {
       actorOrgId: input.orgId,
       subjectType: 'INTENT',
       subjectId: input.intentId,
-      lifecycleStep: this.mapLifecycleStep((suggestion.intent?.stage as IntentStage) ?? 'NEW'),
-      pipelineStage: (suggestion.intent?.stage as IntentStage) ?? 'NEW',
+      lifecycleStep,
+      pipelineStage,
       channel,
       correlationId,
       payload: {
@@ -742,6 +812,48 @@ export class IntentService {
         reasonCode: input.reasonCode,
       },
     });
+
+    if (feedback) {
+      await this.prisma.avatarSuggestionFeedback.create({
+        data: {
+          orgId: input.orgId,
+          intentId: input.intentId,
+          suggestionId: suggestion.id,
+          userId: input.actorUserId ?? null,
+          decision: 'REJECTED',
+          rating: feedback.rating ?? undefined,
+          sentiment: feedback.sentiment ?? undefined,
+          reasonCode: feedback.reasonCode ?? undefined,
+          commentL1: feedback.commentL1 ?? undefined,
+        },
+      });
+      await this.events.emitEvent({
+        type: EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK,
+        occurredAt: now,
+        orgId: input.orgId,
+        actorUserId: input.actorUserId,
+        actorOrgId: input.orgId,
+        subjectType: 'INTENT',
+        subjectId: input.intentId,
+        lifecycleStep,
+        pipelineStage,
+        channel,
+        correlationId: suggestion.coachRunId ?? suggestion.id,
+        payload: {
+          payloadVersion: 1,
+          orgId: input.orgId,
+          intentId: input.intentId,
+          suggestionId: suggestion.id,
+          avatarType: suggestion.avatarType,
+          suggestionKind: suggestion.kind,
+          decision: 'REJECTED',
+          ...(feedback.rating !== undefined ? { rating: feedback.rating } : {}),
+          ...(feedback.sentiment ? { sentiment: feedback.sentiment } : {}),
+          ...(feedback.reasonCode ? { reasonCode: feedback.reasonCode } : {}),
+          ...(feedback.commentL1 ? { commentL1: feedback.commentL1 } : {}),
+        },
+      });
+    }
 
     return { suggestion: updated };
   }
@@ -1716,6 +1828,55 @@ export class IntentService {
       return 'COMMIT_ASSURE';
     }
     return 'CLARIFY';
+  }
+
+  private normalizeSuggestionFeedback(input: {
+    rating?: number;
+    sentiment?: CoachSuggestionFeedbackSentiment;
+    reasonCode?: CoachSuggestionFeedbackReasonCode;
+    commentL1?: string | null;
+  }): {
+    rating?: number;
+    sentiment?: CoachSuggestionFeedbackSentiment;
+    reasonCode?: CoachSuggestionFeedbackReasonCode;
+    commentL1?: string;
+  } | null {
+    const rating = typeof input.rating === 'number' ? input.rating : undefined;
+    const sentiment = input.sentiment;
+    const reasonCode = input.reasonCode;
+    const commentL1 = this.sanitizeFeedbackComment(input.commentL1);
+    if (!rating && !sentiment && !reasonCode && !commentL1) {
+      return null;
+    }
+    return {
+      rating,
+      sentiment,
+      reasonCode,
+      commentL1: commentL1 ?? undefined,
+    };
+  }
+
+  private sanitizeFeedbackComment(raw: string | null | undefined): string | null {
+    const normalized = this.normalizeOptionalText(raw);
+    if (!normalized) return null;
+    const trimmed = normalized.length > 280 ? normalized.slice(0, 280) : normalized;
+    if (this.containsFeedbackPii(trimmed)) {
+      return null;
+    }
+    return trimmed;
+  }
+
+  private containsFeedbackPii(text: string): boolean {
+    const emailPattern = /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i;
+    const phonePattern = /(\+?\d[\d\s().-]{6,}\d)/;
+    const nameHintPattern = /\b(name|contact|owner|person|lead)\s*[:\-]/i;
+    const honorificPattern = /\b(Mr|Ms|Mrs|Dr)\./i;
+    return (
+      emailPattern.test(text) ||
+      phonePattern.test(text) ||
+      nameHintPattern.test(text) ||
+      honorificPattern.test(text)
+    );
   }
 
   private normalizeOptionalText(value: string | null | undefined): string | null {
