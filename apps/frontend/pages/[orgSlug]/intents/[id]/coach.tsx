@@ -1,6 +1,6 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import OrgShell from '../../../../components/OrgShell';
 import { getXNavItems } from '../../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../../lib/org-context';
@@ -11,31 +11,34 @@ type IntentTabProps = {
   intentId: string;
 };
 
+type CoachField = 'goal' | 'context' | 'scope' | 'kpi' | 'risks';
+
 type CoachSuggestion = {
   id: string;
-  kind: 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
   title: string;
   l1Text?: string | null;
   evidenceRef?: string | null;
   status: 'ISSUED' | 'ACCEPTED' | 'REJECTED';
   proposedPatch?: { fields?: Record<string, string | null> } | null;
   appliedFields?: string[];
+  actionable?: boolean;
+  targetField?: CoachField | null;
 };
 
-const COACH_TASKS = ['intent_gap_detection', 'clarifying_questions', 'summary_internal'];
-const KIND_ORDER: CoachSuggestion['kind'][] = [
-  'missing_info',
-  'question',
-  'risk',
-  'summary',
-  'rewrite',
-];
-const KIND_LABELS: Record<CoachSuggestion['kind'], string> = {
-  missing_info: 'Missing info',
-  question: 'Questions',
-  risk: 'Risks',
-  rewrite: 'Rewrites',
-  summary: 'Summaries',
+type CoachHistoryItem = {
+  id: string;
+  createdAt: string;
+  summaryItems: string[];
+};
+
+const COACH_FIELDS: CoachField[] = ['goal', 'context', 'scope', 'kpi', 'risks'];
+
+const COACH_FIELD_LABELS: Record<CoachField, string> = {
+  goal: 'Goal',
+  context: 'Context',
+  scope: 'Scope',
+  kpi: 'KPIs',
+  risks: 'Risks',
 };
 
 export default function Coach({ user, org, intentId }: IntentTabProps) {
@@ -44,41 +47,102 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [coachRunId, setCoachRunId] = useState<string | null>(null);
+  const [summaryItems, setSummaryItems] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
+  const [instructions, setInstructions] = useState('');
+  const [focusFields, setFocusFields] = useState<CoachField[]>([]);
+  const [summarySelected, setSummarySelected] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
+  const [hasHistory, setHasHistory] = useState(false);
+  const [historyPopupText, setHistoryPopupText] = useState<string | null>(null);
+  const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
   const isViewer = user.role === 'Viewer';
 
-  const groupedSuggestions = useMemo(
-    () =>
-      KIND_ORDER.map((kind) => ({
-        kind,
-        items: suggestions.filter((item) => item.kind === kind),
-      })).filter((group) => group.items.length > 0),
-    [suggestions],
-  );
+  const orderedSuggestions = useMemo(() => {
+    const order = new Map(COACH_FIELDS.map((field, index) => [field, index]));
+    return [...suggestions].sort((a, b) => {
+      const aIndex = a.targetField ? order.get(a.targetField) ?? 999 : 999;
+      const bIndex = b.targetField ? order.get(b.targetField) ?? 999 : 999;
+      return aIndex - bIndex;
+    });
+  }, [suggestions]);
 
-  const runCoach = async () => {
+  const hasRun = summaryItems.length > 0 || suggestions.length > 0 || coachRunId !== null;
+
+  useEffect(() => {
+    let active = true;
+    const loadHistory = async () => {
+      try {
+        const res = await fetch(`/api/intents/${intentId}/coach/history`);
+        const data = await res.json();
+        if (!active) return;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        setHasHistory(items.length > 0);
+      } catch {
+        if (active) {
+          setHasHistory(false);
+        }
+      }
+    };
+    loadHistory();
+    return () => {
+      active = false;
+    };
+  }, [intentId]);
+
+  const runCoach = async (payload?: {
+    instructions?: string;
+    focusFields?: CoachField[];
+    includeSummary?: boolean;
+    replaceField?: CoachField | null;
+  }) => {
     if (running || isViewer) return;
+    const includeSummary = payload?.includeSummary ?? true;
+    const replaceField = payload?.replaceField ?? null;
+    const shouldReset = !replaceField;
     setRunning(true);
     setMessage(null);
     setError(null);
     setCoachRunId(null);
-    setSuggestions([]);
+    if (shouldReset) {
+      if (includeSummary) {
+        setSummaryItems([]);
+      }
+      setSuggestions([]);
+    }
     try {
+      const body: Record<string, unknown> = {
+        requestedLanguage: org.defaultLanguage ?? 'EN',
+      };
+      if (payload?.instructions) {
+        body.instructions = payload.instructions;
+      }
+      if (payload?.focusFields && payload.focusFields.length > 0) {
+        body.focusFields = payload.focusFields;
+      }
       const res = await fetch(`/api/intents/${intentId}/coach/suggest`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          requestedLanguage: org.defaultLanguage ?? 'EN',
-          tasks: COACH_TASKS,
-        }),
+        body: JSON.stringify(body),
       });
       const data = await res.json();
       if (!res.ok) {
         throw new Error(readApiError(data) || 'Intent Coach failed');
       }
       setCoachRunId(data?.coachRunId ?? null);
+      const summaryBlock = Array.isArray(data?.summaryBlock) ? data.summaryBlock : [];
+      if (includeSummary) {
+        setSummaryItems(summaryBlock);
+      }
       if (Array.isArray(data?.suggestions)) {
-        setSuggestions(data.suggestions);
+        if (replaceField) {
+          setSuggestions((prev) => {
+            const filtered = prev.filter((item) => item.targetField !== replaceField);
+            return [...filtered, ...data.suggestions];
+          });
+        } else {
+          setSuggestions(data.suggestions);
+        }
         setMessage(
           `Intent Coach generated ${data.suggestions.length} suggestion${
             data.suggestions.length === 1 ? '' : 's'
@@ -87,11 +151,55 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       } else {
         setMessage('No suggestions returned.');
       }
+      setHasHistory(true);
     } catch (err: any) {
       setError(err?.message ?? 'Intent Coach failed');
     } finally {
       setRunning(false);
     }
+  };
+
+  const showHistory = async () => {
+    if (historyLoading) return;
+    setHistoryLoading(true);
+    setError(null);
+    try {
+      const res = await fetch(`/api/intents/${intentId}/coach/history`);
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(readApiError(data) || 'Failed to load history');
+      }
+      const items = Array.isArray(data?.items)
+        ? (data.items as CoachHistoryItem[])
+        : ([] as CoachHistoryItem[]);
+      setHasHistory(items.length > 0);
+      if (typeof window === 'undefined') {
+        return;
+      }
+      if (!items.length) {
+        window.alert('No history yet.');
+        return;
+      }
+      const historyText = items
+        .map((item) => {
+          const createdAt = new Date(item.createdAt).toLocaleString();
+          const lines = Array.isArray(item.summaryItems) ? item.summaryItems : [];
+          const summaryText = lines.length ? lines.map((line) => `- ${line}`).join('\n') : '- (empty)';
+          return `${createdAt}\n${summaryText}`;
+        })
+        .join('\n\n');
+      setHistoryPopupText(historyText);
+    } catch (err: any) {
+      setError(err?.message ?? 'Failed to load history');
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const toggleFocusField = (field: CoachField) => {
+    setFocusFields((prev) =>
+      prev.includes(field) ? prev.filter((item) => item !== field) : [...prev, field],
+    );
   };
 
   const updateSuggestion = (suggestionId: string, patch: Partial<CoachSuggestion>) => {
@@ -147,6 +255,26 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     }
   };
 
+  const askCoachAgain = async (suggestion: CoachSuggestion) => {
+    if (running || isViewer) return;
+    if (!suggestion.targetField) {
+      setError('Missing target field for suggestion.');
+      return;
+    }
+    const trimmedInstructions = instructions.trim();
+    setRerunSuggestionId(suggestion.id);
+    try {
+      await runCoach({
+        instructions: trimmedInstructions ? trimmedInstructions : undefined,
+        focusFields: [suggestion.targetField],
+        includeSummary: false,
+        replaceField: suggestion.targetField,
+      });
+    } finally {
+      setRerunSuggestionId(null);
+    }
+  };
+
   return (
     <OrgShell
       user={user}
@@ -161,13 +289,12 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       <div style={cardStyle}>
         <p style={{ marginTop: 0, fontWeight: 600 }}>Intent Coach</p>
         <p style={{ margin: 0 }}>Intent ID: {intentId}</p>
-        {coachRunId ? <p style={metaStyle}>Run ID: {coachRunId}</p> : null}
       </div>
       <div style={actionRowStyle}>
         <button
           type="button"
           style={buttonStyle}
-          onClick={runCoach}
+          onClick={() => runCoach()}
           disabled={isViewer || running}
         >
           {running ? 'Running...' : 'Run Intent Coach'}
@@ -179,17 +306,53 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         )}
       </div>
       {message ? <p style={messageStyle}>{message}</p> : null}
-      {groupedSuggestions.length ? (
-        <div style={suggestionGridStyle}>
-          {groupedSuggestions.map((group) => (
-            <div key={group.kind} style={groupCardStyle}>
-              <div style={groupTitleStyle}>{KIND_LABELS[group.kind]}</div>
-              <div style={suggestionListStyle}>
-                {group.items.map((item) => (
+      <div style={blockGridStyle}>
+        <div style={blockCardStyle}>
+          <div style={blockHeaderStyle}>
+            <div>
+              <p style={blockTitleStyle}>Summary and observations</p>
+              {coachRunId ? <p style={metaStyle}>Run ID: {coachRunId}</p> : null}
+            </div>
+            {hasHistory ? (
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={showHistory}
+                disabled={historyLoading}
+              >
+                {historyLoading ? 'Loading...' : 'Last sugestions'}
+              </button>
+            ) : null}
+          </div>
+          {summaryItems.length ? (
+            <ul style={summaryListStyle}>
+              {summaryItems.map((item, index) => (
+                <li key={`${index}-${item}`}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={placeholderStyle}>Run Intent Coach to see the summary.</p>
+          )}
+        </div>
+        <div style={blockCardStyle}>
+          <div style={blockHeaderStyle}>
+            <p style={blockTitleStyle}>Field suggestions</p>
+          </div>
+          {orderedSuggestions.length ? (
+            <div style={suggestionListStyle}>
+              {orderedSuggestions.map((item) => {
+                const actionable = item.actionable !== false;
+                const isRerunActive = running && rerunSuggestionId === item.id;
+                return (
                   <div key={item.id} style={suggestionCardStyle}>
                     <div style={suggestionHeaderStyle}>
                       <span style={{ fontWeight: 600 }}>{item.title}</span>
-                      <span style={statusBadgeStyle}>{item.status}</span>
+                      <div style={statusColumnStyle}>
+                        <span style={statusBadgeStyle}>{item.status}</span>
+                        {!actionable ? (
+                          <span style={statusNoteStyle}>Jest ok, brak zmian</span>
+                        ) : null}
+                      </div>
                     </div>
                     {item.l1Text ? <p style={suggestionTextStyle}>{item.l1Text}</p> : null}
                     {item.evidenceRef ? (
@@ -205,36 +368,123 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
                         Applied fields: {item.appliedFields.join(', ')}
                       </div>
                     ) : null}
-                    <div style={suggestionActionsStyle}>
-                      <button
-                        type="button"
-                        style={acceptButtonStyle}
-                        onClick={() => acceptSuggestion(item.id)}
-                        disabled={
-                          isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                        }
-                      >
-                        Accept
-                      </button>
-                      <button
-                        type="button"
-                        style={rejectButtonStyle}
-                        onClick={() => rejectSuggestion(item.id)}
-                        disabled={
-                          isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                        }
-                      >
-                        Reject
-                      </button>
-                    </div>
+                    {actionable && item.status === 'ISSUED' ? (
+                      <div style={suggestionActionsStyle}>
+                        <button
+                          type="button"
+                          style={acceptButtonStyle}
+                          onClick={() => acceptSuggestion(item.id)}
+                          disabled={
+                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
+                          }
+                        >
+                          Accept
+                        </button>
+                        <button
+                          type="button"
+                          style={rejectButtonStyle}
+                          onClick={() => rejectSuggestion(item.id)}
+                          disabled={
+                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
+                          }
+                        >
+                          Reject
+                        </button>
+                      </div>
+                    ) : null}
+                    {item.status === 'REJECTED' ? (
+                      <div style={suggestionActionsStyle}>
+                        <button
+                          type="button"
+                          style={secondaryButtonStyle}
+                          onClick={() => askCoachAgain(item)}
+                          disabled={isViewer || running}
+                        >
+                          {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
+                        </button>
+                      </div>
+                    ) : null}
                   </div>
-                ))}
-              </div>
+                );
+              })}
             </div>
-          ))}
+          ) : (
+            <p style={placeholderStyle}>Run Intent Coach to see field suggestions.</p>
+          )}
+        </div>
+        {hasRun ? (
+          <div style={blockCardStyle}>
+            <div style={blockHeaderStyle}>
+              <p style={blockTitleStyle}>Ask Intent Coach</p>
+            </div>
+            <textarea
+              style={textAreaStyle}
+              value={instructions}
+              onChange={(event) => setInstructions(event.target.value)}
+              placeholder="Add instructions for the next Coach run."
+              rows={4}
+            />
+            <div style={checkboxGridStyle}>
+              <label style={checkboxLabelStyle}>
+                <input
+                  type="checkbox"
+                  checked={summarySelected}
+                  onChange={() => setSummarySelected((prev) => !prev)}
+                />
+                <span>Summary</span>
+              </label>
+              {COACH_FIELDS.map((field) => (
+                <label key={field} style={checkboxLabelStyle}>
+                  <input
+                    type="checkbox"
+                    checked={focusFields.includes(field)}
+                    onChange={() => toggleFocusField(field)}
+                  />
+                  <span>{COACH_FIELD_LABELS[field]}</span>
+                </label>
+              ))}
+            </div>
+            <button
+              type="button"
+              style={secondaryButtonStyle}
+              onClick={() => {
+                const trimmedInstructions = instructions.trim();
+                runCoach({
+                  instructions: trimmedInstructions ? trimmedInstructions : undefined,
+                  focusFields,
+                  includeSummary: summarySelected,
+                });
+              }}
+              disabled={isViewer || running}
+            >
+              Ask Intent Coach
+            </button>
+          </div>
+        ) : null}
+      </div>
+      {error ? <p style={errorStyle}>{error}</p> : null}
+      {historyPopupText ? (
+        <div style={modalOverlayStyle} onClick={() => setHistoryPopupText(null)}>
+          <div
+            style={modalStyle}
+            role="dialog"
+            aria-modal="true"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <div style={modalHeaderStyle}>
+              <p style={modalTitleStyle}>Intent Coach history</p>
+              <button
+                type="button"
+                style={secondaryButtonStyle}
+                onClick={() => setHistoryPopupText(null)}
+              >
+                Close
+              </button>
+            </div>
+            <pre style={modalBodyStyle}>{historyPopupText}</pre>
+          </div>
         </div>
       ) : null}
-      {error ? <p style={errorStyle}>{error}</p> : null}
     </OrgShell>
   );
 }
@@ -278,6 +528,16 @@ const buttonStyle = {
   cursor: 'pointer',
 };
 
+const secondaryButtonStyle = {
+  padding: '0.5rem 1rem',
+  borderRadius: '10px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+  fontWeight: 600,
+  cursor: 'pointer',
+};
+
 const helperStyle = {
   color: 'var(--muted)',
   fontSize: '0.9rem',
@@ -288,27 +548,46 @@ const messageStyle = {
   color: 'var(--text)',
 };
 
-const suggestionGridStyle = {
+const blockGridStyle = {
   marginTop: '1rem',
   display: 'grid',
   gap: '1rem',
 };
 
-const groupCardStyle = {
+const blockCardStyle = {
   borderRadius: '14px',
   border: '1px solid var(--border)',
   background: 'var(--surface)',
   padding: '1rem',
 };
 
-const groupTitleStyle = {
+const blockHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '0.75rem',
+  flexWrap: 'wrap' as const,
+};
+
+const blockTitleStyle = {
   fontWeight: 600,
-  marginBottom: '0.75rem',
+  margin: 0,
+};
+
+const summaryListStyle = {
+  margin: '0.75rem 0 0',
+  paddingLeft: '1.25rem',
+};
+
+const placeholderStyle = {
+  marginTop: '0.75rem',
+  color: 'var(--muted)',
 };
 
 const suggestionListStyle = {
   display: 'grid',
   gap: '0.75rem',
+  marginTop: '0.75rem',
 };
 
 const suggestionCardStyle = {
@@ -332,6 +611,18 @@ const statusBadgeStyle = {
   padding: '0.15rem 0.6rem',
   fontSize: '0.75rem',
   fontWeight: 600,
+};
+
+const statusColumnStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  alignItems: 'flex-end',
+  gap: '0.2rem',
+};
+
+const statusNoteStyle = {
+  fontSize: '0.7rem',
+  color: 'var(--muted)',
 };
 
 const suggestionTextStyle = {
@@ -371,6 +662,30 @@ const rejectButtonStyle = {
   cursor: 'pointer',
 };
 
+const textAreaStyle = {
+  marginTop: '0.75rem',
+  width: '100%',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  padding: '0.75rem',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+};
+
+const checkboxGridStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
+  gap: '0.5rem',
+  margin: '0.75rem 0',
+};
+
+const checkboxLabelStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  color: 'var(--text)',
+};
+
 const metaStyle = {
   margin: '0.35rem 0 0',
   color: 'var(--muted)',
@@ -380,6 +695,55 @@ const metaStyle = {
 const errorStyle = {
   marginTop: '0.75rem',
   color: 'var(--danger)',
+};
+
+const modalOverlayStyle = {
+  position: 'fixed' as const,
+  inset: 0,
+  background: 'rgba(15, 23, 42, 0.55)',
+  display: 'flex',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: '1rem',
+  zIndex: 40,
+};
+
+const modalStyle = {
+  width: 'min(980px, 95vw)',
+  maxHeight: '85vh',
+  overflow: 'hidden',
+  borderRadius: '14px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  boxShadow: '0 24px 60px rgba(15, 23, 42, 0.35)',
+  display: 'flex',
+  flexDirection: 'column' as const,
+};
+
+const modalHeaderStyle = {
+  display: 'flex',
+  justifyContent: 'space-between',
+  alignItems: 'center',
+  gap: '0.75rem',
+  padding: '0.9rem 1rem',
+  borderBottom: '1px solid var(--border)',
+};
+
+const modalTitleStyle = {
+  margin: 0,
+  fontWeight: 600,
+};
+
+const modalBodyStyle = {
+  margin: 0,
+  padding: '1rem',
+  whiteSpace: 'pre-wrap' as const,
+  wordBreak: 'break-word' as const,
+  overflow: 'auto',
+  color: 'var(--text)',
+  fontFamily: 'inherit',
+  fontSize: '0.95rem',
+  lineHeight: 1.45,
 };
 
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {
@@ -396,3 +760,4 @@ export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx
     },
   };
 };
+

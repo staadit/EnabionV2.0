@@ -20,6 +20,7 @@ model Organization {
   users     User[]
   intents   Intent[]
   events    Event[]
+  coachRuns IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
   blobs     Blob[]
   attachments Attachment[]
@@ -175,23 +176,45 @@ model AiRateLimitWindow {
   @@index([windowStart])
 }
 
+model IntentCoachRun {
+  id              String   @id @default(uuid())
+  orgId           String
+  intentId        String
+  createdByUserId String?
+  summaryItems    Json
+  instructions    String?
+  focusFields     Json?
+  createdAt       DateTime @default(now())
+
+  org    Organization @relation(fields: [orgId], references: [id])
+  intent Intent       @relation(fields: [intentId], references: [id])
+  suggestions AvatarSuggestion[]
+
+  @@index([orgId, intentId, createdAt])
+  @@index([intentId, createdAt])
+}
+
 model AvatarSuggestion {
   id             String                 @id @default(uuid())
   orgId          String
   intentId       String
+  coachRunId     String?
   avatarType     AvatarType
   kind           AvatarSuggestionKind
+  targetField    String?
   title          String
   l1Text         String?
   evidenceRef    String?
   proposedPatch  Json?
   status         AvatarSuggestionStatus @default(ISSUED)
+  actionable     Boolean                @default(true)
   createdAt      DateTime               @default(now())
   decidedAt      DateTime?
   decidedByUserId String?
 
   org    Organization @relation(fields: [orgId], references: [id])
   intent Intent       @relation(fields: [intentId], references: [id])
+  coachRun IntentCoachRun? @relation(fields: [coachRunId], references: [id])
 
   @@index([orgId, intentId, createdAt])
   @@index([intentId, status])
@@ -306,6 +329,7 @@ model Intent {
   createdByUser  User         @relation("IntentCreatedBy", fields: [createdByUserId], references: [id])
   owner          User?        @relation("IntentOwner", fields: [ownerUserId], references: [id])
   shareLinks     IntentShareLink[]
+  coachRuns      IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
 
   @@index([orgId])
