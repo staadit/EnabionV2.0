@@ -22,7 +22,7 @@ services:
     build: ../apps/backend
     restart: unless-stopped
     env_file:
-      - ../apps/backend/.env.example
+      - ${ENABION_DEV_BACKEND_ENV:-../apps/backend/.env.example}
     depends_on:
       db:
         condition: service_healthy
@@ -37,9 +37,8 @@ services:
   frontend:
     build: ../apps/frontend
     restart: unless-stopped
-    environment:
-      BACKEND_URL: http://backend:4000
-      NEXT_PUBLIC_BACKEND_URL: http://localhost:4000
+    env_file:
+      - ${ENABION_DEV_FRONTEND_ENV:-./env/dev.frontend.env.example}
     depends_on:
       backend:
         condition: service_healthy
