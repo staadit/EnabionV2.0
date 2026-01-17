@@ -30,6 +30,7 @@ type IntentDetail = {
   risks: string | null;
   sourceTextRaw: string | null;
   hasL2: boolean;
+  aiAllowL2: boolean;
   owner?: { id: string; email: string } | null;
 };
 
@@ -92,6 +93,9 @@ export default function IntentDetail({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadLevel, setUploadLevel] = useState<'L1' | 'L2'>('L1');
   const [uploading, setUploading] = useState(false);
+  const [aiAccessSaving, setAiAccessSaving] = useState(false);
+  const [aiAccessError, setAiAccessError] = useState<string | null>(null);
+  const isViewer = user.role === 'Viewer';
 
   const hasL2 = useMemo(() => {
     const hasL2Attachment = attachmentList.some((item) => item.confidentialityLevel === 'L2');
@@ -121,6 +125,8 @@ export default function IntentDetail({
   const shareAccessed = activeShareLink ? `${activeShareLink.accessCount}x` : '0x';
   const canCopyShare = Boolean(activeShareLink && shareUrl);
   const ndaAccepted = ndaStatus?.accepted ? 'Accepted' : 'Not accepted';
+  const aiAllowL2 = Boolean(intentState.aiAllowL2);
+  const aiToggleDisabled = isViewer || !ndaStatus?.accepted || aiAccessSaving;
   const ndaVersion = ndaCurrent?.ndaVersion ?? 'mutual_nda_v0.1_en';
   const ndaHash = ndaCurrent?.enHashSha256 ? shortHash(ndaCurrent.enHashSha256) : '2b5c...9a1f';
   const timelineItems = useMemo(() => buildTimeline(events, members), [events, members]);
@@ -390,6 +396,26 @@ export default function IntentDetail({
       setAttachmentList((prev) => prev.filter((item) => item.id !== id));
     }
     setOpenMenuId(null);
+  };
+
+  const handleAiAccessToggle = async () => {
+    if (aiToggleDisabled) {
+      return;
+    }
+    const nextAllowL2 = !aiAllowL2;
+    setAiAccessSaving(true);
+    setAiAccessError(null);
+    const result = await patchAiAccess(intentState.id, nextAllowL2);
+    if (result.error) {
+      setAiAccessError(result.error);
+    }
+    if (result.intent) {
+      setIntentState((prev) => ({
+        ...prev,
+        aiAllowL2: Boolean(result.intent?.aiAllowL2),
+      }));
+    }
+    setAiAccessSaving(false);
   };
 
   return (
@@ -1528,6 +1554,58 @@ export default function IntentDetail({
                 </div>
               </section>
 
+              <section className="card" style={{ marginTop: 'var(--gap)' }} aria-label="AI data level">
+                <header className="cardHeader">
+                  <h2 className="cardTitle">AI data level</h2>
+                  <span className={aiAllowL2 ? 'badge badgeWarn' : 'badge'}>
+                    {aiAllowL2 ? 'L2' : 'L1'}
+                  </span>
+                </header>
+                <div className="cardBody">
+                  <div className="kv">
+                    <div>
+                      <div className="k">Mode</div>
+                      <div className="v">{aiAllowL2 ? 'L2 (confidential)' : 'L1 (default)'}</div>
+                    </div>
+                  </div>
+                  <div className="small">
+                    AI defaults to L1-only. L2 requires Mutual NDA and explicit opt-in.
+                  </div>
+                  {!hasL2 ? (
+                    <div className="small" style={{ marginTop: '6px' }}>
+                      No L2 content detected yet.
+                    </div>
+                  ) : null}
+                  <div
+                    className="actions"
+                    style={{ justifyContent: 'flex-start', marginTop: '10px', gap: '8px' }}
+                  >
+                    <button
+                      className="btn btnSmall"
+                      type="button"
+                      onClick={handleAiAccessToggle}
+                      disabled={aiToggleDisabled}
+                    >
+                      {aiAccessSaving
+                        ? 'Updating...'
+                        : aiAllowL2
+                          ? 'Disable L2'
+                          : 'Enable L2'}
+                    </button>
+                    {!ndaStatus?.accepted ? (
+                      <Link className="btn btnSmall btnWarn" href={`/${org.slug}/intents/${intentState.id}/nda`}>
+                        Sign NDA
+                      </Link>
+                    ) : null}
+                  </div>
+                  {aiAccessError ? (
+                    <div className="small" style={{ marginTop: '6px', color: 'var(--danger)' }}>
+                      {aiAccessError}
+                    </div>
+                  ) : null}
+                </div>
+              </section>
+
               <section className="card" style={{ marginTop: 'var(--gap)' }} aria-label="Share link">
                 <header className="cardHeader">
                   <h2 className="cardTitle">Share (L1-only)</h2>
@@ -1797,6 +1875,31 @@ async function patchIntent(intentId: string, payload: Record<string, unknown>) {
   }
 }
 
+function readApiError(data: any) {
+  if (!data) return null;
+  if (Array.isArray(data?.message)) {
+    return data.message.join('; ');
+  }
+  return data?.message || data?.error || null;
+}
+
+async function patchAiAccess(intentId: string, allowL2: boolean) {
+  try {
+    const res = await fetch(`/api/intents/${intentId}/ai-access`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ allowL2, channel: 'ui' }),
+    });
+    const data = (await res.json()) as { intent?: Record<string, any> };
+    if (!res.ok) {
+      return { intent: null, error: readApiError(data) || 'Failed to update AI access' };
+    }
+    return { intent: data?.intent ?? null, error: null };
+  } catch {
+    return { intent: null, error: 'Failed to update AI access' };
+  }
+}
+
 async function fetchIntentDetail(
   cookie: string | undefined,
   intentId: string,
@@ -1829,6 +1932,7 @@ async function fetchIntentDetail(
     risks: intent.risks ?? null,
     sourceTextRaw: intent.sourceTextRaw ?? null,
     hasL2: Boolean(intent.hasL2),
+    aiAllowL2: Boolean(intent.aiAllowL2),
     owner: intent.owner
       ? {
           id: String(intent.owner.id ?? ''),

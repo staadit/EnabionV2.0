@@ -20,6 +20,16 @@ import { IntentService } from './intent.service';
 import { INTENT_STAGES, IntentStage } from './intent.types';
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+const SUGGESTION_FEEDBACK_SENTIMENTS = ['UP', 'DOWN', 'NEUTRAL'] as const;
+const SUGGESTION_FEEDBACK_REASON_CODES = [
+  'HELPFUL_STRUCTURING',
+  'TOO_GENERIC',
+  'INCORRECT_ASSUMPTION',
+  'MISSING_CONTEXT',
+  'NOT_RELEVANT',
+  'ALREADY_KNOWN',
+  'OTHER',
+] as const;
 
 const createIntentSchema = z.object({
   intentName: z.string().min(1),
@@ -51,16 +61,27 @@ const updateIntentSchema = z.object({
 const suggestIntentCoachSchema = z
   .object({
     requestedLanguage: z.string().optional().nullable(),
+    requestedDataLevel: z.enum(['L1', 'L2']).optional(),
     tasks: z.array(z.string()).optional(),
     instructions: z.string().optional().nullable(),
     focusFields: z.array(z.string()).optional().nullable(),
-    mode: z.enum(['initial', 'refine']).optional(),
+    mode: z.enum(['initial', 'refine', 'suggestion_only']).optional(),
+    channel: z.enum(['ui', 'api']).optional(),
   })
   .default({});
 
+const updateAiAccessSchema = z.object({
+  allowL2: z.boolean(),
+  channel: z.enum(['ui', 'api']).optional(),
+});
+
 const decideSuggestionSchema = z
   .object({
-    reasonCode: z.string().optional().nullable(),
+    rating: z.number().int().min(1).max(5).optional(),
+    sentiment: z.enum(SUGGESTION_FEEDBACK_SENTIMENTS).optional(),
+    reasonCode: z.enum(SUGGESTION_FEEDBACK_REASON_CODES).optional().nullable(),
+    commentL1: z.string().max(280).optional().nullable(),
+    channel: z.enum(['ui', 'api']).optional(),
   })
   .default({});
 
@@ -136,9 +157,11 @@ export class IntentController {
       actorUserId: user.id,
       tasks: parsed.tasks,
       requestedLanguage: this.normalizeOptionalText(parsed.requestedLanguage),
+      requestedDataLevel: parsed.requestedDataLevel,
       instructions: this.normalizeOptionalText(parsed.instructions),
       focusFields: parsed.focusFields ?? null,
       mode: parsed.mode,
+      channel: parsed.channel,
     });
   }
 
@@ -164,12 +187,17 @@ export class IntentController {
     @Body() body: unknown,
   ) {
     const user = this.requireUser(req);
-    this.parseBody(decideSuggestionSchema, body);
+    const parsed = this.parseBody(decideSuggestionSchema, body);
     return this.intentService.acceptIntentCoachSuggestion({
       orgId: user.orgId,
       intentId,
       suggestionId,
       actorUserId: user.id,
+      rating: parsed.rating,
+      sentiment: parsed.sentiment,
+      reasonCode: parsed.reasonCode ?? undefined,
+      commentL1: this.normalizeOptionalText(parsed.commentL1),
+      channel: parsed.channel,
     });
   }
 
@@ -188,7 +216,29 @@ export class IntentController {
       intentId,
       suggestionId,
       actorUserId: user.id,
-      reasonCode: this.normalizeOptionalText(parsed.reasonCode) ?? undefined,
+      rating: parsed.rating,
+      sentiment: parsed.sentiment,
+      reasonCode: parsed.reasonCode ?? undefined,
+      commentL1: this.normalizeOptionalText(parsed.commentL1),
+      channel: parsed.channel,
+    });
+  }
+
+  @Patch(':intentId/ai-access')
+  @Roles('Owner', 'BD_AM')
+  async updateIntentAiAccess(
+    @Req() req: AuthenticatedRequest,
+    @Param('intentId') intentId: string,
+    @Body() body: unknown,
+  ) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(updateAiAccessSchema, body);
+    return this.intentService.updateIntentAiAccess({
+      orgId: user.orgId,
+      actorUserId: user.id,
+      intentId,
+      allowL2: parsed.allowL2,
+      channel: parsed.channel,
     });
   }
 

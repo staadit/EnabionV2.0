@@ -17,7 +17,7 @@
     "test:auth-reset-email": "ts-node --project tsconfig.json scripts/auth-reset-email.test.ts",
     "test:ai-gateway": "ts-node --project tsconfig.json scripts/ai-gateway.test.ts",
     "test:tenant": "ts-node --project tsconfig.json scripts/tenant-isolation.test.ts",
-    "test:intents": "ts-node --project tsconfig.json scripts/intent-manual-create.test.ts",
+    "test:intents": "ts-node --project tsconfig.json scripts/intent-manual-create.test.ts && ts-node --project tsconfig.json scripts/intent-coach.test.ts",
     "test:share-links": "ts-node --project tsconfig.json scripts/share-links.test.ts",
     "test:export": "ts-node --project tsconfig.json scripts/intent-export.test.ts",
     "test:adminpanel": "ts-node --project tsconfig.json scripts/adminpanel-tenant-isolation.test.ts && ts-node --project tsconfig.json scripts/adminpanel-rbac.test.ts",

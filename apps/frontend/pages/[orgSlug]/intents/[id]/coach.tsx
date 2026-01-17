@@ -1,20 +1,44 @@
 import Head from 'next/head';
+import Link from 'next/link';
 import type { GetServerSideProps } from 'next';
 import { useEffect, useMemo, useState } from 'react';
 import OrgShell from '../../../../components/OrgShell';
 import { getXNavItems } from '../../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../../lib/org-context';
+import { fetchNdaStatus, type NdaStatus } from '../../../../lib/org-nda';
+
+const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 type IntentTabProps = {
   user: OrgUser;
   org: OrgInfo;
   intentId: string;
+  aiAllowL2: boolean;
+  hasL2: boolean;
+  ndaStatus: NdaStatus | null;
+};
+
+type IntentAccess = {
+  id: string;
+  aiAllowL2: boolean;
+  hasL2: boolean;
 };
 
 type CoachField = 'goal' | 'context' | 'scope' | 'kpi' | 'risks';
+type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
+type CoachSuggestionFeedbackSentiment = 'UP' | 'DOWN' | 'NEUTRAL';
+type CoachSuggestionFeedbackReasonCode =
+  | 'HELPFUL_STRUCTURING'
+  | 'TOO_GENERIC'
+  | 'INCORRECT_ASSUMPTION'
+  | 'MISSING_CONTEXT'
+  | 'NOT_RELEVANT'
+  | 'ALREADY_KNOWN'
+  | 'OTHER';
 
 type CoachSuggestion = {
   id: string;
+  kind: CoachSuggestionKind;
   title: string;
   l1Text?: string | null;
   evidenceRef?: string | null;
@@ -22,13 +46,20 @@ type CoachSuggestion = {
   proposedPatch?: { fields?: Record<string, string | null> } | null;
   appliedFields?: string[];
   actionable?: boolean;
-  targetField?: CoachField | null;
+  targetField?: string | null;
 };
 
 type CoachHistoryItem = {
   id: string;
   createdAt: string;
   summaryItems: string[];
+};
+
+type SuggestionFeedbackDraft = {
+  rating?: number;
+  sentiment?: CoachSuggestionFeedbackSentiment;
+  reasonCode?: CoachSuggestionFeedbackReasonCode;
+  commentL1?: string;
 };
 
 const COACH_FIELDS: CoachField[] = ['goal', 'context', 'scope', 'kpi', 'risks'];
@@ -41,11 +72,60 @@ const COACH_FIELD_LABELS: Record<CoachField, string> = {
   risks: 'Risks',
 };
 
-export default function Coach({ user, org, intentId }: IntentTabProps) {
+const SUGGESTION_KIND_ORDER: CoachSuggestionKind[] = [
+  'missing_info',
+  'question',
+  'risk',
+  'rewrite',
+  'summary',
+];
+
+const SUGGESTION_KIND_LABELS: Record<CoachSuggestionKind, string> = {
+  missing_info: 'Missing information',
+  question: 'Clarifying questions',
+  risk: 'Risks',
+  rewrite: 'Rewrite suggestions',
+  summary: 'Summary',
+};
+
+const FEEDBACK_RATINGS = [1, 2, 3, 4, 5] as const;
+const FEEDBACK_SENTIMENT_LABELS: Record<CoachSuggestionFeedbackSentiment, string> = {
+  UP: 'Up',
+  DOWN: 'Down',
+  NEUTRAL: 'Neutral',
+};
+const FEEDBACK_REASON_CODES: CoachSuggestionFeedbackReasonCode[] = [
+  'HELPFUL_STRUCTURING',
+  'TOO_GENERIC',
+  'INCORRECT_ASSUMPTION',
+  'MISSING_CONTEXT',
+  'NOT_RELEVANT',
+  'ALREADY_KNOWN',
+  'OTHER',
+];
+const FEEDBACK_REASON_LABELS: Record<CoachSuggestionFeedbackReasonCode, string> = {
+  HELPFUL_STRUCTURING: 'Helpful structuring',
+  TOO_GENERIC: 'Too generic',
+  INCORRECT_ASSUMPTION: 'Incorrect assumption',
+  MISSING_CONTEXT: 'Missing context',
+  NOT_RELEVANT: 'Not relevant',
+  ALREADY_KNOWN: 'Already known',
+  OTHER: 'Other',
+};
+
+export default function Coach({
+  user,
+  org,
+  intentId,
+  aiAllowL2,
+  hasL2,
+  ndaStatus,
+}: IntentTabProps) {
   const [running, setRunning] = useState(false);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [errorCode, setErrorCode] = useState<string | null>(null);
   const [coachRunId, setCoachRunId] = useState<string | null>(null);
   const [summaryItems, setSummaryItems] = useState<string[]>([]);
   const [suggestions, setSuggestions] = useState<CoachSuggestion[]>([]);
@@ -56,15 +136,43 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
   const [hasHistory, setHasHistory] = useState(false);
   const [historyPopupText, setHistoryPopupText] = useState<string | null>(null);
   const [rerunSuggestionId, setRerunSuggestionId] = useState<string | null>(null);
+  const [feedbackById, setFeedbackById] = useState<Record<string, SuggestionFeedbackDraft>>({});
   const isViewer = user.role === 'Viewer';
+  const dataLevel = aiAllowL2 ? 'L2' : 'L1';
+  const ndaAccepted = Boolean(ndaStatus?.accepted);
 
-  const orderedSuggestions = useMemo(() => {
+  const groupedSuggestions = useMemo(() => {
     const order = new Map(COACH_FIELDS.map((field, index) => [field, index]));
-    return [...suggestions].sort((a, b) => {
-      const aIndex = a.targetField ? order.get(a.targetField) ?? 999 : 999;
-      const bIndex = b.targetField ? order.get(b.targetField) ?? 999 : 999;
-      return aIndex - bIndex;
-    });
+    const groups = new Map<CoachSuggestionKind, CoachSuggestion[]>();
+    for (const suggestion of suggestions) {
+      const kind = suggestion.kind ?? 'rewrite';
+      const bucket = groups.get(kind);
+      if (bucket) {
+        bucket.push(suggestion);
+      } else {
+        groups.set(kind, [suggestion]);
+      }
+    }
+
+    const orderedGroups: { kind: CoachSuggestionKind; items: CoachSuggestion[] }[] = [];
+    for (const kind of SUGGESTION_KIND_ORDER) {
+      const items = groups.get(kind);
+      if (!items || items.length === 0) continue;
+      const sorted =
+        kind === 'rewrite'
+          ? [...items].sort((a, b) => {
+              const aIndex = a.targetField
+                ? order.get(a.targetField as CoachField) ?? 999
+                : 999;
+              const bIndex = b.targetField
+                ? order.get(b.targetField as CoachField) ?? 999
+                : 999;
+              return aIndex - bIndex;
+            })
+          : items;
+      orderedGroups.push({ kind, items: sorted });
+    }
+    return orderedGroups;
   }, [suggestions]);
 
   const hasRun = summaryItems.length > 0 || suggestions.length > 0 || coachRunId !== null;
@@ -103,16 +211,19 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     setRunning(true);
     setMessage(null);
     setError(null);
+    setErrorCode(null);
     setCoachRunId(null);
     if (shouldReset) {
       if (includeSummary) {
         setSummaryItems([]);
       }
       setSuggestions([]);
+      setFeedbackById({});
     }
     try {
       const body: Record<string, unknown> = {
         requestedLanguage: org.defaultLanguage ?? 'EN',
+        requestedDataLevel: dataLevel,
       };
       if (payload?.instructions) {
         body.instructions = payload.instructions;
@@ -127,8 +238,11 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       });
       const data = await res.json();
       if (!res.ok) {
-        throw new Error(readApiError(data) || 'Intent Coach failed');
+        const apiError = readApiError(data);
+        setErrorCode(apiError);
+        throw new Error(formatCoachError(apiError) || 'Intent Coach failed');
       }
+      setErrorCode(null);
       setCoachRunId(data?.coachRunId ?? null);
       const summaryBlock = Array.isArray(data?.summaryBlock) ? data.summaryBlock : [];
       if (includeSummary) {
@@ -208,14 +322,58 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     );
   };
 
+  const updateFeedback = (suggestionId: string, patch: Partial<SuggestionFeedbackDraft>) => {
+    setFeedbackById((prev) => ({
+      ...prev,
+      [suggestionId]: {
+        ...prev[suggestionId],
+        ...patch,
+      },
+    }));
+  };
+
+  const buildFeedbackPayload = (suggestionId: string) => {
+    const feedback = feedbackById[suggestionId];
+    if (!feedback) return {};
+    const payload: Record<string, unknown> = {};
+    if (typeof feedback.rating === 'number') {
+      payload.rating = feedback.rating;
+    }
+    if (feedback.sentiment) {
+      payload.sentiment = feedback.sentiment;
+    }
+    if (feedback.reasonCode) {
+      payload.reasonCode = feedback.reasonCode;
+    }
+    const comment = feedback.commentL1?.trim();
+    if (comment) {
+      payload.commentL1 = comment.length > 280 ? comment.slice(0, 280) : comment;
+    }
+    return payload;
+  };
+
+  const clearFeedback = (suggestionId: string) => {
+    setFeedbackById((prev) => {
+      if (!prev[suggestionId]) return prev;
+      const next = { ...prev };
+      delete next[suggestionId];
+      return next;
+    });
+  };
+
   const acceptSuggestion = async (suggestionId: string) => {
     if (pendingId || isViewer) return;
     setPendingId(suggestionId);
     setError(null);
     try {
+      const payload = buildFeedbackPayload(suggestionId);
       const res = await fetch(
         `/api/intents/${intentId}/coach/suggestions/${suggestionId}/accept`,
-        { method: 'POST', headers: { 'content-type': 'application/json' } },
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
       );
       const data = await res.json();
       if (!res.ok) {
@@ -225,6 +383,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         status: data?.suggestion?.status ?? 'ACCEPTED',
         appliedFields: data?.appliedFields ?? [],
       });
+      clearFeedback(suggestionId);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to accept suggestion');
     } finally {
@@ -237,9 +396,14 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     setPendingId(suggestionId);
     setError(null);
     try {
+      const payload = buildFeedbackPayload(suggestionId);
       const res = await fetch(
         `/api/intents/${intentId}/coach/suggestions/${suggestionId}/reject`,
-        { method: 'POST', headers: { 'content-type': 'application/json' } },
+        {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        },
       );
       const data = await res.json();
       if (!res.ok) {
@@ -248,6 +412,7 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
       updateSuggestion(suggestionId, {
         status: data?.suggestion?.status ?? 'REJECTED',
       });
+      clearFeedback(suggestionId);
     } catch (err: any) {
       setError(err?.message ?? 'Failed to reject suggestion');
     } finally {
@@ -257,7 +422,11 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
 
   const askCoachAgain = async (suggestion: CoachSuggestion) => {
     if (running || isViewer) return;
-    if (!suggestion.targetField) {
+    const targetField =
+      suggestion.targetField && COACH_FIELDS.includes(suggestion.targetField as CoachField)
+        ? (suggestion.targetField as CoachField)
+        : null;
+    if (!targetField) {
       setError('Missing target field for suggestion.');
       return;
     }
@@ -266,9 +435,9 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
     try {
       await runCoach({
         instructions: trimmedInstructions ? trimmedInstructions : undefined,
-        focusFields: [suggestion.targetField],
+        focusFields: [targetField],
         includeSummary: false,
-        replaceField: suggestion.targetField,
+        replaceField: targetField,
       });
     } finally {
       setRerunSuggestionId(null);
@@ -302,9 +471,34 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         {isViewer ? (
           <span style={helperStyle}>View-only access.</span>
         ) : (
-          <span style={helperStyle}>Uses L1 intent fields only (no raw/pasted text).</span>
+          <span style={helperStyle}>
+            Data level: {dataLevel}.{' '}
+            {aiAllowL2
+              ? 'Includes confidential source text when available.'
+              : 'L1-only fields (no raw/pasted text).'}
+          </span>
         )}
       </div>
+      {!isViewer && !aiAllowL2 ? (
+        <div style={helperMutedStyle}>
+          {ndaAccepted ? (
+            <span>
+              Enable L2 in Intent settings to include confidential data.{' '}
+              <Link href={`/${org.slug}/intents/${intentId}`}>Open intent</Link>
+            </span>
+          ) : (
+            <span>
+              Mutual NDA required to enable L2.{' '}
+              <Link href={`/${org.slug}/intents/${intentId}/nda`}>Sign NDA</Link>
+            </span>
+          )}
+        </div>
+      ) : null}
+      {!isViewer && aiAllowL2 && !hasL2 ? (
+        <div style={helperMutedStyle}>
+          L2 enabled, but no confidential source text detected yet.
+        </div>
+      ) : null}
       {message ? <p style={messageStyle}>{message}</p> : null}
       <div style={blockGridStyle}>
         <div style={blockCardStyle}>
@@ -336,80 +530,195 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
         </div>
         <div style={blockCardStyle}>
           <div style={blockHeaderStyle}>
-            <p style={blockTitleStyle}>Field suggestions</p>
+            <p style={blockTitleStyle}>Suggestions</p>
           </div>
-          {orderedSuggestions.length ? (
-            <div style={suggestionListStyle}>
-              {orderedSuggestions.map((item) => {
-                const actionable = item.actionable !== false;
-                const isRerunActive = running && rerunSuggestionId === item.id;
-                return (
-                  <div key={item.id} style={suggestionCardStyle}>
-                    <div style={suggestionHeaderStyle}>
-                      <span style={{ fontWeight: 600 }}>{item.title}</span>
-                      <div style={statusColumnStyle}>
-                        <span style={statusBadgeStyle}>{item.status}</span>
-                        {!actionable ? (
-                          <span style={statusNoteStyle}>Jest ok, brak zmian</span>
-                        ) : null}
-                      </div>
-                    </div>
-                    {item.l1Text ? <p style={suggestionTextStyle}>{item.l1Text}</p> : null}
-                    {item.evidenceRef ? (
-                      <div style={suggestionMetaStyle}>Evidence: {item.evidenceRef}</div>
-                    ) : null}
-                    {item.proposedPatch?.fields ? (
-                      <div style={suggestionMetaStyle}>
-                        Patch: {formatPatchFields(item.proposedPatch.fields)}
-                      </div>
-                    ) : null}
-                    {item.appliedFields && item.appliedFields.length > 0 ? (
-                      <div style={suggestionMetaStyle}>
-                        Applied fields: {item.appliedFields.join(', ')}
-                      </div>
-                    ) : null}
-                    {actionable && item.status === 'ISSUED' ? (
-                      <div style={suggestionActionsStyle}>
-                        <button
-                          type="button"
-                          style={acceptButtonStyle}
-                          onClick={() => acceptSuggestion(item.id)}
-                          disabled={
-                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                          }
-                        >
-                          Accept
-                        </button>
-                        <button
-                          type="button"
-                          style={rejectButtonStyle}
-                          onClick={() => rejectSuggestion(item.id)}
-                          disabled={
-                            isViewer || pendingId !== null || item.status !== 'ISSUED' || running
-                          }
-                        >
-                          Reject
-                        </button>
-                      </div>
-                    ) : null}
-                    {item.status === 'REJECTED' ? (
-                      <div style={suggestionActionsStyle}>
-                        <button
-                          type="button"
-                          style={secondaryButtonStyle}
-                          onClick={() => askCoachAgain(item)}
-                          disabled={isViewer || running}
-                        >
-                          {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
-                        </button>
-                      </div>
-                    ) : null}
+          {groupedSuggestions.length ? (
+            <div style={suggestionGroupListStyle}>
+              {groupedSuggestions.map((group) => (
+                <div key={group.kind}>
+                  <p style={suggestionGroupTitleStyle}>
+                    {SUGGESTION_KIND_LABELS[group.kind]}
+                  </p>
+                  <div style={suggestionListStyle}>
+                    {group.items.map((item) => {
+                      const actionable = item.actionable !== false;
+                      const isRerunActive = running && rerunSuggestionId === item.id;
+                      const feedback = feedbackById[item.id] ?? {};
+                      const feedbackDisabled =
+                        isViewer || pendingId !== null || running || item.status !== 'ISSUED';
+                      const canRerun =
+                        item.kind === 'rewrite' &&
+                        typeof item.targetField === 'string' &&
+                        COACH_FIELDS.includes(item.targetField as CoachField);
+                      return (
+                        <div key={item.id} style={suggestionCardStyle}>
+                          <div style={suggestionHeaderStyle}>
+                            <span style={{ fontWeight: 600 }}>{item.title}</span>
+                            <div style={statusColumnStyle}>
+                              <span style={statusBadgeStyle}>{item.status}</span>
+                              {!actionable ? (
+                                <span style={statusNoteStyle}>
+                                  {item.kind === 'rewrite'
+                                    ? 'No change suggested'
+                                    : 'Manual follow-up'}
+                                </span>
+                              ) : null}
+                            </div>
+                          </div>
+                          {item.l1Text ? <p style={suggestionTextStyle}>{item.l1Text}</p> : null}
+                          {item.evidenceRef ? (
+                            <div style={suggestionMetaStyle}>Evidence: {item.evidenceRef}</div>
+                          ) : null}
+                          {item.proposedPatch?.fields ? (
+                            <div style={suggestionMetaStyle}>
+                              Patch: {formatPatchFields(item.proposedPatch.fields)}
+                            </div>
+                          ) : null}
+                          {item.appliedFields && item.appliedFields.length > 0 ? (
+                            <div style={suggestionMetaStyle}>
+                              Applied fields: {item.appliedFields.join(', ')}
+                            </div>
+                          ) : null}
+                          {item.status === 'ISSUED' ? (
+                            <div style={feedbackSectionStyle}>
+                              <div style={feedbackRowStyle}>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Sentiment</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.sentiment ?? ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        sentiment: value
+                                          ? (value as CoachSuggestionFeedbackSentiment)
+                                          : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No sentiment</option>
+                                    {Object.entries(FEEDBACK_SENTIMENT_LABELS).map(
+                                      ([value, label]) => (
+                                        <option key={value} value={value}>
+                                          {label}
+                                        </option>
+                                      ),
+                                    )}
+                                  </select>
+                                </label>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Rating</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.rating ? String(feedback.rating) : ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        rating: value ? Number(value) : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No rating</option>
+                                    {FEEDBACK_RATINGS.map((value) => (
+                                      <option key={value} value={value}>
+                                        {value}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                                <label style={feedbackFieldStyle}>
+                                  <span style={feedbackLabelStyle}>Reason</span>
+                                  <select
+                                    style={feedbackSelectStyle}
+                                    value={feedback.reasonCode ?? ''}
+                                    onChange={(event) => {
+                                      const value = event.target.value;
+                                      updateFeedback(item.id, {
+                                        reasonCode: value
+                                          ? (value as CoachSuggestionFeedbackReasonCode)
+                                          : undefined,
+                                      });
+                                    }}
+                                    disabled={feedbackDisabled}
+                                  >
+                                    <option value="">No reason</option>
+                                    {FEEDBACK_REASON_CODES.map((value) => (
+                                      <option key={value} value={value}>
+                                        {FEEDBACK_REASON_LABELS[value]}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </label>
+                              </div>
+                              <label style={feedbackFieldStyle}>
+                                <span style={feedbackLabelStyle}>Comment (L1 only)</span>
+                                <textarea
+                                  style={feedbackTextareaStyle}
+                                  rows={2}
+                                  maxLength={280}
+                                  value={feedback.commentL1 ?? ''}
+                                  onChange={(event) =>
+                                    updateFeedback(item.id, { commentL1: event.target.value })
+                                  }
+                                  placeholder="Optional note (max 280 chars, avoid names/emails)."
+                                  disabled={feedbackDisabled}
+                                />
+                              </label>
+                            </div>
+                          ) : null}
+                          {item.status === 'ISSUED' ? (
+                            <div style={suggestionActionsStyle}>
+                              <button
+                                type="button"
+                                style={acceptButtonStyle}
+                                onClick={() => acceptSuggestion(item.id)}
+                                disabled={
+                                  isViewer ||
+                                  pendingId !== null ||
+                                  item.status !== 'ISSUED' ||
+                                  running
+                                }
+                              >
+                                Accept
+                              </button>
+                              <button
+                                type="button"
+                                style={rejectButtonStyle}
+                                onClick={() => rejectSuggestion(item.id)}
+                                disabled={
+                                  isViewer ||
+                                  pendingId !== null ||
+                                  item.status !== 'ISSUED' ||
+                                  running
+                                }
+                              >
+                                Reject
+                              </button>
+                            </div>
+                          ) : null}
+                          {item.status === 'REJECTED' && canRerun ? (
+                            <div style={suggestionActionsStyle}>
+                              <button
+                                type="button"
+                                style={secondaryButtonStyle}
+                                onClick={() => askCoachAgain(item)}
+                                disabled={isViewer || running}
+                              >
+                                {isRerunActive ? 'Running...' : 'Ask Intent Coach again'}
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
           ) : (
-            <p style={placeholderStyle}>Run Intent Coach to see field suggestions.</p>
+            <p style={placeholderStyle}>Run Intent Coach to see suggestions.</p>
           )}
         </div>
         {hasRun ? (
@@ -462,7 +771,26 @@ export default function Coach({ user, org, intentId }: IntentTabProps) {
           </div>
         ) : null}
       </div>
-      {error ? <p style={errorStyle}>{error}</p> : null}
+      {error ? (
+        <div>
+          <p style={errorStyle}>{error}</p>
+          {errorCode && isL2AccessError(errorCode) ? (
+            <p style={helperMutedStyle}>
+              {ndaAccepted ? (
+                <span>
+                  Enable L2 in Intent settings.{' '}
+                  <Link href={`/${org.slug}/intents/${intentId}`}>Open intent</Link>
+                </span>
+              ) : (
+                <span>
+                  Mutual NDA required for L2 access.{' '}
+                  <Link href={`/${org.slug}/intents/${intentId}/nda`}>Sign NDA</Link>
+                </span>
+              )}
+            </p>
+          ) : null}
+        </div>
+      ) : null}
       {historyPopupText ? (
         <div style={modalOverlayStyle} onClick={() => setHistoryPopupText(null)}>
           <div
@@ -497,10 +825,52 @@ function readApiError(data: any) {
   return data?.message || data?.error || null;
 }
 
+function formatCoachError(error: string | null) {
+  if (!error) return null;
+  if (error === 'AI_L2_NOT_ALLOWED' || error === 'NDA_REQUIRED_FOR_L2_AI') {
+    return 'L2 access requires Mutual NDA and explicit opt-in.';
+  }
+  if (error === 'TOGGLE_DISABLED' || error === 'NDA_NOT_ACCEPTED') {
+    return 'Enable L2 in Intent settings after completing Mutual NDA.';
+  }
+  return error;
+}
+
+function isL2AccessError(error: string) {
+  return [
+    'AI_L2_NOT_ALLOWED',
+    'NDA_REQUIRED_FOR_L2_AI',
+    'TOGGLE_DISABLED',
+    'NDA_NOT_ACCEPTED',
+  ].includes(error);
+}
+
 function formatPatchFields(fields: Record<string, string | null>) {
   return Object.entries(fields)
     .map(([key, value]) => `${key}=${value ?? 'null'}`)
     .join(', ');
+}
+
+async function fetchIntentAccess(
+  cookie: string | undefined,
+  intentId: string,
+): Promise<IntentAccess | null> {
+  const res = await fetch(`${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}`, {
+    headers: { cookie: cookie ?? '' },
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const data = (await res.json()) as { intent?: Record<string, any> } | null;
+  const intent = data?.intent;
+  if (!intent) {
+    return null;
+  }
+  return {
+    id: String(intent.id ?? ''),
+    aiAllowL2: Boolean(intent.aiAllowL2),
+    hasL2: Boolean(intent.hasL2),
+  };
 }
 
 const cardStyle = {
@@ -541,6 +911,12 @@ const secondaryButtonStyle = {
 const helperStyle = {
   color: 'var(--muted)',
   fontSize: '0.9rem',
+};
+
+const helperMutedStyle = {
+  marginTop: '0.5rem',
+  color: 'var(--muted)',
+  fontSize: '0.85rem',
 };
 
 const messageStyle = {
@@ -590,6 +966,18 @@ const suggestionListStyle = {
   marginTop: '0.75rem',
 };
 
+const suggestionGroupListStyle = {
+  display: 'grid',
+  gap: '1rem',
+  marginTop: '0.75rem',
+};
+
+const suggestionGroupTitleStyle = {
+  margin: 0,
+  fontWeight: 600,
+  color: 'var(--text)',
+};
+
 const suggestionCardStyle = {
   padding: '0.85rem 1rem',
   borderRadius: '12px',
@@ -634,6 +1022,48 @@ const suggestionMetaStyle = {
   marginTop: '0.35rem',
   color: 'var(--muted)',
   fontSize: '0.85rem',
+};
+
+const feedbackSectionStyle = {
+  marginTop: '0.75rem',
+  display: 'grid',
+  gap: '0.5rem',
+};
+
+const feedbackRowStyle = {
+  display: 'grid',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+  gap: '0.5rem',
+};
+
+const feedbackFieldStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '0.25rem',
+};
+
+const feedbackLabelStyle = {
+  fontSize: '0.75rem',
+  color: 'var(--muted)',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.04em',
+};
+
+const feedbackSelectStyle = {
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  padding: '0.4rem 0.6rem',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+};
+
+const feedbackTextareaStyle = {
+  borderRadius: '8px',
+  border: '1px solid var(--border)',
+  padding: '0.5rem 0.6rem',
+  background: 'var(--surface-2)',
+  color: 'var(--text)',
+  resize: 'vertical' as const,
 };
 
 const suggestionActionsStyle = {
@@ -752,11 +1182,20 @@ export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx
     return { redirect: result.redirect };
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
+  const cookie = result.context!.cookie;
+  const intentAccess = await fetchIntentAccess(cookie, intentId);
+  if (!intentAccess) {
+    return { notFound: true };
+  }
+  const ndaStatus = await fetchNdaStatus(cookie);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
       intentId,
+      aiAllowL2: intentAccess.aiAllowL2,
+      hasL2: intentAccess.hasL2,
+      ndaStatus,
     },
   };
 };

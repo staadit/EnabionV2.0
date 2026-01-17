@@ -10,6 +10,7 @@ export type AiGatewayMessage = {
 export type AiGatewayRequest = {
   tenantId: string;
   userId?: string | null;
+  intentId?: string | null;
   useCase: AiGatewayUseCase | string;
   model?: string | null;
   messages: AiGatewayMessage[];
@@ -19,6 +20,7 @@ export type AiGatewayRequest = {
   requestId?: string;
   inputClass: 'L1' | 'L2';
   containsL2?: boolean;
+  requestedDataLevel?: 'L1' | 'L2';
 };
 
 export type AiGatewayUsage = {

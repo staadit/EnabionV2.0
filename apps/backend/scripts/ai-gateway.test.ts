@@ -1,5 +1,6 @@
 import { BadRequestException, ForbiddenException, HttpException } from '@nestjs/common';
 import { AiGatewayService } from '../src/ai-gateway/ai-gateway.service';
+import { PiiRedactionService } from '../src/ai-gateway/pii-redaction.service';
 import { MemoryRateLimiter } from '../src/ai-gateway/rate-limiter';
 import { redactForLogs } from '../src/ai-gateway/redact';
 import type { AiGatewayConfig } from '../src/ai-gateway/ai-gateway.config';
@@ -37,7 +38,14 @@ class StubPrisma {
   };
 }
 
-function buildGateway(overrides?: Partial<AiGatewayConfig>) {
+class StubAiAccessService {
+  constructor(private readonly allowL2: boolean) {}
+  async resolveAiDataAccess() {
+    return { allowL2: this.allowL2, reason: 'TOGGLE_DISABLED' };
+  }
+}
+
+function buildGateway(overrides?: Partial<AiGatewayConfig>, allowL2 = false) {
   const config: AiGatewayConfig = {
     openaiApiKey: 'test',
     defaultModel: 'gpt-4o-mini',
@@ -61,6 +69,8 @@ function buildGateway(overrides?: Partial<AiGatewayConfig>) {
   const provider = new StubProvider();
   const events = new StubEventService();
   const prisma = new StubPrisma();
+  const aiAccess = new StubAiAccessService(allowL2);
+  const redaction = new PiiRedactionService();
   const logger = {
     setContext: () => {},
     info: () => {},
@@ -73,6 +83,8 @@ function buildGateway(overrides?: Partial<AiGatewayConfig>) {
     provider as any,
     events as any,
     prisma as any,
+    aiAccess as any,
+    redaction as any,
     logger as any,
   );
   return { service, provider, events };
@@ -83,9 +95,8 @@ function baseRequest(): AiGatewayRequest {
     tenantId: 'org-1',
     userId: 'user-1',
     useCase: 'intent_gap_detection',
-    messages: [{ role: 'user', content: 'Goal: build a pilot' }],
+    messages: [{ role: 'user' as const, content: 'Goal: build a pilot' }],
     inputClass: 'L1',
-    containsL2: false,
   };
 }
 
@@ -109,8 +120,14 @@ async function testTemperatureClamp() {
 }
 
 async function testL2Blocked() {
-  const { service } = buildGateway();
-  const request = { ...baseRequest(), inputClass: 'L2' as const };
+  const { service } = buildGateway(undefined, false);
+  const request = {
+    ...baseRequest(),
+    intentId: 'intent-1',
+    inputClass: 'L2' as const,
+    containsL2: true,
+    requestedDataLevel: 'L2' as const,
+  };
   let threw = false;
   try {
     await service.generateText(request);
@@ -120,17 +137,37 @@ async function testL2Blocked() {
   assert(threw, 'L2 input should be blocked');
 }
 
+async function testL2AllowedEmitsEvent() {
+  const { service, events } = buildGateway(undefined, true);
+  const request = {
+    ...baseRequest(),
+    intentId: 'intent-allow',
+    inputClass: 'L2' as const,
+    containsL2: true,
+    requestedDataLevel: 'L2' as const,
+    messages: [{ role: 'user' as const, content: 'Email: test@example.com' }],
+  };
+  await service.generateText(request);
+  const l2Events = events.events.filter((event) => event.type === 'AI_L2_USED');
+  assert(l2Events.length === 1, 'AI_L2_USED should be emitted for L2 requests');
+  const payload = l2Events[0].payload as any;
+  assert(payload.redactionApplied === true, 'AI_L2_USED should reflect redaction');
+}
+
 async function testRateLimit() {
-  const { service } = buildGateway({
-    rateLimit: {
-      tenantRpm: 1,
-      userRpm: 1,
-      useCaseRpm: {},
-      backend: 'memory',
-      cleanupIntervalMs: 60000,
-      retentionHours: 24,
+  const { service } = buildGateway(
+    {
+      rateLimit: {
+        tenantRpm: 1,
+        userRpm: 1,
+        useCaseRpm: {},
+        backend: 'memory',
+        cleanupIntervalMs: 60000,
+        retentionHours: 24,
+      },
     },
-  });
+    false,
+  );
   await service.generateText(baseRequest());
   let threw = false;
   try {
@@ -148,12 +185,28 @@ function testRedaction() {
   assert(!payload.includes('build a pilot'), 'Redaction should not include raw content');
 }
 
+function testPiiRedaction() {
+  const redaction = new PiiRedactionService();
+  const message =
+    'Email: jane.doe@example.com Phone: +48 600 700 800 IBAN: PL27114020040000300201355387 PESEL 44051401358 NIP 123-456-32-18 SSN 123-45-6789';
+  const result = redaction.redactInputMessages([{ role: 'user', content: message }]);
+  const output = result.messages[0].content;
+  assert(output.includes('[REDACTED_EMAIL]'), 'Email should be redacted');
+  assert(output.includes('[REDACTED_PHONE]'), 'Phone should be redacted');
+  assert(output.includes('[REDACTED_IBAN]'), 'IBAN should be redacted');
+  assert(output.includes('[REDACTED_PESEL]'), 'PESEL should be redacted');
+  assert(output.includes('[REDACTED_NIP]'), 'NIP should be redacted');
+  assert(output.includes('[REDACTED_SSN]'), 'SSN should be redacted');
+}
+
 async function run() {
   await testModelAllowlist();
   await testTemperatureClamp();
   await testL2Blocked();
+  await testL2AllowedEmitsEvent();
   await testRateLimit();
   testRedaction();
+  testPiiRedaction();
   // eslint-disable-next-line no-console
   console.log('AI gateway tests passed.');
 }
