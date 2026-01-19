@@ -67,6 +67,7 @@ export const EVENT_TYPES = {
   AI_GATEWAY_RATE_LIMITED: 'AI_GATEWAY_RATE_LIMITED',
   AI_L2_USED: 'AI_L2_USED',
   TRUSTSCORE_SNAPSHOT_CREATED: 'TRUSTSCORE_SNAPSHOT_CREATED',
+  TRUSTSCORE_RECALCULATED: 'TRUSTSCORE_RECALCULATED',
   // Audit-critical coverage
   INTENT_VIEWED: 'INTENT_VIEWED',
   INTENT_SHARED_LINK_VIEWED: 'INTENT_SHARED_LINK_VIEWED',
@@ -370,6 +371,20 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     factors: z.array(z.string().min(1)),
     computedAt: z.coerce.date(),
     algorithmVersion: z.string().min(1),
+  }),
+  [EVENT_TYPES.TRUSTSCORE_RECALCULATED]: basePayload.extend({
+    orgId: z.string().min(1),
+    trustScoreSnapshotId: z.string().min(1),
+    scoreOverall: z.number(),
+    statusLabel: z.string().min(1),
+    scoreProfile: z.number().optional(),
+    scoreResponsiveness: z.number().optional(),
+    scoreBehaviour: z.number().optional(),
+    previousScore: z.number().optional(),
+    previousStatusLabel: z.string().min(1).optional(),
+    reason: z.string().min(1).optional(),
+    algorithmVersion: z.string().min(1),
+    explanationPublic: z.array(z.string().min(1)).optional(),
   }),
   [EVENT_TYPES.INTENT_VIEWED]: basePayload.extend({
     intentId: z.string().min(1),

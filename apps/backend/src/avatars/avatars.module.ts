@@ -3,6 +3,7 @@ import { AuthModule } from '../auth/auth.module';
 import { EventModule } from '../events/event.module';
 import { NdaModule } from '../nda/nda.module';
 import { PrismaService } from '../prisma.service';
+import { TrustScoreModule } from '../trustscore/trustscore.module';
 import { AvatarSuggestionController } from './avatar-suggestion.controller';
 import { AvatarSuggestionService } from './avatar-suggestion.service';
 import { OrgAvatarController } from './org-avatar.controller';
@@ -12,7 +13,7 @@ import { SystemAvatarController } from './system-avatar.controller';
 import { SystemAvatarService } from './system-avatar.service';
 
 @Module({
-  imports: [AuthModule, EventModule, NdaModule],
+  imports: [AuthModule, EventModule, NdaModule, TrustScoreModule],
   controllers: [
     SystemAvatarController,
     OrgAvatarController,

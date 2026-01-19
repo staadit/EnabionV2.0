@@ -7,6 +7,7 @@ import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES, type Channel } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { TrustScoreService } from '../trustscore/trustscore.service';
 import {
   NDA_FILES,
   NDA_LANGUAGES,
@@ -52,6 +53,7 @@ export class NdaService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
+    private readonly trustScore: TrustScoreService,
   ) {}
 
   normalizeLanguage(value?: string | null): NdaLanguage {
@@ -326,6 +328,12 @@ export class NdaService {
         acceptedAt: now.toISOString(),
         counterpartyOrgId: input.counterpartyOrgId ?? undefined,
       },
+    });
+
+    await this.trustScore.recalculateOrgTrustScore({
+      orgId: input.orgId,
+      actorUserId: input.userId,
+      reason: 'NDA_ACCEPTED',
     });
 
     return acceptance;

@@ -3,6 +3,7 @@ import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { TrustScoreService } from '../trustscore/trustscore.service';
 
 const ALGORITHM_VERSION = 'rule-v1';
 const WEIGHTS = {
@@ -27,12 +28,19 @@ type FactorBreakdown = {
   notes: string;
 };
 
+type TrustScoreSummary = {
+  scoreOverall: number;
+  statusLabel: string;
+  computedAt: string;
+};
+
 export type MatchCandidate = {
   orgId: string;
   orgName: string;
   orgSlug: string;
   totalScore: number;
   breakdown: Record<MatchFactor, FactorBreakdown>;
+  trustScore?: TrustScoreSummary;
   feedbackStatus?: MatchFeedbackStatus;
 };
 
@@ -49,13 +57,14 @@ export class IntentMatchingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly events: EventService,
+    private readonly trustScore: TrustScoreService,
   ) {}
 
   async runMatching(input: { orgId: string; intentId: string; actorUserId: string }) {
     const intent = await this.getIntentForMatching(input.orgId, input.intentId);
     const candidates = await this.fetchCandidateOrgs(input.orgId);
-
-    const results = this.scoreCandidates(intent, candidates);
+    const trustScoresByOrgId = await this.fetchTrustScoreMap(candidates);
+    const results = this.scoreCandidates(intent, candidates, trustScoresByOrgId);
     const now = new Date();
 
     const matchList = await this.prisma.matchList.create({
@@ -101,6 +110,12 @@ export class IntentMatchingService {
         algorithmVersion: ALGORITHM_VERSION,
         topCandidates,
       },
+    });
+
+    await this.trustScore.recalculateOrgTrustScore({
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      reason: 'MATCH_LIST_CREATED',
     });
 
     return this.buildMatchListResponse(matchList);
@@ -237,6 +252,7 @@ export class IntentMatchingService {
         providerRegions: true,
         providerTags: true,
         providerBudgetBucket: true,
+        trustScoreLatestId: true,
       },
     });
   }
@@ -258,7 +274,9 @@ export class IntentMatchingService {
       providerRegions: string[];
       providerTags: string[];
       providerBudgetBucket: string;
+      trustScoreLatestId?: string | null;
     }>,
+    trustScoresByOrgId: Record<string, TrustScoreSummary>,
   ): MatchCandidate[] {
     const intentLanguage = this.normalizeScalar(intent.language);
     const intentTech = this.normalizeList(intent.tech);
@@ -368,6 +386,7 @@ export class IntentMatchingService {
           orgSlug: org.slug,
           totalScore,
           breakdown,
+          trustScore: trustScoresByOrgId[org.id],
         };
       });
 
@@ -385,6 +404,45 @@ export class IntentMatchingService {
     });
 
     return candidates;
+  }
+
+  private async fetchTrustScoreMap(
+    orgs: Array<{ id: string; trustScoreLatestId?: string | null }>,
+  ): Promise<Record<string, TrustScoreSummary>> {
+    const latestIds = orgs
+      .map((org) => org.trustScoreLatestId)
+      .filter((id): id is string => Boolean(id));
+    if (latestIds.length === 0) {
+      return {};
+    }
+
+    const snapshots = await this.prisma.trustScoreSnapshot.findMany({
+      where: { id: { in: latestIds } },
+      select: {
+        id: true,
+        scoreOverall: true,
+        statusLabel: true,
+        computedAt: true,
+      },
+    });
+
+    const snapshotById = new Map(snapshots.map((snapshot) => [snapshot.id, snapshot]));
+    const output: Record<string, TrustScoreSummary> = {};
+    orgs.forEach((org) => {
+      if (!org.trustScoreLatestId) {
+        return;
+      }
+      const snapshot = snapshotById.get(org.trustScoreLatestId);
+      if (!snapshot) {
+        return;
+      }
+      output[org.id] = {
+        scoreOverall: snapshot.scoreOverall,
+        statusLabel: snapshot.statusLabel,
+        computedAt: snapshot.computedAt.toISOString(),
+      };
+    });
+    return output;
   }
 
   private buildMatchListResponse(matchList: {

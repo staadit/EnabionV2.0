@@ -14,6 +14,7 @@ import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
 import { AiGatewayService } from '../ai-gateway/ai-gateway.service';
 import { AiAccessService } from '../ai-gateway/ai-access.service';
+import { TrustScoreService } from '../trustscore/trustscore.service';
 import type { AiGatewayMessage } from '../ai-gateway/ai-gateway.types';
 import { normalizeUseCase } from '../ai-gateway/use-cases';
 import { IntentStage } from './intent.types';
@@ -212,6 +213,7 @@ export class IntentService {
     private readonly events: EventService,
     private readonly aiGateway: AiGatewayService,
     private readonly aiAccess: AiAccessService,
+    private readonly trustScore: TrustScoreService,
   ) {}
 
   async createIntent(input: CreateIntentInput) {
@@ -310,6 +312,12 @@ export class IntentService {
       channel: 'ui',
       correlationId: ulid(),
       payload,
+    });
+
+    await this.trustScore.recalculateOrgTrustScore({
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      reason: 'INTENT_CREATED',
     });
 
     return intent;
@@ -1963,6 +1971,18 @@ export class IntentService {
         },
       });
     }
+
+    const trustScoreReason = stageChanged
+      ? 'INTENT_STAGE_CHANGED'
+      : changedFields.includes('ownerUserId')
+        ? 'INTENT_OWNER_CHANGED'
+        : 'INTENT_UPDATED';
+
+    await this.trustScore.recalculateOrgTrustScore({
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      reason: trustScoreReason,
+    });
 
     return updated;
   }

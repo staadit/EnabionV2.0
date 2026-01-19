@@ -31,12 +31,19 @@ type FactorBreakdown = {
   compared?: { intent: string[]; org: string[] };
 };
 
+type TrustScoreSummary = {
+  scoreOverall: number;
+  statusLabel: string;
+  computedAt: string;
+};
+
 type MatchCandidate = {
   orgId: string;
   orgName: string;
   orgSlug: string;
   totalScore: number;
   breakdown: Record<MatchFactor, FactorBreakdown>;
+  trustScore?: TrustScoreSummary;
   feedbackStatus?: FeedbackStatus;
 };
 
@@ -154,6 +161,19 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
           <div style={candidateHeaderMetaStyle}>
             {status !== 'NEUTRAL' ? (
               <span style={statusBadgeStyle(status)}>{formatStatusLabel(status)}</span>
+            ) : null}
+            {candidate.trustScore ? (
+              <div
+                style={trustScorePillStyle}
+                title={`${candidate.trustScore.statusLabel} · ${formatDateTime(
+                  candidate.trustScore.computedAt,
+                )}`}
+              >
+                <span style={trustScoreLabelStyle}>TrustScore</span>
+                <span style={trustScoreValueStyle}>
+                  {formatTrustScore(candidate.trustScore.scoreOverall)}
+                </span>
+              </div>
             ) : null}
             <div style={candidateScoreStyle}>{formatScore(candidate.totalScore)}</div>
           </div>
@@ -482,6 +502,27 @@ const candidateScoreStyle = {
   background: 'var(--surface)',
 };
 
+const trustScorePillStyle = {
+  display: 'inline-flex',
+  alignItems: 'baseline',
+  gap: '0.35rem',
+  padding: '0.35rem 0.7rem',
+  borderRadius: '999px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+};
+
+const trustScoreLabelStyle = {
+  fontSize: '0.65rem',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--muted)',
+};
+
+const trustScoreValueStyle = {
+  fontWeight: 700,
+};
+
 const statusBadgeStyle = (status: FeedbackStatus) => {
   const color =
     status === 'SHORTLISTED' ? 'var(--green)' : status === 'HIDDEN' ? 'var(--muted)' : 'var(--danger)';
@@ -596,6 +637,11 @@ const emptyStateStyle = {
 const formatScore = (value: number) => {
   if (!Number.isFinite(value)) return '-';
   return value.toFixed(1);
+};
+
+const formatTrustScore = (value: number) => {
+  if (!Number.isFinite(value)) return '-';
+  return Math.round(value).toString();
 };
 
 const normalizeFeedbackStatus = (value: FeedbackStatus | string | undefined | null): FeedbackStatus => {

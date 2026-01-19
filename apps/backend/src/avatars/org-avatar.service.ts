@@ -3,6 +3,7 @@ import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AvatarSuggestionService } from './avatar-suggestion.service';
 import { IntentStage } from '../intents/intent.types';
+import { TrustScoreService } from '../trustscore/trustscore.service';
 
 const ORG_PROFILE_VERSION = 'R1.0';
 
@@ -33,6 +34,7 @@ export class OrgAvatarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly suggestions: AvatarSuggestionService,
+    private readonly trustScore: TrustScoreService,
   ) {}
 
   async getProfile(orgId: string): Promise<OrgAvatarProfilePayload> {
@@ -74,6 +76,12 @@ export class OrgAvatarService {
         createdByUserId: input.actorUserId,
         updatedByUserId: input.actorUserId,
       },
+    });
+
+    await this.trustScore.recalculateOrgTrustScore({
+      orgId: input.orgId,
+      actorUserId: input.actorUserId,
+      reason: 'ORG_AVATAR_PROFILE_UPDATED',
     });
 
     return this.normalizeProfile(updated);

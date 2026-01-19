@@ -5,10 +5,20 @@ import SettingsLayout from '../../../components/SettingsLayout';
 import { getAdminLabels } from '../../../lib/admin-i18n';
 import { getOwnerContext, type AdminOrg, type AdminUser } from '../../../lib/admin-server';
 import { isReservedOrgSlug } from '../../../lib/reserved-slugs';
+import { formatDateTime } from '../../../lib/date-format';
+
+type TrustScoreSnapshot = {
+  scoreOverall: number;
+  statusLabel: string;
+  explanationPublic: string[];
+  algorithmVersion: string;
+  computedAt: string;
+};
 
 type OrgSettingsProps = {
   user: AdminUser;
   org: AdminOrg;
+  trustScore: TrustScoreSnapshot | null;
 };
 
 const PROVIDER_LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
@@ -28,6 +38,7 @@ const PROVIDER_TEAM_SIZE_BUCKETS = [
   'TEAM_51_200',
   'TEAM_201_PLUS',
 ] as const;
+const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 function parseError(payload: any) {
   const message = Array.isArray(payload?.message)
@@ -88,7 +99,7 @@ function formatTeamSizeBucket(value: string) {
   }
 }
 
-export default function OrgSettings({ user, org }: OrgSettingsProps) {
+export default function OrgSettings({ user, org, trustScore: initialTrustScore }: OrgSettingsProps) {
   const [currentOrg, setCurrentOrg] = useState(org);
   const [name, setName] = useState(org.name);
   const [slug, setSlug] = useState(org.slug);
@@ -105,6 +116,10 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
   const [providerTeamSizeBucket, setProviderTeamSizeBucket] = useState(
     org.providerTeamSizeBucket ?? 'UNKNOWN',
   );
+  const [trustScore, setTrustScore] = useState<TrustScoreSnapshot | null>(
+    initialTrustScore,
+  );
+  const [trustScoreError, setTrustScoreError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -126,6 +141,20 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
       }
       return [...prev, language];
     });
+  };
+
+  const refreshTrustScore = async () => {
+    setTrustScoreError(null);
+    try {
+      const res = await fetch('/api/org/trust-score');
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(parseError(data) || labels.commonRequestFailed);
+      }
+      setTrustScore((data?.trustScore as TrustScoreSnapshot) ?? null);
+    } catch (err: any) {
+      setTrustScoreError(err?.message ?? labels.commonRequestFailed);
+    }
   };
 
   const onSave = async () => {
@@ -170,6 +199,7 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
       setProviderTags((data.org.providerTags ?? []).join(', '));
       setProviderBudgetBucket(data.org.providerBudgetBucket ?? 'UNKNOWN');
       setProviderTeamSizeBucket(data.org.providerTeamSizeBucket ?? 'UNKNOWN');
+      await refreshTrustScore();
       setSuccess(true);
     } catch (err: any) {
       setError(err?.message ?? labels.commonRequestFailed);
@@ -289,6 +319,36 @@ export default function OrgSettings({ user, org }: OrgSettingsProps) {
           </div>
         </div>
 
+        <div style={sectionStyle}>
+          <div style={trustScoreHeaderStyle}>
+            <h3 style={{ margin: 0 }}>{labels.orgTrustScoreTitle}</h3>
+            {trustScore ? (
+              <span style={trustScoreBadgeStyle}>{trustScore.statusLabel}</span>
+            ) : null}
+          </div>
+          <div style={trustScoreValueStyle}>
+            {trustScore ? Math.round(trustScore.scoreOverall) : '--'}
+          </div>
+          {trustScore?.explanationPublic?.length ? (
+            <ul style={trustScoreListStyle}>
+              {trustScore.explanationPublic.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
+          ) : (
+            <p style={hintStyle}>{labels.orgTrustScoreEmpty}</p>
+          )}
+          {trustScore ? (
+            <div style={trustScoreMetaStyle}>
+              {labels.orgTrustScoreUpdatedLabel} {formatDateTime(trustScore.computedAt)} ·{' '}
+              {trustScore.algorithmVersion}
+            </div>
+          ) : null}
+          {trustScoreError ? (
+            <p style={errorStyle}>{labels.commonErrorPrefix} {trustScoreError}</p>
+          ) : null}
+        </div>
+
         {error ? <p style={errorStyle}>{labels.commonErrorPrefix} {error}</p> : null}
         {success ? <p style={successStyle}>{labels.orgSaved}</p> : null}
 
@@ -320,6 +380,42 @@ const sectionStyle = {
   borderRadius: '12px',
   border: '1px solid var(--border)',
   background: 'var(--surface-2)',
+};
+
+const trustScoreHeaderStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: '0.75rem',
+  flexWrap: 'wrap' as const,
+};
+
+const trustScoreBadgeStyle = {
+  padding: '0.3rem 0.7rem',
+  borderRadius: '999px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  fontSize: '0.75rem',
+  fontWeight: 700,
+  color: 'var(--text)',
+};
+
+const trustScoreValueStyle = {
+  fontSize: '2rem',
+  fontWeight: 700,
+  marginTop: '0.5rem',
+};
+
+const trustScoreListStyle = {
+  margin: '0.75rem 0 0',
+  paddingLeft: '1.2rem',
+  color: 'var(--text)',
+};
+
+const trustScoreMetaStyle = {
+  marginTop: '0.75rem',
+  color: 'var(--muted)',
+  fontSize: '0.85rem',
 };
 
 const inputStyle = {
@@ -392,10 +488,27 @@ export const getServerSideProps: GetServerSideProps<OrgSettingsProps> = async (c
   if (result.redirect) {
     return { redirect: result.redirect };
   }
+  const trustScore = await fetchTrustScore(result.context!.cookie);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
+      trustScore,
     },
   };
 };
+
+async function fetchTrustScore(cookie?: string): Promise<TrustScoreSnapshot | null> {
+  const res = await fetch(`${BACKEND_BASE}/v1/org/trust-score`, {
+    headers: { cookie: cookie ?? '' },
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const data = await res.json();
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const trustScore = (data as { trustScore?: TrustScoreSnapshot | null }).trustScore ?? null;
+  return trustScore && typeof trustScore === 'object' ? trustScore : null;
+}

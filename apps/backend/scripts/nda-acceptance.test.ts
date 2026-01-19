@@ -40,6 +40,15 @@ class MockPrismaService {
   };
 }
 
+class MockTrustScoreService {
+  public calls: any[] = [];
+
+  async recalculateOrgTrustScore(input: any) {
+    this.calls.push(input);
+    return { snapshot: { id: 'snapshot-1' } };
+  }
+}
+
 function assert(condition: any, message: string) {
   if (!condition) {
     throw new Error(message);
@@ -49,7 +58,8 @@ function assert(condition: any, message: string) {
 async function run() {
   const prisma = new MockPrismaService();
   const events = new MockEventService();
-  const ndaService = new NdaService(prisma as any, events as any);
+  const trustScore = new MockTrustScoreService();
+  const ndaService = new NdaService(prisma as any, events as any, trustScore as any);
 
   const acceptance = await ndaService.acceptMutualNda({
     orgId: 'org-1',

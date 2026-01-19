@@ -81,6 +81,15 @@ class StubAiAccessService {
   }
 }
 
+class MockTrustScoreService {
+  public calls: any[] = [];
+
+  async recalculateOrgTrustScore(input: any) {
+    this.calls.push(input);
+    return { snapshot: { id: 'snapshot-1' } };
+  }
+}
+
 class MockPrismaService {
   organizations: any[] = [{ id: 'org-1', policyAiEnabled: true }];
   intents: any[] = [];
@@ -211,7 +220,14 @@ async function testInsufficientL1Data() {
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
   const aiAccess = new StubAiAccessService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
+  const trustScore = new MockTrustScoreService();
+  const service = new IntentService(
+    prisma as any,
+    events as any,
+    aiGateway as any,
+    aiAccess as any,
+    trustScore as any,
+  );
 
   const intentId = 'intent-1';
   prisma.intents.push({
@@ -241,7 +257,14 @@ async function testPolicyDisabled() {
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
   const aiAccess = new StubAiAccessService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
+  const trustScore = new MockTrustScoreService();
+  const service = new IntentService(
+    prisma as any,
+    events as any,
+    aiGateway as any,
+    aiAccess as any,
+    trustScore as any,
+  );
 
   const intentId = 'intent-policy';
   prisma.intents.push({
@@ -273,7 +296,14 @@ async function testL2AccessBlocked() {
   const aiGateway = new StubAiGatewayService();
   const aiAccess = new StubAiAccessService();
   aiAccess.allowL2 = false;
-  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
+  const trustScore = new MockTrustScoreService();
+  const service = new IntentService(
+    prisma as any,
+    events as any,
+    aiGateway as any,
+    aiAccess as any,
+    trustScore as any,
+  );
 
   const intentId = 'intent-l2-block';
   prisma.intents.push({
@@ -309,7 +339,14 @@ async function testSuggestAndDecideFlow() {
   const events = new EventService(prisma as any);
   const aiGateway = new StubAiGatewayService();
   const aiAccess = new StubAiAccessService();
-  const service = new IntentService(prisma as any, events as any, aiGateway as any, aiAccess as any);
+  const trustScore = new MockTrustScoreService();
+  const service = new IntentService(
+    prisma as any,
+    events as any,
+    aiGateway as any,
+    aiAccess as any,
+    trustScore as any,
+  );
 
   const intentId = 'intent-2';
   prisma.intents.push({

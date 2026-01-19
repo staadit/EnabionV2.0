@@ -13,6 +13,7 @@ import { ExportModule } from './export/export.module';
 import { ThemeModule } from './theme/theme.module';
 import { AiGatewayModule } from './ai-gateway/ai-gateway.module';
 import { AvatarsModule } from './avatars/avatars.module';
+import { TrustScoreModule } from './trustscore/trustscore.module';
 
 @Module({
   imports: [
@@ -42,6 +43,7 @@ import { AvatarsModule } from './avatars/avatars.module';
     ThemeModule,
     AiGatewayModule,
     AvatarsModule,
+    TrustScoreModule,
   ],
   controllers: [AppController],
   providers: [AppService],

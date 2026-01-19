@@ -206,6 +206,15 @@ class MockEventService extends EventService {
   }
 }
 
+class MockTrustScoreService {
+  public calls: any[] = [];
+
+  async recalculateOrgTrustScore(input: any) {
+    this.calls.push(input);
+    return { snapshot: { id: 'snapshot-1' } };
+  }
+}
+
 function assert(cond: any, msg: string) {
   if (!cond) {
     throw new Error(msg);
@@ -246,7 +255,8 @@ async function run() {
   });
   const attachmentService = new AttachmentService(prisma as any, blobService, eventService as any);
   const policy = new AttachmentAccessPolicy();
-  const ndaService = new NdaService(prisma as any, eventService as any);
+  const trustScore = new MockTrustScoreService();
+  const ndaService = new NdaService(prisma as any, eventService as any, trustScore as any);
   const ndaPolicy = new NdaPolicy(ndaService);
   const controller = new AttachmentController(
     attachmentService,

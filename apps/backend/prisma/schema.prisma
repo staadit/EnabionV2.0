@@ -38,6 +38,10 @@ model Organization {
   matchLists MatchList[]
   matchFeedbacks MatchFeedback[]
   matchFeedbackCandidates MatchFeedback[] @relation("MatchFeedbackCandidateOrg")
+  trustScoreLatestId String? @unique
+  trustScoreLatest TrustScoreSnapshot? @relation("TrustScoreLatest", fields: [trustScoreLatestId], references: [id])
+  trustScoreSnapshots TrustScoreSnapshot[] @relation("TrustScoreOrg")
+  trustScoreSubjectSnapshots TrustScoreSnapshot[] @relation("TrustScoreSubjectOrg")
   createdAt DateTime @default(now())
 }
 
@@ -67,6 +71,7 @@ model User {
   updatedOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationUpdatedBy")
   createdMatchLists MatchList[] @relation("MatchListCreatedBy")
   matchFeedbacks MatchFeedback[] @relation("MatchFeedbackActor")
+  trustScoreSnapshots TrustScoreSnapshot[] @relation("TrustScoreActor")
   createdAt DateTime @default(now())
 }
 
@@ -233,6 +238,10 @@ enum LeadPriority {
   P3
 }
 
+enum TrustScoreScope {
+  GLOBAL
+}
+
 model Event {
   id             String   @id
   schemaVersion  Int
@@ -255,6 +264,34 @@ model Event {
   @@index([orgId, subjectId, type, occurredAt])
   @@index([correlationId])
   @@index([occurredAt])
+}
+
+model TrustScoreSnapshot {
+  id                 String          @id @default(cuid())
+  orgId              String
+  subjectOrgId       String
+  scope              TrustScoreScope @default(GLOBAL)
+  scoreOverall       Int
+  scoreProfile       Int?
+  scoreResponsiveness Int?
+  scoreBehaviour     Int?
+  statusLabel        String
+  explanationPublic  Json?
+  explanationInternal Json?
+  triggerReason      String?
+  actorUserId        String?
+  algorithmVersion   String
+  computedAt         DateTime
+  createdAt          DateTime @default(now())
+
+  org        Organization @relation("TrustScoreOrg", fields: [orgId], references: [id])
+  subjectOrg Organization @relation("TrustScoreSubjectOrg", fields: [subjectOrgId], references: [id])
+  actorUser  User?        @relation("TrustScoreActor", fields: [actorUserId], references: [id])
+  latestFor  Organization? @relation("TrustScoreLatest")
+
+  @@index([orgId, computedAt])
+  @@index([subjectOrgId, computedAt])
+  @@index([orgId, subjectOrgId, computedAt])
 }
 
 model AiRateLimitWindow {

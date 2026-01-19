@@ -24,6 +24,9 @@ export type AdminLabels = {
   orgProviderRegionsHint: string;
   orgSave: string;
   orgSaved: string;
+  orgTrustScoreTitle: string;
+  orgTrustScoreEmpty: string;
+  orgTrustScoreUpdatedLabel: string;
   membersTitle: string;
   membersEmail: string;
   membersRole: string;
@@ -75,6 +78,9 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgProviderRegionsHint: 'Comma-separated, e.g. PL, DE, NL.',
     orgSave: 'Save changes',
     orgSaved: 'Saved.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore will appear after profile/pipeline activity.',
+    orgTrustScoreUpdatedLabel: 'Updated',
     membersTitle: 'Members and roles',
     membersEmail: 'Email',
     membersRole: 'Role',
@@ -124,6 +130,9 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgProviderRegionsHint: 'Po przecinku, np. PL, DE, NL.',
     orgSave: 'Zapisz zmiany',
     orgSaved: 'Zapisano.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore pojawi sie po aktywnosci profilu/pipeline.',
+    orgTrustScoreUpdatedLabel: 'Aktualizacja',
     membersTitle: 'Czlonkowie i role',
     membersEmail: 'Email',
     membersRole: 'Rola',
@@ -173,6 +182,9 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgProviderRegionsHint: 'Kommagetrennt, z.B. PL, DE, NL.',
     orgSave: 'Aenderungen speichern',
     orgSaved: 'Gespeichert.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore erscheint nach Profil/Pipeline Aktivitaet.',
+    orgTrustScoreUpdatedLabel: 'Aktualisiert',
     membersTitle: 'Mitglieder und Rollen',
     membersEmail: 'E-Mail',
     membersRole: 'Rolle',
@@ -222,6 +234,9 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgProviderRegionsHint: 'Komma-gescheiden, bv. PL, DE, NL.',
     orgSave: 'Wijzigingen opslaan',
     orgSaved: 'Opgeslagen.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore verschijnt na profiel/pipeline activiteit.',
+    orgTrustScoreUpdatedLabel: 'Bijgewerkt',
     membersTitle: 'Leden en rollen',
     membersEmail: 'Email',
     membersRole: 'Rol',

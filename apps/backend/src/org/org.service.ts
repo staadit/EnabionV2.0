@@ -11,6 +11,7 @@ import { UserRole } from '../auth/auth.types';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
 import { PrismaService } from '../prisma.service';
+import { TrustScoreService } from '../trustscore/trustscore.service';
 import { isReservedOrgSlug } from './org-slug';
 
 type CreateMemberInput = {
@@ -78,6 +79,7 @@ export class OrgService {
     private readonly prisma: PrismaService,
     private readonly authService: AuthService,
     private readonly events: EventService,
+    private readonly trustScore: TrustScoreService,
   ) {}
 
   async getOrg(orgId: string) {
@@ -226,6 +228,11 @@ export class OrgService {
         orgId: input.orgId,
         actorUserId: input.actorUserId,
         payload: { payloadVersion: 1, orgId: input.orgId, changedFields: profileChanges },
+      });
+      await this.trustScore.recalculateOrgTrustScore({
+        orgId: input.orgId,
+        actorUserId: input.actorUserId,
+        reason: 'ORG_PROFILE_UPDATED',
       });
     }
 

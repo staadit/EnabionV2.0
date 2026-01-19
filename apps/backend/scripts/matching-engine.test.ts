@@ -26,6 +26,7 @@ class MockPrismaService {
   matchLists: any[] = [];
   matchFeedbacks: any[] = [];
   events: any[] = [];
+  trustScoreSnapshots: any[] = [];
 
   intent = {
     findFirst: async (args: any) => {
@@ -64,6 +65,14 @@ class MockPrismaService {
         results = results.filter((org) => org.id !== where.id.not);
       }
       return results.map((org) => applySelect(org, args?.select));
+    },
+  };
+
+  trustScoreSnapshot = {
+    findMany: async (args: any) => {
+      const ids = args?.where?.id?.in ?? [];
+      const filtered = this.trustScoreSnapshots.filter((snapshot) => ids.includes(snapshot.id));
+      return filtered.map((snapshot) => applySelect(snapshot, args?.select));
     },
   };
 
@@ -117,10 +126,20 @@ class MockPrismaService {
   };
 }
 
+class MockTrustScoreService {
+  public calls: any[] = [];
+
+  async recalculateOrgTrustScore(input: any) {
+    this.calls.push(input);
+    return { snapshot: { id: 'snapshot-1' } };
+  }
+}
+
 async function testMatchingEngine() {
   const prisma = new MockPrismaService();
   const events = new EventService(prisma as any);
-  const service = new IntentMatchingService(prisma as any, events as any);
+  const trustScore = new MockTrustScoreService();
+  const service = new IntentMatchingService(prisma as any, events as any, trustScore as any);
 
   prisma.intents = [
     {
@@ -155,6 +174,7 @@ async function testMatchingEngine() {
       providerRegions: ['EU'],
       providerTags: ['react', 'saas'],
       providerBudgetBucket: 'EUR_10K_50K',
+      trustScoreLatestId: 'ts-alpha',
     },
     {
       id: 'org-b',
@@ -175,6 +195,15 @@ async function testMatchingEngine() {
       providerRegions: [],
       providerTags: [],
       providerBudgetBucket: 'UNKNOWN',
+    },
+  ];
+
+  prisma.trustScoreSnapshots = [
+    {
+      id: 'ts-alpha',
+      scoreOverall: 62,
+      statusLabel: 'Good behaviour',
+      computedAt: new Date(),
     },
   ];
 
