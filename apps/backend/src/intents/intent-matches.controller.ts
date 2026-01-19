@@ -183,4 +183,13 @@ export class IntentMatchesV1Controller {
     }
     return req.user;
   }
+
+  private parseBody<T extends z.ZodTypeAny>(schema: T, body: unknown): z.infer<T> {
+    const result = schema.safeParse(body);
+    if (result.success) {
+      return result.data;
+    }
+    const message = result.error.issues.map((issue) => issue.message).join('; ');
+    throw new BadRequestException(message || 'Invalid request');
+  }
 }
