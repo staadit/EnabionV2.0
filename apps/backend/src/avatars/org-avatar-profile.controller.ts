@@ -36,10 +36,11 @@ export class OrgAvatarProfileController {
   async updateProfile(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
     const user = this.requireUser(req);
     const parsed = this.parseBody(profileSchema, body);
+    const normalized = this.normalizeProfileInput(parsed);
     const profile = await this.orgAvatar.updateProfile({
       orgId: user.orgId,
       actorUserId: user.id,
-      profile: parsed,
+      profile: normalized,
     });
     return { profile };
   }
@@ -58,5 +59,17 @@ export class OrgAvatarProfileController {
     }
     const message = result.error.issues.map((issue) => issue.message).join('; ');
     throw new BadRequestException(message || 'Invalid request');
+  }
+
+  private normalizeProfileInput(input: z.infer<typeof profileSchema>) {
+    return {
+      markets: input.markets ?? undefined,
+      industries: input.industries ?? undefined,
+      clientTypes: input.clientTypes ?? undefined,
+      servicePortfolio: input.servicePortfolio ?? undefined,
+      techStack: input.techStack ?? undefined,
+      excludedSectors: input.excludedSectors ?? undefined,
+      constraints: input.constraints ?? undefined,
+    };
   }
 }

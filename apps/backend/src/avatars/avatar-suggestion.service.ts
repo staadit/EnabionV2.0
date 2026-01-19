@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { ulid } from 'ulid';
 import { PrismaService } from '../prisma.service';
 import { EventService } from '../events/event.service';
@@ -74,7 +75,7 @@ export class AvatarSuggestionService {
           title: input.title,
           l1Text: input.l1Text ?? null,
           evidenceRef: input.evidenceRef ?? null,
-          proposedPatch: input.proposedPatch ?? undefined,
+          proposedPatch: this.toJsonValue(input.proposedPatch),
           ctas: input.ctas ?? undefined,
           metadata: input.metadata ?? undefined,
           language: input.language ?? null,
@@ -95,7 +96,7 @@ export class AvatarSuggestionService {
         title: input.title,
         l1Text: input.l1Text ?? null,
         evidenceRef: input.evidenceRef ?? null,
-        proposedPatch: input.proposedPatch ?? undefined,
+        proposedPatch: this.toJsonValue(input.proposedPatch),
         ctas: input.ctas ?? undefined,
         metadata: input.metadata ?? undefined,
         language: input.language ?? null,
@@ -242,9 +243,16 @@ export class AvatarSuggestionService {
     const note = typeof input.note === 'string' ? input.note.trim() : '';
     const next = { ...base, decision: input.decision };
     if (note) {
-      next.decisionNote = note;
+      next['decisionNote'] = note;
     }
     return next;
+  }
+
+  private toJsonValue(value: unknown): Prisma.InputJsonValue | undefined {
+    if (value === null || value === undefined) {
+      return undefined;
+    }
+    return value as Prisma.InputJsonValue;
   }
 
   private resolveSubjectType(suggestion: { subjectType: string | null; intentId: string | null }) {

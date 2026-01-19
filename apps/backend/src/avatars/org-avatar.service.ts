@@ -1,4 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma.service';
 import { AvatarSuggestionService } from './avatar-suggestion.service';
 import { IntentStage } from '../intents/intent.types';
@@ -56,7 +57,7 @@ export class OrgAvatarService {
       servicePortfolio: this.normalizeTagList(input.profile.servicePortfolio),
       techStack: this.normalizeTagList(input.profile.techStack),
       excludedSectors: this.normalizeTagList(input.profile.excludedSectors),
-      constraints: this.normalizeConstraints(input.profile.constraints),
+      constraints: this.normalizeConstraints(input.profile.constraints) as Prisma.InputJsonValue,
     };
 
     const updated = await this.prisma.orgAvatarProfile.upsert({
