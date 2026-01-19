@@ -241,7 +241,7 @@ export class AvatarSuggestionService {
   ) {
     const base = this.normalizeMetadata(metadata);
     const note = typeof input.note === 'string' ? input.note.trim() : '';
-    const next = { ...base, decision: input.decision };
+    const next: Record<string, unknown> = { ...base, decision: input.decision };
     if (note) {
       next['decisionNote'] = note;
     }
