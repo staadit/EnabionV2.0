@@ -5,6 +5,7 @@ import OrgShell from '../../components/OrgShell';
 import { getXNavItems } from '../../lib/org-nav';
 import { formatDateTime } from '../../lib/date-format';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../lib/org-context';
+import { getAvatarLabels } from '../../lib/avatar-i18n';
 
 type AvatarsProps = {
   user: OrgUser;
@@ -30,77 +31,89 @@ type AiGatewayEvent = {
 };
 
 export default function Avatars({ user, org, events, error }: AvatarsProps) {
+  const labels = getAvatarLabels(org.defaultLanguage);
   return (
     <OrgShell
       user={user}
       org={org}
-      title="Avatars"
-      subtitle="Intent Coach and AI Gateway activity."
+      title={labels.avatarsTitle}
+      subtitle={labels.avatarsSubtitle}
       navItems={getXNavItems(org.slug, 'avatars')}
     >
       <Head>
-        <title>{org.name} - Avatars</title>
+        <title>{org.name} - {labels.avatarsTitle}</title>
       </Head>
-      <div style={heroStyle}>
-        <div>
-          <p style={{ marginTop: 0, fontWeight: 600 }}>Intent Coach workspace</p>
-          <p style={{ margin: 0 }}>
-            Run Intent Coach from an intent. Results use L1 fields only and are logged as
-            AI Gateway events.
-          </p>
+      <div style={cardGridStyle}>
+        <div style={heroCardStyle}>
+          <p style={heroTitleStyle}>{labels.systemCardTitle}</p>
+          <p style={heroBodyStyle}>{labels.systemCardBody}</p>
+          <Link href={`/${org.slug}/avatars/system`} style={buttonStyle}>
+            {labels.systemCardCta}
+          </Link>
         </div>
-        <Link href={`/${org.slug}/intents`} style={buttonStyle}>
-          Go to intents
-        </Link>
+        <div style={heroCardStyle}>
+          <p style={heroTitleStyle}>{labels.orgCardTitle}</p>
+          <p style={heroBodyStyle}>{labels.orgCardBody}</p>
+          <Link href={`/${org.slug}/avatars/org`} style={buttonStyle}>
+            {labels.orgCardCta}
+          </Link>
+        </div>
       </div>
 
       <div style={sectionStyle}>
-        <h3 style={sectionTitleStyle}>Recent AI Gateway activity</h3>
-        {error ? <p style={errorStyle}>{error}</p> : null}
+        <h3 style={sectionTitleStyle}>{labels.aiGatewayTitle}</h3>
+        {error ? <p style={errorStyle}>{labels.aiGatewayErrorMessage}</p> : null}
         {events.length ? (
           <div style={eventListStyle}>
             {events.map((event) => (
               <div key={event.id} style={eventCardStyle}>
                 <div style={eventHeaderStyle}>
                   <div>
-                    <p style={metaLabelStyle}>Type</p>
+                    <p style={metaLabelStyle}>{labels.aiGatewayTypeLabel}</p>
                     <p style={metaValueStyle}>{event.type}</p>
                   </div>
                   <div>
-                    <p style={metaLabelStyle}>Occurred</p>
+                    <p style={metaLabelStyle}>{labels.aiGatewayOccurredLabel}</p>
                     <p style={metaValueStyle}>{formatDateTime(event.occurredAt)}</p>
                   </div>
                   <div>
-                    <p style={metaLabelStyle}>Use case</p>
+                    <p style={metaLabelStyle}>{labels.aiGatewayUseCaseLabel}</p>
                     <p style={metaValueStyle}>{event.payload.useCase ?? '-'}</p>
                   </div>
                   <div>
-                    <p style={metaLabelStyle}>Model</p>
+                    <p style={metaLabelStyle}>{labels.aiGatewayModelLabel}</p>
                     <p style={metaValueStyle}>{event.payload.model ?? '-'}</p>
                   </div>
                 </div>
                 <div style={eventMetaRowStyle}>
                   {event.payload.totalTokens !== null && event.payload.totalTokens !== undefined ? (
                     <span style={metaSubStyle}>
-                      Tokens: {event.payload.inputTokens ?? 0}/
-                      {event.payload.outputTokens ?? 0} (total {event.payload.totalTokens ?? 0})
+                      {labels.aiGatewayTokensLabel}: {event.payload.inputTokens ?? 0}/
+                      {event.payload.outputTokens ?? 0} ({labels.aiGatewayTotalLabel}{' '}
+                      {event.payload.totalTokens ?? 0})
                     </span>
                   ) : null}
                   {event.payload.latencyMs !== null && event.payload.latencyMs !== undefined ? (
-                    <span style={metaSubStyle}>Latency: {event.payload.latencyMs}ms</span>
+                    <span style={metaSubStyle}>
+                      {labels.aiGatewayLatencyLabel}: {event.payload.latencyMs}ms
+                    </span>
                   ) : null}
                   {event.payload.errorClass ? (
-                    <span style={metaSubStyle}>Error: {event.payload.errorClass}</span>
+                    <span style={metaSubStyle}>
+                      {labels.aiGatewayErrorLabel}: {event.payload.errorClass}
+                    </span>
                   ) : null}
                   {event.subjectId ? (
-                    <span style={metaSubStyle}>Request ID: {event.subjectId}</span>
+                    <span style={metaSubStyle}>
+                      {labels.aiGatewayRequestIdLabel}: {event.subjectId}
+                    </span>
                   ) : null}
                 </div>
               </div>
             ))}
           </div>
         ) : (
-          <p style={{ marginTop: '0.5rem' }}>No AI Gateway events yet.</p>
+          <p style={{ marginTop: '0.5rem' }}>{labels.aiGatewayEmpty}</p>
         )}
       </div>
     </OrgShell>
@@ -116,16 +129,31 @@ const colors = {
   muted2: 'var(--muted-2)',
 };
 
-const heroStyle = {
-  padding: '1rem 1.25rem',
+const cardGridStyle = {
+  display: 'grid',
+  gap: '1rem',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+};
+
+const heroCardStyle = {
+  padding: '1.1rem 1.25rem',
   borderRadius: '12px',
   border: `1px solid ${colors.border}`,
   background: colors.surface2,
-  display: 'flex',
-  flexWrap: 'wrap' as const,
-  gap: '1rem',
-  alignItems: 'center',
-  justifyContent: 'space-between',
+  display: 'grid',
+  gap: '0.75rem',
+  boxShadow: 'var(--shadow)',
+};
+
+const heroTitleStyle = {
+  marginTop: 0,
+  marginBottom: 0,
+  fontWeight: 700,
+};
+
+const heroBodyStyle = {
+  margin: 0,
+  color: colors.muted,
 };
 
 const buttonStyle = {

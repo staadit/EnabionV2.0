@@ -24,6 +24,12 @@ export type OwnerContext = {
   cookie: string;
 };
 
+export type AdminContext = {
+  user: AdminUser;
+  org: AdminOrg;
+  cookie: string;
+};
+
 const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
 function loginRedirect(path: string): { redirect: Redirect } {
@@ -72,6 +78,47 @@ export async function getOwnerContext(
     }
     if (user.role !== 'Owner') {
       return { redirect: { destination: '/', permanent: false } };
+    }
+
+    const orgRes = await fetch(`${BACKEND_BASE}/v1/org/me`, {
+      headers: { cookie },
+    });
+    if (!orgRes.ok) {
+      return { redirect: { destination: '/', permanent: false } };
+    }
+    const orgData = await orgRes.json();
+    const org = orgData?.org as AdminOrg | undefined;
+    if (!org) {
+      return { redirect: { destination: '/', permanent: false } };
+    }
+
+    const paramSlug = ctx.params?.orgSlug;
+    if (typeof paramSlug === 'string' && paramSlug !== org.slug) {
+      return { redirect: buildOrgSlugRedirect(ctx.resolvedUrl, org.slug) };
+    }
+
+    return { context: { user, org, cookie } };
+  } catch {
+    return loginRedirect(ctx.resolvedUrl);
+  }
+}
+
+export async function getAdminContext(
+  ctx: GetServerSidePropsContext,
+): Promise<{ context?: AdminContext; redirect?: Redirect }> {
+  const cookie = ctx.req.headers.cookie ?? '';
+  try {
+    const authRes = await fetch(`${BACKEND_BASE}/auth/me`, {
+      headers: { cookie },
+    });
+    if (!authRes.ok) {
+      return loginRedirect(ctx.resolvedUrl);
+    }
+
+    const authData = await authRes.json();
+    const user = authData?.user as AdminUser | undefined;
+    if (!user) {
+      return loginRedirect(ctx.resolvedUrl);
     }
 
     const orgRes = await fetch(`${BACKEND_BASE}/v1/org/me`, {

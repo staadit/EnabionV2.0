@@ -41,7 +41,6 @@ export class OrgController {
   @Get('me')
   async getOrg(@Req() req: AuthenticatedRequest) {
     const user = this.requireUser(req);
-    this.assertOwner(user.role);
 
     const org = await this.orgService.getOrg(user.orgId);
     return { org: this.toOrgResponse(org) };

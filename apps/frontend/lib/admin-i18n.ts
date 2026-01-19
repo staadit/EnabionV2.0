@@ -8,6 +8,7 @@ export type AdminLabels = {
   navMembers: string;
   navPreferences: string;
   navNda: string;
+  navAvatar: string;
   orgTitle: string;
   orgNameLabel: string;
   orgSlugLabel: string;
@@ -50,6 +51,7 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Members',
     navPreferences: 'Preferences',
     navNda: 'NDA',
+    navAvatar: 'Avatar profile',
     orgTitle: 'Organization profile',
     orgNameLabel: 'Org name',
     orgSlugLabel: 'Org slug',
@@ -90,6 +92,7 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Czlonkowie',
     navPreferences: 'Preferencje',
     navNda: 'NDA',
+    navAvatar: 'Profil Avatara',
     orgTitle: 'Profil organizacji',
     orgNameLabel: 'Nazwa organizacji',
     orgSlugLabel: 'Slug organizacji',
@@ -130,6 +133,7 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Mitglieder',
     navPreferences: 'Einstellungen',
     navNda: 'NDA',
+    navAvatar: 'Avatar Profil',
     orgTitle: 'Organisationsprofil',
     orgNameLabel: 'Org-Name',
     orgSlugLabel: 'Org-Slug',
@@ -170,6 +174,7 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Leden',
     navPreferences: 'Voorkeuren',
     navNda: 'NDA',
+    navAvatar: 'Avatar profiel',
     orgTitle: 'Organisatieprofiel',
     orgNameLabel: 'Organisatienaam',
     orgSlugLabel: 'Org slug',

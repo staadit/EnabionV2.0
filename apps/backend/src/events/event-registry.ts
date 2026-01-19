@@ -102,7 +102,15 @@ const aiGatewayUseCaseEnum = z.enum([
   'summary_internal',
   'help_explanation',
 ]);
-const suggestionKindEnum = z.enum(['missing_info', 'risk', 'question', 'rewrite', 'summary']);
+const suggestionKindEnum = z.enum([
+  'missing_info',
+  'risk',
+  'question',
+  'rewrite',
+  'summary',
+  'lead_qualification',
+  'next_step',
+]);
 const suggestionDecisionEnum = z.enum(['ACCEPTED', 'REJECTED']);
 const feedbackSentimentEnum = z.enum(['UP', 'DOWN', 'NEUTRAL']);
 const feedbackReasonCodeEnum = z.enum([
@@ -193,21 +201,23 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     toLevel: z.enum(['L1', 'L2']),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_ISSUED]: basePayload.extend({
-    intentId: z.string().min(1),
+    intentId: z.string().min(1).optional(),
     avatarType: z.enum(['SYSTEM', 'ORG_X', 'INTENT_COACH']),
     suggestionId: z.string().min(1),
     suggestionKind: suggestionKindEnum,
     suggestionL1Text: z.string().min(1).optional(),
     suggestionRef: z.string().min(1).optional(),
+    fitBand: z.enum(['HIGH', 'MEDIUM', 'LOW', 'NO_FIT']).optional(),
+    priority: z.enum(['P1', 'P2', 'P3']).optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_ACCEPTED]: basePayload.extend({
     suggestionId: z.string().min(1),
-    intentId: z.string().min(1),
-    appliedFields: z.array(z.string().min(1)),
+    intentId: z.string().min(1).optional(),
+    appliedFields: z.array(z.string().min(1)).optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_REJECTED]: basePayload.extend({
     suggestionId: z.string().min(1),
-    intentId: z.string().min(1),
+    intentId: z.string().min(1).optional(),
     reasonCode: feedbackReasonCodeEnum.optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK]: basePayload.extend({

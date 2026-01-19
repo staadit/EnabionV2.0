@@ -1,6 +1,8 @@
 import Link from 'next/link';
 import type { ReactNode, CSSProperties } from 'react';
+import { useEffect, useState } from 'react';
 import type { OrgInfo, OrgUser } from '../lib/org-context';
+import { getAvatarLabels } from '../lib/avatar-i18n';
 import { ThemeSwitcher } from './theme/ThemeSwitcher';
 
 export type NavItem = {
@@ -28,8 +30,62 @@ export default function OrgShell({
   navItems,
   children,
 }: OrgShellProps) {
+  const avatarLabels = getAvatarLabels(org.defaultLanguage);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (window.sessionStorage.getItem('onboardingPromptDismissed') === '1') {
+      return;
+    }
+    let active = true;
+    fetch('/api/avatars/system/onboarding-state')
+      .then((res) => res.json())
+      .then((data) => {
+        if (!active) return;
+        const state = data?.state;
+        if (state && !state.completedAt) {
+          setShowOnboarding(true);
+        }
+      })
+      .catch(() => {
+        if (!active) return;
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
   return (
     <div style={shellStyle}>
+      {showOnboarding ? (
+        <div style={overlayStyle} role="dialog" aria-modal="true">
+          <div style={modalStyle}>
+            <p style={modalEyebrowStyle}>{avatarLabels.onboardingTitle}</p>
+            <h3 style={{ marginTop: 0 }}>{avatarLabels.systemTitle}</h3>
+            <ul style={modalListStyle}>
+              {Object.values(avatarLabels.onboardingStepTitles).map((label) => (
+                <li key={label}>{label}</li>
+              ))}
+            </ul>
+            <div style={modalActionsStyle}>
+              <Link href={`/${org.slug}/avatars/system`} style={primaryActionStyle}>
+                {avatarLabels.systemCardCta}
+              </Link>
+              <button
+                type="button"
+                style={secondaryActionStyle}
+                onClick={() => {
+                  window.sessionStorage.setItem('onboardingPromptDismissed', '1');
+                  setShowOnboarding(false);
+                }}
+              >
+                {avatarLabels.onboardingStepSkip}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       <header style={headerStyle}>
         <div>
           <p style={eyebrowStyle}>{eyebrow}</p>
@@ -193,4 +249,69 @@ const ghostButtonStyle: CSSProperties = {
   textDecoration: 'none',
   fontWeight: 600,
   background: 'var(--surface)',
+};
+
+const overlayStyle: CSSProperties = {
+  position: 'fixed',
+  inset: 0,
+  background: 'rgba(10, 18, 33, 0.6)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '1.5rem',
+  zIndex: 1000,
+};
+
+const modalStyle: CSSProperties = {
+  background: 'var(--surface)',
+  borderRadius: 'var(--radius-2)',
+  border: '1px solid var(--border)',
+  boxShadow: 'var(--shadow)',
+  padding: '1.75rem',
+  maxWidth: '520px',
+  width: '100%',
+};
+
+const modalEyebrowStyle: CSSProperties = {
+  textTransform: 'uppercase',
+  letterSpacing: '0.18em',
+  fontSize: '0.65rem',
+  color: 'var(--muted2)',
+  marginTop: 0,
+  marginBottom: '0.5rem',
+};
+
+const modalListStyle: CSSProperties = {
+  margin: '0 0 1.25rem 0',
+  paddingLeft: '1.1rem',
+  color: 'var(--muted)',
+  display: 'grid',
+  gap: '0.4rem',
+};
+
+const modalActionsStyle: CSSProperties = {
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: '0.75rem',
+};
+
+const primaryActionStyle: CSSProperties = {
+  padding: '0.7rem 1.1rem',
+  borderRadius: 'var(--radius)',
+  border: '1px solid var(--navy)',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  fontWeight: 600,
+  textDecoration: 'none',
+  textAlign: 'center',
+};
+
+const secondaryActionStyle: CSSProperties = {
+  padding: '0.65rem 1rem',
+  borderRadius: 'var(--radius)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  color: 'var(--text)',
+  fontWeight: 600,
+  cursor: 'pointer',
 };

@@ -23,6 +23,9 @@ model Organization {
   coachRuns IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  userOnboardingStates UserOnboardingState[]
+  orgAvatarProfile OrgAvatarProfile?
+  orgLeadQualifications OrgLeadQualification[]
   blobs     Blob[]
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
@@ -49,6 +52,11 @@ model User {
   revokedShareLinks IntentShareLink[] @relation("ShareLinkRevokedBy")
   aiAccessIntents Intent[] @relation("IntentAiAllowL2SetBy")
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  onboardingStates UserOnboardingState[]
+  createdOrgAvatarProfiles OrgAvatarProfile[] @relation("OrgAvatarProfileCreatedBy")
+  updatedOrgAvatarProfiles OrgAvatarProfile[] @relation("OrgAvatarProfileUpdatedBy")
+  createdOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationCreatedBy")
+  updatedOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationUpdatedBy")
   createdAt DateTime @default(now())
 }
 
@@ -130,12 +138,20 @@ enum AvatarType {
   INTENT_COACH
 }
 
+enum AvatarSuggestionSubjectType {
+  INTENT
+  USER
+  ORG
+}
+
 enum AvatarSuggestionKind {
   missing_info
   question
   risk
   rewrite
   summary
+  lead_qualification
+  next_step
 }
 
 enum AvatarSuggestionStatus {
@@ -163,6 +179,19 @@ enum AvatarSuggestionFeedbackReasonCode {
   NOT_RELEVANT
   ALREADY_KNOWN
   OTHER
+}
+
+enum LeadFitBand {
+  HIGH
+  MEDIUM
+  LOW
+  NO_FIT
+}
+
+enum LeadPriority {
+  P1
+  P2
+  P3
 }
 
 model Event {
@@ -221,15 +250,20 @@ model IntentCoachRun {
 model AvatarSuggestion {
   id             String                 @id @default(uuid())
   orgId          String
-  intentId       String
+  intentId       String?
   coachRunId     String?
   avatarType     AvatarType
   kind           AvatarSuggestionKind
+  subjectType    AvatarSuggestionSubjectType? @default(INTENT)
+  subjectId      String?
   targetField    String?
   title          String
   l1Text         String?
   evidenceRef    String?
   proposedPatch  Json?
+  ctas           Json?
+  metadata       Json?
+  language       String?
   status         AvatarSuggestionStatus @default(ISSUED)
   actionable     Boolean                @default(true)
   createdAt      DateTime               @default(now())
@@ -237,11 +271,12 @@ model AvatarSuggestion {
   decidedByUserId String?
 
   org    Organization @relation(fields: [orgId], references: [id])
-  intent Intent       @relation(fields: [intentId], references: [id])
+  intent Intent?      @relation(fields: [intentId], references: [id])
   coachRun IntentCoachRun? @relation(fields: [coachRunId], references: [id])
   feedback AvatarSuggestionFeedback[]
 
   @@index([orgId, intentId, createdAt])
+  @@index([orgId, subjectType, subjectId, createdAt])
   @@index([intentId, status])
   @@index([orgId, status])
 }
@@ -383,6 +418,7 @@ model Intent {
   coachRuns      IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  orgLeadQualifications OrgLeadQualification[]
 
   @@index([orgId])
   @@index([orgId, stage])
@@ -443,4 +479,65 @@ model ThemePaletteRevision {
 
   @@unique([paletteId, revision])
   @@index([paletteId, createdAt])
+}
+
+model UserOnboardingState {
+  id             String   @id @default(cuid())
+  orgId          String
+  userId         String
+  version        String
+  currentStep    String?
+  completedSteps Json?
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id])
+  user User         @relation(fields: [userId], references: [id])
+
+  @@unique([orgId, userId, version])
+  @@index([orgId, userId])
+}
+
+model OrgAvatarProfile {
+  id              String   @id @default(cuid())
+  orgId           String   @unique
+  profileVersion  String
+  markets         Json?
+  industries      Json?
+  clientTypes     Json?
+  servicePortfolio Json?
+  techStack       Json?
+  excludedSectors Json?
+  constraints     Json?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  createdBy User?        @relation("OrgAvatarProfileCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy User?        @relation("OrgAvatarProfileUpdatedBy", fields: [updatedByUserId], references: [id])
+}
+
+model OrgLeadQualification {
+  id              String       @id @default(cuid())
+  orgId           String
+  intentId        String
+  fitBand         LeadFitBand
+  priority        LeadPriority
+  reasons         Json?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  intent    Intent       @relation(fields: [intentId], references: [id])
+  createdBy User?        @relation("OrgLeadQualificationCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy User?        @relation("OrgLeadQualificationUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@unique([orgId, intentId])
+  @@index([orgId, fitBand])
+  @@index([orgId, priority])
 }

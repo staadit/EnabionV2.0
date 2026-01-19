@@ -12,6 +12,7 @@ import { NdaModule } from './nda/nda.module';
 import { ExportModule } from './export/export.module';
 import { ThemeModule } from './theme/theme.module';
 import { AiGatewayModule } from './ai-gateway/ai-gateway.module';
+import { AvatarsModule } from './avatars/avatars.module';
 
 @Module({
   imports: [
@@ -40,6 +41,7 @@ import { AiGatewayModule } from './ai-gateway/ai-gateway.module';
     ExportModule,
     ThemeModule,
     AiGatewayModule,
+    AvatarsModule,
   ],
   controllers: [AppController],
   providers: [AppService],
