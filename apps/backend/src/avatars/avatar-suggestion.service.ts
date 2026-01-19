@@ -158,7 +158,7 @@ export class AvatarSuggestionService {
         status: input.decision,
         decidedAt: now,
         decidedByUserId: input.actorUserId ?? null,
-        metadata,
+        metadata: this.toJsonValue(metadata),
       },
     });
 
