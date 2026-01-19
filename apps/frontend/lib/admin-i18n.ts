@@ -14,6 +14,14 @@ export type AdminLabels = {
   orgSlugLabel: string;
   orgSlugHint: string;
   orgInboundLabel: string;
+  orgProviderTitle: string;
+  orgProviderLanguagesLabel: string;
+  orgProviderRegionsLabel: string;
+  orgProviderTagsLabel: string;
+  orgProviderBudgetLabel: string;
+  orgProviderTeamSizeLabel: string;
+  orgProviderTagsHint: string;
+  orgProviderRegionsHint: string;
   orgSave: string;
   orgSaved: string;
   membersTitle: string;
@@ -57,6 +65,14 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgSlugLabel: 'Org slug',
     orgSlugHint: '3-6 chars, lowercase letters/numbers; optional -01 suffix.',
     orgInboundLabel: 'Inbound email',
+    orgProviderTitle: 'Provider profile (Matching)',
+    orgProviderLanguagesLabel: 'Provider languages',
+    orgProviderRegionsLabel: 'Provider regions',
+    orgProviderTagsLabel: 'Provider tags',
+    orgProviderBudgetLabel: 'Budget bucket',
+    orgProviderTeamSizeLabel: 'Team size',
+    orgProviderTagsHint: 'Comma-separated, e.g. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Comma-separated, e.g. PL, DE, NL.',
     orgSave: 'Save changes',
     orgSaved: 'Saved.',
     membersTitle: 'Members and roles',
@@ -98,6 +114,14 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgSlugLabel: 'Slug organizacji',
     orgSlugHint: '3-6 znakow, male litery/cyfry; opcjonalny sufiks -01.',
     orgInboundLabel: 'Adres inbound email',
+    orgProviderTitle: 'Profil dostawcy (Matching)',
+    orgProviderLanguagesLabel: 'Jezyki dostawcy',
+    orgProviderRegionsLabel: 'Regiony dostawcy',
+    orgProviderTagsLabel: 'Tagi dostawcy',
+    orgProviderBudgetLabel: 'Budzet',
+    orgProviderTeamSizeLabel: 'Wielkosc zespolu',
+    orgProviderTagsHint: 'Po przecinku, np. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Po przecinku, np. PL, DE, NL.',
     orgSave: 'Zapisz zmiany',
     orgSaved: 'Zapisano.',
     membersTitle: 'Czlonkowie i role',
@@ -139,6 +163,14 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgSlugLabel: 'Org-Slug',
     orgSlugHint: '3-6 Zeichen, klein, Buchstaben/Zahlen; optional -01 Suffix.',
     orgInboundLabel: 'Inbound E-Mail',
+    orgProviderTitle: 'Provider Profil (Matching)',
+    orgProviderLanguagesLabel: 'Provider Sprachen',
+    orgProviderRegionsLabel: 'Provider Regionen',
+    orgProviderTagsLabel: 'Provider Tags',
+    orgProviderBudgetLabel: 'Budget',
+    orgProviderTeamSizeLabel: 'Teamgroesse',
+    orgProviderTagsHint: 'Kommagetrennt, z.B. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Kommagetrennt, z.B. PL, DE, NL.',
     orgSave: 'Aenderungen speichern',
     orgSaved: 'Gespeichert.',
     membersTitle: 'Mitglieder und Rollen',
@@ -180,6 +212,14 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     orgSlugLabel: 'Org slug',
     orgSlugHint: '3-6 tekens, lowercase letters/cijfers; optioneel -01 suffix.',
     orgInboundLabel: 'Inbound email',
+    orgProviderTitle: 'Provider profiel (Matching)',
+    orgProviderLanguagesLabel: 'Provider talen',
+    orgProviderRegionsLabel: "Provider regio's",
+    orgProviderTagsLabel: 'Provider tags',
+    orgProviderBudgetLabel: 'Budget',
+    orgProviderTeamSizeLabel: 'Teamgrootte',
+    orgProviderTagsHint: 'Komma-gescheiden, bv. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Komma-gescheiden, bv. PL, DE, NL.',
     orgSave: 'Wijzigingen opslaan',
     orgSaved: 'Opgeslagen.',
     membersTitle: 'Leden en rollen',

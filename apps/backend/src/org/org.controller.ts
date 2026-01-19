@@ -20,6 +20,25 @@ const createMemberSchema = z.object({
   role: z.enum(USER_ROLES).optional(),
 });
 
+const PROVIDER_LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+const PROVIDER_REGION_OPTIONS = ['PL', 'DE', 'NL', 'EU', 'GLOBAL'] as const;
+const PROVIDER_BUDGET_BUCKETS = [
+  'UNKNOWN',
+  'LT_10K',
+  'EUR_10K_50K',
+  'EUR_50K_150K',
+  'EUR_150K_500K',
+  'GT_500K',
+] as const;
+const PROVIDER_TEAM_SIZE_BUCKETS = [
+  'UNKNOWN',
+  'SOLO',
+  'TEAM_2_10',
+  'TEAM_11_50',
+  'TEAM_51_200',
+  'TEAM_201_PLUS',
+] as const;
+
 const updateOrgSchema = z.object({
   name: z.string().min(1).optional(),
   slug: z.string().min(1).optional(),
@@ -27,6 +46,11 @@ const updateOrgSchema = z.object({
   policyAiEnabled: z.boolean().optional(),
   policyShareLinksEnabled: z.boolean().optional(),
   policyEmailIngestEnabled: z.boolean().optional(),
+  providerLanguages: z.array(z.enum(PROVIDER_LANGUAGE_OPTIONS)).optional(),
+  providerRegions: z.array(z.enum(PROVIDER_REGION_OPTIONS)).optional(),
+  providerTags: z.array(z.string()).optional(),
+  providerBudgetBucket: z.enum(PROVIDER_BUDGET_BUCKETS).optional(),
+  providerTeamSizeBucket: z.enum(PROVIDER_TEAM_SIZE_BUCKETS).optional(),
 });
 
 const updateRoleSchema = z.object({
@@ -158,6 +182,11 @@ export class OrgController {
       policyAiEnabled: org.policyAiEnabled,
       policyShareLinksEnabled: org.policyShareLinksEnabled,
       policyEmailIngestEnabled: org.policyEmailIngestEnabled,
+      providerLanguages: org.providerLanguages,
+      providerRegions: org.providerRegions,
+      providerTags: org.providerTags,
+      providerBudgetBucket: org.providerBudgetBucket,
+      providerTeamSizeBucket: org.providerTeamSizeBucket,
       inboundEmailAddress,
     };
   }

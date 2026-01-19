@@ -15,6 +15,11 @@ export type AdminOrg = {
   policyAiEnabled: boolean;
   policyShareLinksEnabled: boolean;
   policyEmailIngestEnabled: boolean;
+  providerLanguages?: string[];
+  providerRegions?: string[];
+  providerTags?: string[];
+  providerBudgetBucket?: string;
+  providerTeamSizeBucket?: string;
   inboundEmailAddress?: string;
 };
 

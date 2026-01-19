@@ -28,6 +28,11 @@ type UpdateOrgInput = {
   policyAiEnabled?: boolean;
   policyShareLinksEnabled?: boolean;
   policyEmailIngestEnabled?: boolean;
+  providerLanguages?: string[];
+  providerRegions?: string[];
+  providerTags?: string[];
+  providerBudgetBucket?: string;
+  providerTeamSizeBucket?: string;
 };
 
 type UpdateMemberRoleInput = {
@@ -44,6 +49,28 @@ type DeactivateMemberInput = {
 };
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+const PROVIDER_LANGUAGE_OPTIONS = LANGUAGE_OPTIONS;
+const PROVIDER_REGION_OPTIONS = ['PL', 'DE', 'NL', 'EU', 'GLOBAL'] as const;
+const PROVIDER_BUDGET_BUCKETS = [
+  'UNKNOWN',
+  'LT_10K',
+  'EUR_10K_50K',
+  'EUR_50K_150K',
+  'EUR_150K_500K',
+  'GT_500K',
+] as const;
+const PROVIDER_TEAM_SIZE_BUCKETS = [
+  'UNKNOWN',
+  'SOLO',
+  'TEAM_2_10',
+  'TEAM_11_50',
+  'TEAM_51_200',
+  'TEAM_201_PLUS',
+] as const;
+const PROVIDER_LANGUAGE_LIMIT = 8;
+const PROVIDER_REGION_LIMIT = 10;
+const PROVIDER_TAG_LIMIT = 30;
+const PROVIDER_TAG_MAX_LENGTH = 40;
 
 @Injectable()
 export class OrgService {
@@ -121,6 +148,66 @@ export class OrgService {
       if (input.policyEmailIngestEnabled !== org.policyEmailIngestEnabled) {
         data.policyEmailIngestEnabled = input.policyEmailIngestEnabled;
         preferenceChanges.push('policyEmailIngestEnabled');
+      }
+    }
+
+    if (Array.isArray(input.providerLanguages)) {
+      const normalized = this.normalizeEnumList(
+        input.providerLanguages,
+        PROVIDER_LANGUAGE_OPTIONS,
+        PROVIDER_LANGUAGE_LIMIT,
+        'providerLanguages',
+      );
+      if (!this.arraysEqual(normalized, org.providerLanguages ?? [])) {
+        data.providerLanguages = normalized;
+        profileChanges.push('providerLanguages');
+      }
+    }
+
+    if (Array.isArray(input.providerRegions)) {
+      const normalized = this.normalizeEnumList(
+        input.providerRegions,
+        PROVIDER_REGION_OPTIONS,
+        PROVIDER_REGION_LIMIT,
+        'providerRegions',
+      );
+      if (!this.arraysEqual(normalized, org.providerRegions ?? [])) {
+        data.providerRegions = normalized;
+        profileChanges.push('providerRegions');
+      }
+    }
+
+    if (Array.isArray(input.providerTags)) {
+      const normalized = this.normalizeTags(input.providerTags);
+      if (!this.arraysEqual(normalized, org.providerTags ?? [])) {
+        data.providerTags = normalized;
+        profileChanges.push('providerTags');
+      }
+    }
+
+    if (typeof input.providerBudgetBucket === 'string') {
+      const bucket = input.providerBudgetBucket.trim().toUpperCase();
+      if (!PROVIDER_BUDGET_BUCKETS.includes(bucket as (typeof PROVIDER_BUDGET_BUCKETS)[number])) {
+        throw new BadRequestException('Invalid provider budget bucket');
+      }
+      if (bucket !== org.providerBudgetBucket) {
+        data.providerBudgetBucket = bucket;
+        profileChanges.push('providerBudgetBucket');
+      }
+    }
+
+    if (typeof input.providerTeamSizeBucket === 'string') {
+      const bucket = input.providerTeamSizeBucket.trim().toUpperCase();
+      if (
+        !PROVIDER_TEAM_SIZE_BUCKETS.includes(
+          bucket as (typeof PROVIDER_TEAM_SIZE_BUCKETS)[number],
+        )
+      ) {
+        throw new BadRequestException('Invalid provider team size bucket');
+      }
+      if (bucket !== org.providerTeamSizeBucket) {
+        data.providerTeamSizeBucket = bucket;
+        profileChanges.push('providerTeamSizeBucket');
       }
     }
 
@@ -341,6 +428,79 @@ export class OrgService {
       return 'BD_AM';
     }
     return role as UserRole;
+  }
+
+  private normalizeEnumList(
+    values: string[],
+    allowed: readonly string[],
+    limit: number,
+    field: string,
+  ): string[] {
+    if (values.length > limit) {
+      throw new BadRequestException(`Too many ${field} entries`);
+    }
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+    for (const value of values) {
+      if (typeof value !== 'string') {
+        continue;
+      }
+      const candidate = value.trim().toUpperCase();
+      if (!candidate) {
+        continue;
+      }
+      if (!allowed.includes(candidate)) {
+        throw new BadRequestException(`Invalid ${field} entry`);
+      }
+      if (!seen.has(candidate)) {
+        normalized.push(candidate);
+        seen.add(candidate);
+      }
+    }
+    if (normalized.length > limit) {
+      throw new BadRequestException(`Too many ${field} entries`);
+    }
+    return normalized;
+  }
+
+  private normalizeTags(values: string[]): string[] {
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+    for (const rawValue of values) {
+      if (typeof rawValue !== 'string') {
+        continue;
+      }
+      const parts = rawValue.split(',');
+      for (const part of parts) {
+        const candidate = part.trim().toLowerCase();
+        if (!candidate) {
+          continue;
+        }
+        if (candidate.length > PROVIDER_TAG_MAX_LENGTH) {
+          throw new BadRequestException('Provider tag is too long');
+        }
+        if (!seen.has(candidate)) {
+          normalized.push(candidate);
+          seen.add(candidate);
+          if (normalized.length > PROVIDER_TAG_LIMIT) {
+            throw new BadRequestException('Too many provider tags');
+          }
+        }
+      }
+    }
+    return normalized;
+  }
+
+  private arraysEqual(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async assertNotLastOwner(

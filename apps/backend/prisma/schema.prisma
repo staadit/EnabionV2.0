@@ -17,6 +17,11 @@ model Organization {
   policyAiEnabled Boolean @default(true)
   policyShareLinksEnabled Boolean @default(false)
   policyEmailIngestEnabled Boolean @default(false)
+  providerLanguages String[] @default([])
+  providerRegions   String[] @default([])
+  providerTags      String[] @default([])
+  providerBudgetBucket ProviderBudgetBucket @default(UNKNOWN)
+  providerTeamSizeBucket ProviderTeamSizeBucket @default(UNKNOWN)
   users     User[]
   intents   Intent[]
   events    Event[]
@@ -95,6 +100,24 @@ enum ConfidentialityLevel {
 enum OrganizationStatus {
   ACTIVE
   SUSPENDED
+}
+
+enum ProviderBudgetBucket {
+  UNKNOWN
+  LT_10K
+  EUR_10K_50K
+  EUR_50K_150K
+  EUR_150K_500K
+  GT_500K
+}
+
+enum ProviderTeamSizeBucket {
+  UNKNOWN
+  SOLO
+  TEAM_2_10
+  TEAM_11_50
+  TEAM_51_200
+  TEAM_201_PLUS
 }
 
 enum BlobStorageDriver {
