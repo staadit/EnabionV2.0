@@ -7,7 +7,7 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma, ProviderBudgetBucket } from '@prisma/client';
 import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES } from '../events/event-registry';
@@ -237,7 +237,8 @@ export class IntentService {
     const tech = this.normalizeTagList(input.tech);
     const industry = this.normalizeTagList(input.industry);
     const region = this.normalizeRegionList(input.region);
-    const budgetBucket = this.normalizeBudgetBucket(input.budgetBucket) ?? 'UNKNOWN';
+    const budgetBucket =
+      this.normalizeBudgetBucket(input.budgetBucket) ?? ProviderBudgetBucket.UNKNOWN;
     const ownerUserId = input.ownerUserId ?? input.actorUserId;
     const now = new Date();
 
@@ -1888,7 +1889,8 @@ export class IntentService {
     }
 
     if (input.budgetBucket !== undefined) {
-      const normalized = this.normalizeBudgetBucket(input.budgetBucket) ?? 'UNKNOWN';
+      const normalized =
+        this.normalizeBudgetBucket(input.budgetBucket) ?? ProviderBudgetBucket.UNKNOWN;
       if (normalized !== intent.budgetBucket) {
         updates.budgetBucket = normalized;
         changedFields.push('budgetBucket');
@@ -2146,14 +2148,16 @@ export class IntentService {
     return normalized;
   }
 
-  private normalizeBudgetBucket(value: string | null | undefined): string | null {
+  private normalizeBudgetBucket(
+    value: string | null | undefined,
+  ): ProviderBudgetBucket | null {
     if (value === null || value === undefined) return null;
     const candidate = value.trim().toUpperCase();
     if (!candidate) return null;
     if (!INTENT_BUDGET_BUCKETS.includes(candidate as (typeof INTENT_BUDGET_BUCKETS)[number])) {
       throw new BadRequestException('Invalid intent budget bucket');
     }
-    return candidate;
+    return candidate as ProviderBudgetBucket;
   }
 
   private arraysEqual(left: string[], right: string[]): boolean {
