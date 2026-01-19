@@ -24,6 +24,7 @@ const EVENT_TYPE_OPTIONS = [
   'AVATAR_SUGGESTION_FEEDBACK',
   'AVATAR_FEEDBACK_RECORDED',
   'MATCH_LIST_CREATED',
+  'MATCH_FEEDBACK_RECORDED',
   'PARTNER_INVITED',
   'PARTNER_RESPONSE_RECEIVED',
   'COMMIT_DECISION_TAKEN',
@@ -275,6 +276,17 @@ function formatEventNote(event: IntentEvent) {
   }
   if (event.type === 'INTENT_SHARED_LINK_VIEWED') {
     return '- Share link viewed';
+  }
+  if (event.type === 'MATCH_FEEDBACK_RECORDED') {
+    const rating = payload.rating ? String(payload.rating).toUpperCase() : '';
+    const candidate = payload.candidateOrgId ? String(payload.candidateOrgId) : '';
+    if (rating && candidate) {
+      return `- ${rating} for ${candidate}`;
+    }
+    if (rating) {
+      return `- ${rating} feedback`;
+    }
+    return '- Feedback recorded';
   }
   return '';
 }

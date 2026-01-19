@@ -5,6 +5,8 @@ import { NdaModule } from '../nda/nda.module';
 import { PrismaService } from '../prisma.service';
 import { AiGatewayModule } from '../ai-gateway/ai-gateway.module';
 import { IntentController } from './intent.controller';
+import { IntentMatchesController, IntentMatchesV1Controller } from './intent-matches.controller';
+import { IntentMatchingService } from './intent-matching.service';
 import { IntentRedactionController } from './intent-redaction.controller';
 import { IntentV1Controller } from './intent-v1.controller';
 import { IntentRedactionService } from './intent-redaction.service';
@@ -17,12 +19,20 @@ import { IntentService } from './intent.service';
   imports: [AuthModule, EventModule, NdaModule, AiGatewayModule],
   controllers: [
     IntentController,
+    IntentMatchesController,
+    IntentMatchesV1Controller,
     IntentV1Controller,
     IntentRedactionController,
     ShareLinkController,
     SharePublicController,
   ],
-  providers: [IntentService, IntentRedactionService, ShareLinkService, PrismaService],
+  providers: [
+    IntentService,
+    IntentMatchingService,
+    IntentRedactionService,
+    ShareLinkService,
+    PrismaService,
+  ],
   exports: [IntentRedactionService, IntentService],
 })
 export class IntentModule {}

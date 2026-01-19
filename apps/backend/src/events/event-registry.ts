@@ -51,6 +51,7 @@ export const EVENT_TYPES = {
   AVATAR_SUGGESTION_FEEDBACK: 'AVATAR_SUGGESTION_FEEDBACK',
   AVATAR_FEEDBACK_RECORDED: 'AVATAR_FEEDBACK_RECORDED',
   MATCH_LIST_CREATED: 'MATCH_LIST_CREATED',
+  MATCH_FEEDBACK_RECORDED: 'MATCH_FEEDBACK_RECORDED',
   PARTNER_INVITED: 'PARTNER_INVITED',
   PARTNER_RESPONSE_RECEIVED: 'PARTNER_RESPONSE_RECEIVED',
   COMMIT_DECISION_TAKEN: 'COMMIT_DECISION_TAKEN',
@@ -243,6 +244,13 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     matchListId: z.string().min(1),
     algorithmVersion: z.string().min(1),
     topCandidates: z.array(z.string().min(1)),
+  }),
+  [EVENT_TYPES.MATCH_FEEDBACK_RECORDED]: basePayload.extend({
+    intentId: z.string().min(1),
+    matchListId: z.string().min(1),
+    candidateOrgId: z.string().min(1),
+    rating: z.enum(['up', 'down']),
+    notes: z.string().min(1).max(280).optional(),
   }),
   [EVENT_TYPES.PARTNER_INVITED]: basePayload.extend({
     intentId: z.string().min(1),

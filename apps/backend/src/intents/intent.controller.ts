@@ -20,6 +20,15 @@ import { IntentService } from './intent.service';
 import { INTENT_STAGES, IntentStage } from './intent.types';
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'] as const;
+const INTENT_REGION_OPTIONS = ['PL', 'DE', 'NL', 'EU', 'GLOBAL'] as const;
+const INTENT_BUDGET_BUCKETS = [
+  'UNKNOWN',
+  'LT_10K',
+  'EUR_10K_50K',
+  'EUR_50K_150K',
+  'EUR_150K_500K',
+  'GT_500K',
+] as const;
 const SUGGESTION_FEEDBACK_SENTIMENTS = ['UP', 'DOWN', 'NEUTRAL'] as const;
 const SUGGESTION_FEEDBACK_REASON_CODES = [
   'HELPFUL_STRUCTURING',
@@ -41,6 +50,10 @@ const createIntentSchema = z.object({
   kpi: z.string().optional().nullable(),
   risks: z.string().optional().nullable(),
   deadlineAt: z.string().optional().nullable(),
+  tech: z.array(z.string()).optional(),
+  industry: z.array(z.string()).optional(),
+  region: z.array(z.enum(INTENT_REGION_OPTIONS)).optional(),
+  budgetBucket: z.enum(INTENT_BUDGET_BUCKETS).optional(),
 });
 
 const updateIntentSchema = z.object({
@@ -54,6 +67,10 @@ const updateIntentSchema = z.object({
   kpi: z.string().optional().nullable(),
   risks: z.string().optional().nullable(),
   deadlineAt: z.string().optional().nullable(),
+  tech: z.array(z.string()).optional(),
+  industry: z.array(z.string()).optional(),
+  region: z.array(z.enum(INTENT_REGION_OPTIONS)).optional(),
+  budgetBucket: z.enum(INTENT_BUDGET_BUCKETS).optional(),
   pipelineStage: z.string().optional(),
   stage: z.string().optional(),
 });
@@ -122,6 +139,10 @@ export class IntentController {
       kpi: hasRaw ? null : this.normalizeOptionalText(parsed.kpi),
       risks: hasRaw ? null : this.normalizeOptionalText(parsed.risks),
       deadlineAt: hasRaw ? null : this.parseDeadline(parsed.deadlineAt),
+      tech: parsed.tech,
+      industry: parsed.industry,
+      region: parsed.region,
+      budgetBucket: parsed.budgetBucket,
     });
 
     return { intent };
@@ -269,6 +290,10 @@ export class IntentController {
       risks: this.normalizeOptionalText(parsed.risks) ?? undefined,
       deadlineAt:
         parsed.deadlineAt !== undefined ? this.parseDeadline(parsed.deadlineAt) : undefined,
+      tech: parsed.tech,
+      industry: parsed.industry,
+      region: parsed.region,
+      budgetBucket: parsed.budgetBucket,
       pipelineStage: nextStage,
     });
 

@@ -35,6 +35,17 @@ type CoachTask = (typeof COACH_TASKS_DEFAULT)[number];
 const COACH_TASKS_SUPPORTED = new Set<string>(COACH_TASKS_DEFAULT as readonly string[]);
 
 const MAX_L2_SOURCE_CHARS = 4000;
+const INTENT_REGION_OPTIONS = ['PL', 'DE', 'NL', 'EU', 'GLOBAL'] as const;
+const INTENT_BUDGET_BUCKETS = [
+  'UNKNOWN',
+  'LT_10K',
+  'EUR_10K_50K',
+  'EUR_50K_150K',
+  'EUR_150K_500K',
+  'GT_500K',
+] as const;
+const INTENT_TAG_LIMIT = 30;
+const INTENT_TAG_MAX_LENGTH = 40;
 
 type CoachSuggestionKind = 'missing_info' | 'question' | 'risk' | 'rewrite' | 'summary';
 type CoachSuggestionFeedbackSentiment = 'UP' | 'DOWN' | 'NEUTRAL';
@@ -107,6 +118,10 @@ export type CreateIntentInput = {
   kpi?: string | null;
   risks?: string | null;
   deadlineAt?: Date | null;
+  tech?: string[] | null;
+  industry?: string[] | null;
+  region?: string[] | null;
+  budgetBucket?: string | null;
 };
 
 export type UpdateIntentInput = {
@@ -124,6 +139,10 @@ export type UpdateIntentInput = {
   risks?: string | null;
   deadlineAt?: Date | null;
   pipelineStage?: IntentStage;
+  tech?: string[] | null;
+  industry?: string[] | null;
+  region?: string[] | null;
+  budgetBucket?: string | null;
 };
 
 export type ListIntentInput = {
@@ -215,6 +234,10 @@ export class IntentService {
     const title = isPaste ? this.deriveTitle(rawText!, input.title) : input.goal ?? '';
     const goal = isPaste ? title : input.goal ?? '';
     const language = (input.language ?? org.defaultLanguage ?? 'EN').toUpperCase();
+    const tech = this.normalizeTagList(input.tech);
+    const industry = this.normalizeTagList(input.industry);
+    const region = this.normalizeRegionList(input.region);
+    const budgetBucket = this.normalizeBudgetBucket(input.budgetBucket) ?? 'UNKNOWN';
     const ownerUserId = input.ownerUserId ?? input.actorUserId;
     const now = new Date();
 
@@ -229,6 +252,10 @@ export class IntentService {
         client: input.client ?? null,
         intentName,
         language,
+        tech,
+        industry,
+        region,
+        budgetBucket,
         goal,
         title,
         context: input.context ?? null,
@@ -401,6 +428,10 @@ export class IntentService {
         client: true,
         stage: true,
         language: true,
+        tech: true,
+        industry: true,
+        region: true,
+        budgetBucket: true,
         lastActivityAt: true,
         deadlineAt: true,
         ownerUserId: true,
@@ -1832,6 +1863,38 @@ export class IntentService {
       }
     }
 
+    if (input.tech !== undefined) {
+      const normalized = this.normalizeTagList(input.tech);
+      if (!this.arraysEqual(normalized, intent.tech ?? [])) {
+        updates.tech = normalized;
+        changedFields.push('tech');
+      }
+    }
+
+    if (input.industry !== undefined) {
+      const normalized = this.normalizeTagList(input.industry);
+      if (!this.arraysEqual(normalized, intent.industry ?? [])) {
+        updates.industry = normalized;
+        changedFields.push('industry');
+      }
+    }
+
+    if (input.region !== undefined) {
+      const normalized = this.normalizeRegionList(input.region);
+      if (!this.arraysEqual(normalized, intent.region ?? [])) {
+        updates.region = normalized;
+        changedFields.push('region');
+      }
+    }
+
+    if (input.budgetBucket !== undefined) {
+      const normalized = this.normalizeBudgetBucket(input.budgetBucket) ?? 'UNKNOWN';
+      if (normalized !== intent.budgetBucket) {
+        updates.budgetBucket = normalized;
+        changedFields.push('budgetBucket');
+      }
+    }
+
     let stageChanged = false;
     let fromStage: IntentStage | null = null;
     let toStage: IntentStage | null = null;
@@ -2029,6 +2092,80 @@ export class IntentService {
     if (value === null || value === undefined) return null;
     const trimmed = value.trim();
     return trimmed ? trimmed : null;
+  }
+
+  private normalizeTagList(values: string[] | null | undefined): string[] {
+    if (!Array.isArray(values)) return [];
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+    for (const rawValue of values) {
+      if (typeof rawValue !== 'string') {
+        continue;
+      }
+      const parts = rawValue.split(',');
+      for (const part of parts) {
+        const candidate = part.trim().toLowerCase();
+        if (!candidate) {
+          continue;
+        }
+        if (candidate.length > INTENT_TAG_MAX_LENGTH) {
+          throw new BadRequestException('Intent tag is too long');
+        }
+        if (!seen.has(candidate)) {
+          normalized.push(candidate);
+          seen.add(candidate);
+          if (normalized.length > INTENT_TAG_LIMIT) {
+            throw new BadRequestException('Too many intent tags');
+          }
+        }
+      }
+    }
+    return normalized;
+  }
+
+  private normalizeRegionList(values: string[] | null | undefined): string[] {
+    if (!Array.isArray(values)) return [];
+    const normalized: string[] = [];
+    const seen = new Set<string>();
+    for (const rawValue of values) {
+      if (typeof rawValue !== 'string') {
+        continue;
+      }
+      const candidate = rawValue.trim().toUpperCase();
+      if (!candidate) {
+        continue;
+      }
+      if (!INTENT_REGION_OPTIONS.includes(candidate as (typeof INTENT_REGION_OPTIONS)[number])) {
+        throw new BadRequestException('Invalid intent region');
+      }
+      if (!seen.has(candidate)) {
+        normalized.push(candidate);
+        seen.add(candidate);
+      }
+    }
+    return normalized;
+  }
+
+  private normalizeBudgetBucket(value: string | null | undefined): string | null {
+    if (value === null || value === undefined) return null;
+    const candidate = value.trim().toUpperCase();
+    if (!candidate) return null;
+    if (!INTENT_BUDGET_BUCKETS.includes(candidate as (typeof INTENT_BUDGET_BUCKETS)[number])) {
+      throw new BadRequestException('Invalid intent budget bucket');
+    }
+    return candidate;
+  }
+
+  private arraysEqual(left: string[], right: string[]): boolean {
+    if (left.length !== right.length) {
+      return false;
+    }
+    for (let index = 0; index < left.length; index += 1) {
+      if (left[index] !== right[index]) {
+        return false;
+      }
+    }
+    return true;
   }
 
   private async ensureIntentNameAvailable(

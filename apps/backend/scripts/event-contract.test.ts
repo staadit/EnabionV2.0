@@ -54,6 +54,27 @@ const cases = [
     },
   },
   {
+    type: EVENT_TYPES.MATCH_LIST_CREATED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      matchListId: 'matchlist_test',
+      algorithmVersion: 'rule-v1',
+      topCandidates: ['org_1', 'org_2'],
+    },
+  },
+  {
+    type: EVENT_TYPES.MATCH_FEEDBACK_RECORDED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      matchListId: 'matchlist_test',
+      candidateOrgId: 'org_candidate',
+      rating: 'up',
+      notes: 'Strong fit.',
+    },
+  },
+  {
     type: EVENT_TYPES.INTENT_VIEWED,
     payload: {
       payloadVersion: 1,

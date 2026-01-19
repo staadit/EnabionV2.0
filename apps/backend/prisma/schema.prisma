@@ -35,6 +35,9 @@ model Organization {
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
   shareLinks IntentShareLink[]
+  matchLists MatchList[]
+  matchFeedbacks MatchFeedback[]
+  matchFeedbackCandidates MatchFeedback[] @relation("MatchFeedbackCandidateOrg")
   createdAt DateTime @default(now())
 }
 
@@ -62,6 +65,8 @@ model User {
   updatedOrgAvatarProfiles OrgAvatarProfile[] @relation("OrgAvatarProfileUpdatedBy")
   createdOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationCreatedBy")
   updatedOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationUpdatedBy")
+  createdMatchLists MatchList[] @relation("MatchListCreatedBy")
+  matchFeedbacks MatchFeedback[] @relation("MatchFeedbackActor")
   createdAt DateTime @default(now())
 }
 
@@ -202,6 +207,11 @@ enum AvatarSuggestionFeedbackReasonCode {
   NOT_RELEVANT
   ALREADY_KNOWN
   OTHER
+}
+
+enum MatchFeedbackRating {
+  UP
+  DOWN
 }
 
 enum LeadFitBand {
@@ -415,6 +425,10 @@ model Intent {
   title                String?
   client               String?
   language             String               @default("EN")
+  tech                 String[]             @default([])
+  industry             String[]             @default([])
+  region               String[]             @default([])
+  budgetBucket         ProviderBudgetBucket @default(UNKNOWN)
   context              String?
   scope                String?
   kpi                  String?
@@ -442,6 +456,8 @@ model Intent {
   avatarSuggestions AvatarSuggestion[]
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
   orgLeadQualifications OrgLeadQualification[]
+  matchLists     MatchList[]
+  matchFeedbacks MatchFeedback[]
 
   @@index([orgId])
   @@index([orgId, stage])
@@ -451,6 +467,46 @@ model Intent {
   @@index([orgId, stage, lastActivityAt])
   @@index([createdByUserId])
   @@unique([orgId, intentName])
+}
+
+model MatchList {
+  id               String   @id @default(cuid())
+  orgId            String
+  intentId         String
+  algorithmVersion String
+  createdByUserId  String?
+  resultsJson      Json
+  createdAt        DateTime @default(now())
+
+  org            Organization @relation(fields: [orgId], references: [id])
+  intent         Intent       @relation(fields: [intentId], references: [id])
+  createdByUser  User?        @relation("MatchListCreatedBy", fields: [createdByUserId], references: [id])
+  feedback       MatchFeedback[]
+
+  @@index([orgId, intentId, createdAt])
+  @@index([orgId, createdAt])
+}
+
+model MatchFeedback {
+  id              String               @id @default(cuid())
+  orgId           String
+  intentId        String
+  matchListId     String
+  candidateOrgId  String
+  actorUserId     String?
+  rating          MatchFeedbackRating
+  notes           String?
+  createdAt       DateTime             @default(now())
+
+  org           Organization @relation(fields: [orgId], references: [id])
+  intent        Intent       @relation(fields: [intentId], references: [id])
+  matchList     MatchList    @relation(fields: [matchListId], references: [id])
+  candidateOrg  Organization @relation("MatchFeedbackCandidateOrg", fields: [candidateOrgId], references: [id])
+  actorUser     User?        @relation("MatchFeedbackActor", fields: [actorUserId], references: [id])
+
+  @@index([orgId, intentId, createdAt])
+  @@index([orgId, matchListId])
+  @@index([candidateOrgId, createdAt])
 }
 
 model IntentShareLink {
