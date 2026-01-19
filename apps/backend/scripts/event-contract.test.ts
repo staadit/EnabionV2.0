@@ -70,6 +70,7 @@ const cases = [
       intentId: 'intent_test',
       matchListId: 'matchlist_test',
       candidateOrgId: 'org_candidate',
+      action: 'SHORTLIST',
       rating: 'up',
       notes: 'Strong fit.',
     },

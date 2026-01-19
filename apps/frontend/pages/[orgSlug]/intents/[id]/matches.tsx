@@ -16,8 +16,11 @@ const FACTOR_LABELS: Record<(typeof FACTOR_ORDER)[number], string> = {
   region: 'Region',
   budget: 'Budget',
 };
+const FEEDBACK_ACTIONS = ['SHORTLIST', 'HIDE', 'NOT_RELEVANT'] as const;
 
 type MatchFactor = (typeof FACTOR_ORDER)[number];
+type FeedbackAction = (typeof FEEDBACK_ACTIONS)[number];
+type FeedbackStatus = 'NEUTRAL' | 'SHORTLISTED' | 'HIDDEN' | 'NOT_RELEVANT';
 
 type FactorBreakdown = {
   weight: number;
@@ -34,6 +37,7 @@ type MatchCandidate = {
   orgSlug: string;
   totalScore: number;
   breakdown: Record<MatchFactor, FactorBreakdown>;
+  feedbackStatus?: FeedbackStatus;
 };
 
 type MatchList = {
@@ -55,8 +59,12 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
   const [matchList, setMatchList] = useState<MatchList | null>(initialMatchList);
   const [isRunning, setIsRunning] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [feedbackState, setFeedbackState] = useState<Record<string, 'up' | 'down'>>({});
+  const [feedbackState, setFeedbackState] = useState<Record<string, FeedbackStatus>>(() =>
+    buildFeedbackState(initialMatchList),
+  );
   const [feedbackPending, setFeedbackPending] = useState<Record<string, boolean>>({});
+  const [showHidden, setShowHidden] = useState(false);
+  const [showNotRelevant, setShowNotRelevant] = useState(false);
 
   const handleRunMatching = async () => {
     setError(null);
@@ -72,7 +80,7 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
       }
       const nextMatchList = data?.matchList ?? null;
       setMatchList(nextMatchList);
-      setFeedbackState({});
+      setFeedbackState(buildFeedbackState(nextMatchList));
     } catch {
       setError('Unable to run matching.');
     } finally {
@@ -80,10 +88,13 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
     }
   };
 
-  const handleFeedback = async (candidateOrgId: string, rating: 'up' | 'down') => {
+  const handleFeedback = async (candidateOrgId: string, action: FeedbackAction) => {
     if (!matchList) return;
     setError(null);
+    const previousStatus = feedbackState[candidateOrgId] ?? 'NEUTRAL';
+    const nextStatus = mapActionToStatus(action);
     setFeedbackPending((prev) => ({ ...prev, [candidateOrgId]: true }));
+    setFeedbackState((prev) => ({ ...prev, [candidateOrgId]: nextStatus }));
     try {
       const res = await fetch(
         `/api/intents/${encodeURIComponent(intentId)}/matches/${encodeURIComponent(
@@ -92,16 +103,17 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
         {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ candidateOrgId, rating }),
+          body: JSON.stringify({ candidateOrgId, action }),
         },
       );
       const data = await res.json();
       if (!res.ok) {
+        setFeedbackState((prev) => ({ ...prev, [candidateOrgId]: previousStatus }));
         setError(data?.error ?? 'Unable to record feedback.');
         return;
       }
-      setFeedbackState((prev) => ({ ...prev, [candidateOrgId]: rating }));
     } catch {
+      setFeedbackState((prev) => ({ ...prev, [candidateOrgId]: previousStatus }));
       setError('Unable to record feedback.');
     } finally {
       setFeedbackPending((prev) => ({ ...prev, [candidateOrgId]: false }));
@@ -109,6 +121,104 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
   };
 
   const candidates = matchList?.candidates ?? [];
+  const shortlistedCandidates = candidates.filter(
+    (candidate) => resolveCandidateStatus(candidate, feedbackState) === 'SHORTLISTED',
+  );
+  const hiddenCandidates = candidates.filter(
+    (candidate) => resolveCandidateStatus(candidate, feedbackState) === 'HIDDEN',
+  );
+  const notRelevantCandidates = candidates.filter(
+    (candidate) => resolveCandidateStatus(candidate, feedbackState) === 'NOT_RELEVANT',
+  );
+  const neutralCandidates = candidates.filter(
+    (candidate) => resolveCandidateStatus(candidate, feedbackState) === 'NEUTRAL',
+  );
+  const visibleCandidates = [
+    ...neutralCandidates,
+    ...(showHidden ? hiddenCandidates : []),
+    ...(showNotRelevant ? notRelevantCandidates : []),
+  ];
+  const hasHidden = hiddenCandidates.length > 0;
+  const hasNotRelevant = notRelevantCandidates.length > 0;
+
+  const renderCandidate = (candidate: MatchCandidate) => {
+    const status = resolveCandidateStatus(candidate, feedbackState);
+    const pending = feedbackPending[candidate.orgId];
+    return (
+      <div key={candidate.orgId} style={candidateCardStyle}>
+        <div style={candidateHeaderStyle}>
+          <div>
+            <div style={candidateNameStyle}>{candidate.orgName}</div>
+            <div style={candidateSlugStyle}>{candidate.orgSlug}</div>
+          </div>
+          <div style={candidateHeaderMetaStyle}>
+            {status !== 'NEUTRAL' ? (
+              <span style={statusBadgeStyle(status)}>{formatStatusLabel(status)}</span>
+            ) : null}
+            <div style={candidateScoreStyle}>{formatScore(candidate.totalScore)}</div>
+          </div>
+        </div>
+
+        <details style={detailsStyle}>
+          <summary style={summaryStyle}>Why this partner?</summary>
+          <div style={breakdownGridStyle}>
+            {FACTOR_ORDER.map((factor) => {
+              const breakdown = candidate.breakdown?.[factor];
+              if (!breakdown) return null;
+              const matched = Array.isArray(breakdown.matched) ? breakdown.matched : [];
+              return (
+                <div key={factor} style={breakdownCardStyle}>
+                  <div style={breakdownHeaderStyle}>
+                    <span style={breakdownLabelStyle}>{FACTOR_LABELS[factor]}</span>
+                    <span style={breakdownScoreStyle}>
+                      +{formatScore(breakdown.contribution)}
+                    </span>
+                  </div>
+                  <div style={breakdownMetaStyle}>
+                    Weight {breakdown.weight}  Score {formatScore(breakdown.normalizedScore)}
+                  </div>
+                  <div style={breakdownNotesStyle}>{breakdown.notes}</div>
+                  <div style={breakdownMatchStyle}>
+                    Matched: {matched.length ? matched.join(', ') : 'None'}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </details>
+
+        <div style={feedbackRowStyle}>
+          <div style={feedbackLabelStyle}>Feedback</div>
+          <div style={feedbackButtonsStyle}>
+            <button
+              type="button"
+              style={feedbackButtonStyle(status === 'SHORTLISTED', pending)}
+              onClick={() => handleFeedback(candidate.orgId, 'SHORTLIST')}
+              disabled={pending}
+            >
+              Shortlist
+            </button>
+            <button
+              type="button"
+              style={feedbackButtonStyle(status === 'HIDDEN', pending)}
+              onClick={() => handleFeedback(candidate.orgId, 'HIDE')}
+              disabled={pending}
+            >
+              Hide
+            </button>
+            <button
+              type="button"
+              style={feedbackButtonStyle(status === 'NOT_RELEVANT', pending)}
+              onClick={() => handleFeedback(candidate.orgId, 'NOT_RELEVANT')}
+              disabled={pending}
+            >
+              Not relevant
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <OrgShell
@@ -142,79 +252,56 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
           onClick={handleRunMatching}
           disabled={isRunning}
         >
-          {isRunning ? 'Running...' : 'Run matching'}
+          {isRunning ? 'Running...' : matchList ? 'Refresh suggestions' : 'Run matching'}
         </button>
       </div>
 
       {error ? <div style={errorStyle}>{error}</div> : null}
 
       {matchList && candidates.length > 0 ? (
-        <div style={listStyle}>
-          {candidates.map((candidate) => {
-            const feedback = feedbackState[candidate.orgId];
-            const pending = feedbackPending[candidate.orgId];
-            return (
-              <div key={candidate.orgId} style={candidateCardStyle}>
-                <div style={candidateHeaderStyle}>
-                  <div>
-                    <div style={candidateNameStyle}>{candidate.orgName}</div>
-                    <div style={candidateSlugStyle}>{candidate.orgSlug}</div>
-                  </div>
-                  <div style={candidateScoreStyle}>{formatScore(candidate.totalScore)}</div>
-                </div>
-
-                <details style={detailsStyle}>
-                  <summary style={summaryStyle}>Why this match?</summary>
-                  <div style={breakdownGridStyle}>
-                    {FACTOR_ORDER.map((factor) => {
-                      const breakdown = candidate.breakdown?.[factor];
-                      if (!breakdown) return null;
-                      const matched = Array.isArray(breakdown.matched) ? breakdown.matched : [];
-                      return (
-                        <div key={factor} style={breakdownCardStyle}>
-                          <div style={breakdownHeaderStyle}>
-                            <span style={breakdownLabelStyle}>{FACTOR_LABELS[factor]}</span>
-                            <span style={breakdownScoreStyle}>
-                              +{formatScore(breakdown.contribution)}
-                            </span>
-                          </div>
-                          <div style={breakdownMetaStyle}>
-                            Weight {breakdown.weight} • Score {formatScore(breakdown.normalizedScore)}
-                          </div>
-                          <div style={breakdownNotesStyle}>{breakdown.notes}</div>
-                          <div style={breakdownMatchStyle}>
-                            Matched: {matched.length ? matched.join(', ') : 'None'}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </details>
-
-                <div style={feedbackRowStyle}>
-                  <div style={feedbackLabelStyle}>Feedback</div>
-                  <div style={feedbackButtonsStyle}>
-                    <button
-                      type="button"
-                      style={feedbackButtonStyle(feedback === 'up', pending)}
-                      onClick={() => handleFeedback(candidate.orgId, 'up')}
-                      disabled={pending}
-                    >
-                      Thumb up
-                    </button>
-                    <button
-                      type="button"
-                      style={feedbackButtonStyle(feedback === 'down', pending)}
-                      onClick={() => handleFeedback(candidate.orgId, 'down')}
-                      disabled={pending}
-                    >
-                      Thumb down
-                    </button>
-                  </div>
-                </div>
+        <div style={sectionStackStyle}>
+          {shortlistedCandidates.length > 0 ? (
+            <div>
+              <div style={sectionHeaderStyle}>
+                Shortlisted ({shortlistedCandidates.length})
               </div>
-            );
-          })}
+              <div style={listStyle}>{shortlistedCandidates.map(renderCandidate)}</div>
+            </div>
+          ) : null}
+
+          {hasHidden || hasNotRelevant ? (
+            <div style={filterBarStyle}>
+              {hasHidden ? (
+                <label style={filterToggleStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showHidden}
+                    onChange={(event) => setShowHidden(event.target.checked)}
+                  />
+                  <span>Show hidden ({hiddenCandidates.length})</span>
+                </label>
+              ) : null}
+              {hasNotRelevant ? (
+                <label style={filterToggleStyle}>
+                  <input
+                    type="checkbox"
+                    checked={showNotRelevant}
+                    onChange={(event) => setShowNotRelevant(event.target.checked)}
+                  />
+                  <span>Show not relevant ({notRelevantCandidates.length})</span>
+                </label>
+              ) : null}
+            </div>
+          ) : null}
+
+          <div>
+            <div style={sectionHeaderStyle}>Suggestions ({visibleCandidates.length})</div>
+            {visibleCandidates.length > 0 ? (
+              <div style={listStyle}>{visibleCandidates.map(renderCandidate)}</div>
+            ) : (
+              <div style={emptyStateStyle}>No visible matches for this intent.</div>
+            )}
+          </div>
         </div>
       ) : (
         <div style={emptyStateStyle}>No matches yet for this intent.</div>
@@ -222,6 +309,7 @@ export default function Matches({ user, org, intentId, initialMatchList }: Inten
     </OrgShell>
   );
 }
+
 
 export const getServerSideProps: GetServerSideProps<IntentTabProps> = async (ctx) => {
   const result = await requireOrgContext(ctx);
@@ -316,6 +404,36 @@ const errorStyle = {
   marginBottom: '1rem',
 };
 
+const sectionStackStyle = {
+  display: 'flex',
+  flexDirection: 'column' as const,
+  gap: '1.5rem',
+};
+
+const sectionHeaderStyle = {
+  fontSize: '0.85rem',
+  textTransform: 'uppercase' as const,
+  letterSpacing: '0.08em',
+  color: 'var(--muted)',
+  marginBottom: '0.6rem',
+  fontWeight: 700,
+};
+
+const filterBarStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '1rem',
+  alignItems: 'center',
+};
+
+const filterToggleStyle = {
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  fontSize: '0.85rem',
+  color: 'var(--muted)',
+};
+
 const listStyle = {
   display: 'flex',
   flexDirection: 'column' as const,
@@ -338,6 +456,13 @@ const candidateHeaderStyle = {
   flexWrap: 'wrap' as const,
 };
 
+const candidateHeaderMetaStyle = {
+  display: 'flex',
+  alignItems: 'center',
+  gap: '0.5rem',
+  flexWrap: 'wrap' as const,
+};
+
 const candidateNameStyle = {
   fontSize: '1.1rem',
   fontWeight: 700,
@@ -355,6 +480,21 @@ const candidateScoreStyle = {
   borderRadius: '999px',
   border: '1px solid var(--border)',
   background: 'var(--surface)',
+};
+
+const statusBadgeStyle = (status: FeedbackStatus) => {
+  const color =
+    status === 'SHORTLISTED' ? 'var(--green)' : status === 'HIDDEN' ? 'var(--muted)' : 'var(--danger)';
+  return {
+    padding: '0.25rem 0.6rem',
+    borderRadius: '999px',
+    border: `1px solid ${color}`,
+    color,
+    fontSize: '0.7rem',
+    fontWeight: 700,
+    textTransform: 'uppercase' as const,
+    letterSpacing: '0.08em',
+  };
 };
 
 const detailsStyle = {
@@ -456,4 +596,45 @@ const emptyStateStyle = {
 const formatScore = (value: number) => {
   if (!Number.isFinite(value)) return '-';
   return value.toFixed(1);
+};
+
+const normalizeFeedbackStatus = (value: FeedbackStatus | string | undefined | null): FeedbackStatus => {
+  const raw = String(value ?? '').toUpperCase();
+  if (raw === 'SHORTLISTED') return 'SHORTLISTED';
+  if (raw === 'HIDDEN') return 'HIDDEN';
+  if (raw === 'NOT_RELEVANT') return 'NOT_RELEVANT';
+  return 'NEUTRAL';
+};
+
+const buildFeedbackState = (matchList: MatchList | null): Record<string, FeedbackStatus> => {
+  const state: Record<string, FeedbackStatus> = {};
+  const candidates = matchList?.candidates ?? [];
+  candidates.forEach((candidate) => {
+    state[candidate.orgId] = normalizeFeedbackStatus(candidate.feedbackStatus);
+  });
+  return state;
+};
+
+const resolveCandidateStatus = (
+  candidate: MatchCandidate,
+  feedbackState: Record<string, FeedbackStatus>,
+): FeedbackStatus => {
+  const fromState = feedbackState[candidate.orgId];
+  if (fromState) {
+    return fromState;
+  }
+  return normalizeFeedbackStatus(candidate.feedbackStatus);
+};
+
+const mapActionToStatus = (action: FeedbackAction): FeedbackStatus => {
+  if (action === 'SHORTLIST') return 'SHORTLISTED';
+  if (action === 'HIDE') return 'HIDDEN';
+  return 'NOT_RELEVANT';
+};
+
+const formatStatusLabel = (status: FeedbackStatus) => {
+  if (status === 'SHORTLISTED') return 'Shortlisted';
+  if (status === 'HIDDEN') return 'Hidden';
+  if (status === 'NOT_RELEVANT') return 'Not relevant';
+  return 'Neutral';
 };

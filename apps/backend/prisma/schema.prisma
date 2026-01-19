@@ -214,6 +214,12 @@ enum MatchFeedbackRating {
   DOWN
 }
 
+enum MatchFeedbackAction {
+  SHORTLIST
+  HIDE
+  NOT_RELEVANT
+}
+
 enum LeadFitBand {
   HIGH
   MEDIUM
@@ -494,6 +500,7 @@ model MatchFeedback {
   matchListId     String
   candidateOrgId  String
   actorUserId     String?
+  action          MatchFeedbackAction
   rating          MatchFeedbackRating
   notes           String?
   createdAt       DateTime             @default(now())

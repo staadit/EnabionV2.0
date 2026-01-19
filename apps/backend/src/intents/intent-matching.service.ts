@@ -15,6 +15,9 @@ const WEIGHTS = {
 
 type MatchFactor = keyof typeof WEIGHTS;
 
+type MatchFeedbackAction = 'SHORTLIST' | 'HIDE' | 'NOT_RELEVANT';
+type MatchFeedbackStatus = 'NEUTRAL' | 'SHORTLISTED' | 'HIDDEN' | 'NOT_RELEVANT';
+
 type FactorBreakdown = {
   weight: number;
   normalizedScore: number;
@@ -30,6 +33,7 @@ export type MatchCandidate = {
   orgSlug: string;
   totalScore: number;
   breakdown: Record<MatchFactor, FactorBreakdown>;
+  feedbackStatus?: MatchFeedbackStatus;
 };
 
 export type MatchListResult = {
@@ -120,7 +124,15 @@ export class IntentMatchingService {
       return null;
     }
 
-    return this.buildMatchListResponse(matchList);
+    const results = this.parseResults(matchList.resultsJson);
+    const candidates = Array.isArray(results.candidates) ? (results.candidates as MatchCandidate[]) : [];
+    const feedbackStatusByOrg = await this.fetchFeedbackStatusMap({
+      orgId: input.orgId,
+      intentId: input.intentId,
+      candidateOrgIds: candidates.map((candidate) => candidate.orgId),
+    });
+
+    return this.buildMatchListResponse(matchList, results, feedbackStatusByOrg);
   }
 
   async recordFeedback(input: {
@@ -128,7 +140,7 @@ export class IntentMatchingService {
     intentId: string;
     matchListId: string;
     candidateOrgId: string;
-    rating: 'up' | 'down';
+    action: MatchFeedbackAction;
     notes?: string | null;
     actorUserId: string;
   }) {
@@ -136,14 +148,14 @@ export class IntentMatchingService {
 
     const matchList = await this.prisma.matchList.findFirst({
       where: { id: input.matchListId, orgId: input.orgId, intentId: input.intentId },
-      select: { id: true },
+      select: { id: true, resultsJson: true },
     });
     if (!matchList) {
       throw new NotFoundException('Match list not found');
     }
 
     const notes = this.normalizeNotes(input.notes);
-    const rating = input.rating.toUpperCase() as 'UP' | 'DOWN';
+    const rating = this.mapActionToRating(input.action);
     const now = new Date();
 
     const feedback = await this.prisma.matchFeedback.create({
@@ -153,12 +165,15 @@ export class IntentMatchingService {
         matchListId: input.matchListId,
         candidateOrgId: input.candidateOrgId,
         actorUserId: input.actorUserId,
+        action: input.action,
         rating,
         notes,
         createdAt: now,
       },
       select: { id: true },
     });
+
+    const candidateMeta = this.findCandidateMeta(matchList.resultsJson, input.candidateOrgId);
 
     await this.events.emitEvent({
       type: EVENT_TYPES.MATCH_FEEDBACK_RECORDED,
@@ -177,7 +192,10 @@ export class IntentMatchingService {
         intentId: input.intentId,
         matchListId: input.matchListId,
         candidateOrgId: input.candidateOrgId,
-        rating: input.rating,
+        action: input.action,
+        rating: rating.toLowerCase() as 'up' | 'down',
+        ...(candidateMeta?.name ? { candidateOrgName: candidateMeta.name } : {}),
+        ...(candidateMeta?.slug ? { candidateOrgSlug: candidateMeta.slug } : {}),
         ...(notes ? { notes } : {}),
       },
     });
@@ -375,22 +393,27 @@ export class IntentMatchingService {
     algorithmVersion: string;
     createdAt: Date;
     resultsJson: unknown;
-  }): MatchListResult {
-    const results = typeof matchList.resultsJson === 'object' && matchList.resultsJson !== null
-      ? (matchList.resultsJson as Record<string, unknown>)
-      : {};
-    const candidates = Array.isArray(results.candidates) ? (results.candidates as MatchCandidate[]) : [];
+  }, resultsOverride?: Record<string, unknown>, feedbackStatusByOrg?: Record<string, MatchFeedbackStatus>): MatchListResult {
+    const results = resultsOverride ?? this.parseResults(matchList.resultsJson);
+    const candidates = Array.isArray(results.candidates)
+      ? (results.candidates as MatchCandidate[])
+      : [];
     const generatedAt =
       typeof results.generatedAt === 'string' ? results.generatedAt : matchList.createdAt.toISOString();
     const algorithmVersion =
       typeof results.algorithmVersion === 'string' ? results.algorithmVersion : matchList.algorithmVersion;
+
+    const candidatesWithStatus = candidates.map((candidate) => ({
+      ...candidate,
+      feedbackStatus: this.resolveFeedbackStatus(candidate, feedbackStatusByOrg),
+    }));
 
     return {
       matchListId: matchList.id,
       intentId: matchList.intentId,
       algorithmVersion,
       generatedAt,
-      candidates,
+      candidates: candidatesWithStatus,
     };
   }
 
@@ -462,5 +485,101 @@ export class IntentMatchingService {
     const trimmed = value.trim();
     if (!trimmed) return null;
     return trimmed.length > 280 ? `${trimmed.slice(0, 280)}` : trimmed;
+  }
+
+  private parseResults(resultsJson: unknown): Record<string, unknown> {
+    if (typeof resultsJson === 'object' && resultsJson !== null) {
+      return resultsJson as Record<string, unknown>;
+    }
+    return {};
+  }
+
+  private mapActionToRating(action: MatchFeedbackAction): 'UP' | 'DOWN' {
+    return action === 'SHORTLIST' ? 'UP' : 'DOWN';
+  }
+
+  private resolveFeedbackStatus(
+    candidate: MatchCandidate,
+    feedbackStatusByOrg?: Record<string, MatchFeedbackStatus>,
+  ): MatchFeedbackStatus {
+    const fromMap = feedbackStatusByOrg?.[candidate.orgId];
+    if (fromMap) {
+      return fromMap;
+    }
+    const raw = (candidate.feedbackStatus ?? '').toUpperCase();
+    if (raw === 'SHORTLISTED') return 'SHORTLISTED';
+    if (raw === 'HIDDEN') return 'HIDDEN';
+    if (raw === 'NOT_RELEVANT') return 'NOT_RELEVANT';
+    return 'NEUTRAL';
+  }
+
+  private async fetchFeedbackStatusMap(input: {
+    orgId: string;
+    intentId: string;
+    candidateOrgIds: string[];
+  }): Promise<Record<string, MatchFeedbackStatus>> {
+    if (!input.candidateOrgIds.length) {
+      return {};
+    }
+    const feedbackRows = await this.prisma.matchFeedback.findMany({
+      where: {
+        orgId: input.orgId,
+        intentId: input.intentId,
+        candidateOrgId: { in: input.candidateOrgIds },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        candidateOrgId: true,
+        action: true,
+        rating: true,
+      },
+    });
+
+    const statusByOrg: Record<string, MatchFeedbackStatus> = {};
+    for (const row of feedbackRows) {
+      if (statusByOrg[row.candidateOrgId]) {
+        continue;
+      }
+      statusByOrg[row.candidateOrgId] = this.mapFeedbackToStatus(
+        row.action ?? null,
+        row.rating ?? null,
+      );
+    }
+    return statusByOrg;
+  }
+
+  private mapFeedbackToStatus(
+    action: MatchFeedbackAction | null,
+    rating: 'UP' | 'DOWN' | null,
+  ): MatchFeedbackStatus {
+    if (action === 'SHORTLIST') return 'SHORTLISTED';
+    if (action === 'HIDE') return 'HIDDEN';
+    if (action === 'NOT_RELEVANT') return 'NOT_RELEVANT';
+    if (rating === 'UP') return 'SHORTLISTED';
+    if (rating === 'DOWN') return 'NOT_RELEVANT';
+    return 'NEUTRAL';
+  }
+
+  private findCandidateMeta(
+    resultsJson: unknown,
+    candidateOrgId: string,
+  ): { name?: string; slug?: string } | null {
+    const results = this.parseResults(resultsJson);
+    const candidates = Array.isArray(results.candidates) ? results.candidates : [];
+    const match = candidates.find((candidate) => {
+      if (!candidate || typeof candidate !== 'object') {
+        return false;
+      }
+      const orgId = (candidate as { orgId?: string }).orgId;
+      return orgId === candidateOrgId;
+    }) as { orgName?: string; orgSlug?: string } | undefined;
+
+    if (!match) {
+      return null;
+    }
+    return {
+      name: match.orgName,
+      slug: match.orgSlug,
+    };
   }
 }

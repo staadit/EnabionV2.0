@@ -278,8 +278,22 @@ function formatEventNote(event: IntentEvent) {
     return '- Share link viewed';
   }
   if (event.type === 'MATCH_FEEDBACK_RECORDED') {
+    const action = payload.action ? String(payload.action).toUpperCase() : '';
+    const candidate =
+      payload.candidateOrgName ||
+      payload.candidateOrgSlug ||
+      payload.candidateOrgId ||
+      '';
+    if (action) {
+      const label =
+        action === 'SHORTLIST'
+          ? 'Shortlisted partner'
+          : action === 'HIDE'
+            ? 'Hidden partner'
+            : 'Marked not relevant';
+      return candidate ? `- ${label}: ${candidate}` : `- ${label}`;
+    }
     const rating = payload.rating ? String(payload.rating).toUpperCase() : '';
-    const candidate = payload.candidateOrgId ? String(payload.candidateOrgId) : '';
     if (rating && candidate) {
       return `- ${rating} for ${candidate}`;
     }

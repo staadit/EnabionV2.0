@@ -24,7 +24,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const backendRes = await fetch(
-    `${BACKEND_BASE}/intents/${encodeURIComponent(intentId)}/matches/run`,
+    `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/matches/run`,
     {
       method: 'POST',
       headers: { cookie: req.headers.cookie ?? '' },

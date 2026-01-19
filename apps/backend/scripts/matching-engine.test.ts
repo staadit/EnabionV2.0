@@ -207,7 +207,7 @@ async function testMatchingEngine() {
     intentId: 'intent-1',
     matchListId: matchList.matchListId,
     candidateOrgId: 'org-a',
-    rating: 'up',
+    action: 'SHORTLIST',
     actorUserId: 'user-1',
   });
 
@@ -215,7 +215,7 @@ async function testMatchingEngine() {
     (event) => event.type === EVENT_TYPES.MATCH_FEEDBACK_RECORDED,
   );
   assert(feedbackEvent, 'MATCH_FEEDBACK_RECORDED event should be emitted');
-  assert(feedbackEvent.payload.rating === 'up', 'Feedback event should carry rating');
+  assert(feedbackEvent.payload.action === 'SHORTLIST', 'Feedback event should carry action');
 }
 
 async function run() {

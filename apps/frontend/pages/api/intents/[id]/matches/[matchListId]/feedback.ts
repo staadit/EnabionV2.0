@@ -25,7 +25,7 @@ export default async function handler(req: NextApiRequest, res: NextApiResponse)
   }
 
   const backendRes = await fetch(
-    `${BACKEND_BASE}/intents/${encodeURIComponent(intentId)}/matches/${encodeURIComponent(matchListId)}/feedback`,
+    `${BACKEND_BASE}/v1/intents/${encodeURIComponent(intentId)}/matches/${encodeURIComponent(matchListId)}/feedback`,
     {
       method: 'POST',
       headers: {

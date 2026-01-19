@@ -114,6 +114,7 @@ const suggestionKindEnum = z.enum([
 ]);
 const suggestionDecisionEnum = z.enum(['ACCEPTED', 'REJECTED']);
 const feedbackSentimentEnum = z.enum(['UP', 'DOWN', 'NEUTRAL']);
+const matchFeedbackActionEnum = z.enum(['SHORTLIST', 'HIDE', 'NOT_RELEVANT']);
 const feedbackReasonCodeEnum = z.enum([
   'HELPFUL_STRUCTURING',
   'TOO_GENERIC',
@@ -249,7 +250,10 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     intentId: z.string().min(1),
     matchListId: z.string().min(1),
     candidateOrgId: z.string().min(1),
-    rating: z.enum(['up', 'down']),
+    action: matchFeedbackActionEnum,
+    rating: z.enum(['up', 'down']).optional(),
+    candidateOrgName: z.string().min(1).optional(),
+    candidateOrgSlug: z.string().min(1).optional(),
     notes: z.string().min(1).max(280).optional(),
   }),
   [EVENT_TYPES.PARTNER_INVITED]: basePayload.extend({
