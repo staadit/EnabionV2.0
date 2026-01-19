@@ -6,8 +6,8 @@ ALTER TABLE "MatchFeedback" ADD COLUMN "action" "MatchFeedbackAction";
 
 UPDATE "MatchFeedback"
 SET "action" = CASE
-  WHEN "rating" = 'UP' THEN 'SHORTLIST'
-  ELSE 'NOT_RELEVANT'
+  WHEN "rating" = 'UP' THEN 'SHORTLIST'::"MatchFeedbackAction"
+  ELSE 'NOT_RELEVANT'::"MatchFeedbackAction"
 END
 WHERE "action" IS NULL;
 
