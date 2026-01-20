@@ -17,16 +17,31 @@ model Organization {
   policyAiEnabled Boolean @default(true)
   policyShareLinksEnabled Boolean @default(false)
   policyEmailIngestEnabled Boolean @default(false)
+  providerLanguages String[] @default([])
+  providerRegions   String[] @default([])
+  providerTags      String[] @default([])
+  providerBudgetBucket ProviderBudgetBucket @default(UNKNOWN)
+  providerTeamSizeBucket ProviderTeamSizeBucket @default(UNKNOWN)
   users     User[]
   intents   Intent[]
   events    Event[]
   coachRuns IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  userOnboardingStates UserOnboardingState[]
+  orgAvatarProfile OrgAvatarProfile?
+  orgLeadQualifications OrgLeadQualification[]
   blobs     Blob[]
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
   shareLinks IntentShareLink[]
+  matchLists MatchList[]
+  matchFeedbacks MatchFeedback[]
+  matchFeedbackCandidates MatchFeedback[] @relation("MatchFeedbackCandidateOrg")
+  trustScoreLatestId String? @unique
+  trustScoreLatest TrustScoreSnapshot? @relation("TrustScoreLatest", fields: [trustScoreLatestId], references: [id])
+  trustScoreSnapshots TrustScoreSnapshot[] @relation("TrustScoreOrg")
+  trustScoreSubjectSnapshots TrustScoreSnapshot[] @relation("TrustScoreSubjectOrg")
   createdAt DateTime @default(now())
 }
 
@@ -49,6 +64,14 @@ model User {
   revokedShareLinks IntentShareLink[] @relation("ShareLinkRevokedBy")
   aiAccessIntents Intent[] @relation("IntentAiAllowL2SetBy")
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  onboardingStates UserOnboardingState[]
+  createdOrgAvatarProfiles OrgAvatarProfile[] @relation("OrgAvatarProfileCreatedBy")
+  updatedOrgAvatarProfiles OrgAvatarProfile[] @relation("OrgAvatarProfileUpdatedBy")
+  createdOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationCreatedBy")
+  updatedOrgLeadQualifications OrgLeadQualification[] @relation("OrgLeadQualificationUpdatedBy")
+  createdMatchLists MatchList[] @relation("MatchListCreatedBy")
+  matchFeedbacks MatchFeedback[] @relation("MatchFeedbackActor")
+  trustScoreSnapshots TrustScoreSnapshot[] @relation("TrustScoreActor")
   createdAt DateTime @default(now())
 }
 
@@ -87,6 +110,24 @@ enum ConfidentialityLevel {
 enum OrganizationStatus {
   ACTIVE
   SUSPENDED
+}
+
+enum ProviderBudgetBucket {
+  UNKNOWN
+  LT_10K
+  EUR_10K_50K
+  EUR_50K_150K
+  EUR_150K_500K
+  GT_500K
+}
+
+enum ProviderTeamSizeBucket {
+  UNKNOWN
+  SOLO
+  TEAM_2_10
+  TEAM_11_50
+  TEAM_51_200
+  TEAM_201_PLUS
 }
 
 enum BlobStorageDriver {
@@ -130,12 +171,20 @@ enum AvatarType {
   INTENT_COACH
 }
 
+enum AvatarSuggestionSubjectType {
+  INTENT
+  USER
+  ORG
+}
+
 enum AvatarSuggestionKind {
   missing_info
   question
   risk
   rewrite
   summary
+  lead_qualification
+  next_step
 }
 
 enum AvatarSuggestionStatus {
@@ -165,6 +214,34 @@ enum AvatarSuggestionFeedbackReasonCode {
   OTHER
 }
 
+enum MatchFeedbackRating {
+  UP
+  DOWN
+}
+
+enum MatchFeedbackAction {
+  SHORTLIST
+  HIDE
+  NOT_RELEVANT
+}
+
+enum LeadFitBand {
+  HIGH
+  MEDIUM
+  LOW
+  NO_FIT
+}
+
+enum LeadPriority {
+  P1
+  P2
+  P3
+}
+
+enum TrustScoreScope {
+  GLOBAL
+}
+
 model Event {
   id             String   @id
   schemaVersion  Int
@@ -187,6 +264,34 @@ model Event {
   @@index([orgId, subjectId, type, occurredAt])
   @@index([correlationId])
   @@index([occurredAt])
+}
+
+model TrustScoreSnapshot {
+  id                 String          @id @default(cuid())
+  orgId              String
+  subjectOrgId       String
+  scope              TrustScoreScope @default(GLOBAL)
+  scoreOverall       Int
+  scoreProfile       Int?
+  scoreResponsiveness Int?
+  scoreBehaviour     Int?
+  statusLabel        String
+  explanationPublic  Json?
+  explanationInternal Json?
+  triggerReason      String?
+  actorUserId        String?
+  algorithmVersion   String
+  computedAt         DateTime
+  createdAt          DateTime @default(now())
+
+  org        Organization @relation("TrustScoreOrg", fields: [orgId], references: [id])
+  subjectOrg Organization @relation("TrustScoreSubjectOrg", fields: [subjectOrgId], references: [id])
+  actorUser  User?        @relation("TrustScoreActor", fields: [actorUserId], references: [id])
+  latestFor  Organization? @relation("TrustScoreLatest")
+
+  @@index([orgId, computedAt])
+  @@index([subjectOrgId, computedAt])
+  @@index([orgId, subjectOrgId, computedAt])
 }
 
 model AiRateLimitWindow {
@@ -221,15 +326,20 @@ model IntentCoachRun {
 model AvatarSuggestion {
   id             String                 @id @default(uuid())
   orgId          String
-  intentId       String
+  intentId       String?
   coachRunId     String?
   avatarType     AvatarType
   kind           AvatarSuggestionKind
+  subjectType    AvatarSuggestionSubjectType? @default(INTENT)
+  subjectId      String?
   targetField    String?
   title          String
   l1Text         String?
   evidenceRef    String?
   proposedPatch  Json?
+  ctas           Json?
+  metadata       Json?
+  language       String?
   status         AvatarSuggestionStatus @default(ISSUED)
   actionable     Boolean                @default(true)
   createdAt      DateTime               @default(now())
@@ -237,11 +347,12 @@ model AvatarSuggestion {
   decidedByUserId String?
 
   org    Organization @relation(fields: [orgId], references: [id])
-  intent Intent       @relation(fields: [intentId], references: [id])
+  intent Intent?      @relation(fields: [intentId], references: [id])
   coachRun IntentCoachRun? @relation(fields: [coachRunId], references: [id])
   feedback AvatarSuggestionFeedback[]
 
   @@index([orgId, intentId, createdAt])
+  @@index([orgId, subjectType, subjectId, createdAt])
   @@index([intentId, status])
   @@index([orgId, status])
 }
@@ -357,6 +468,10 @@ model Intent {
   title                String?
   client               String?
   language             String               @default("EN")
+  tech                 String[]             @default([])
+  industry             String[]             @default([])
+  region               String[]             @default([])
+  budgetBucket         ProviderBudgetBucket @default(UNKNOWN)
   context              String?
   scope                String?
   kpi                  String?
@@ -383,6 +498,9 @@ model Intent {
   coachRuns      IntentCoachRun[]
   avatarSuggestions AvatarSuggestion[]
   avatarSuggestionFeedbacks AvatarSuggestionFeedback[]
+  orgLeadQualifications OrgLeadQualification[]
+  matchLists     MatchList[]
+  matchFeedbacks MatchFeedback[]
 
   @@index([orgId])
   @@index([orgId, stage])
@@ -392,6 +510,47 @@ model Intent {
   @@index([orgId, stage, lastActivityAt])
   @@index([createdByUserId])
   @@unique([orgId, intentName])
+}
+
+model MatchList {
+  id               String   @id @default(cuid())
+  orgId            String
+  intentId         String
+  algorithmVersion String
+  createdByUserId  String?
+  resultsJson      Json
+  createdAt        DateTime @default(now())
+
+  org            Organization @relation(fields: [orgId], references: [id])
+  intent         Intent       @relation(fields: [intentId], references: [id])
+  createdByUser  User?        @relation("MatchListCreatedBy", fields: [createdByUserId], references: [id])
+  feedback       MatchFeedback[]
+
+  @@index([orgId, intentId, createdAt])
+  @@index([orgId, createdAt])
+}
+
+model MatchFeedback {
+  id              String               @id @default(cuid())
+  orgId           String
+  intentId        String
+  matchListId     String
+  candidateOrgId  String
+  actorUserId     String?
+  action          MatchFeedbackAction
+  rating          MatchFeedbackRating
+  notes           String?
+  createdAt       DateTime             @default(now())
+
+  org           Organization @relation(fields: [orgId], references: [id])
+  intent        Intent       @relation(fields: [intentId], references: [id])
+  matchList     MatchList    @relation(fields: [matchListId], references: [id])
+  candidateOrg  Organization @relation("MatchFeedbackCandidateOrg", fields: [candidateOrgId], references: [id])
+  actorUser     User?        @relation("MatchFeedbackActor", fields: [actorUserId], references: [id])
+
+  @@index([orgId, intentId, createdAt])
+  @@index([orgId, matchListId])
+  @@index([candidateOrgId, createdAt])
 }
 
 model IntentShareLink {
@@ -443,4 +602,65 @@ model ThemePaletteRevision {
 
   @@unique([paletteId, revision])
   @@index([paletteId, createdAt])
+}
+
+model UserOnboardingState {
+  id             String   @id @default(cuid())
+  orgId          String
+  userId         String
+  version        String
+  currentStep    String?
+  completedSteps Json?
+  startedAt      DateTime @default(now())
+  completedAt    DateTime?
+  updatedAt      DateTime @updatedAt
+
+  org  Organization @relation(fields: [orgId], references: [id])
+  user User         @relation(fields: [userId], references: [id])
+
+  @@unique([orgId, userId, version])
+  @@index([orgId, userId])
+}
+
+model OrgAvatarProfile {
+  id              String   @id @default(cuid())
+  orgId           String   @unique
+  profileVersion  String
+  markets         Json?
+  industries      Json?
+  clientTypes     Json?
+  servicePortfolio Json?
+  techStack       Json?
+  excludedSectors Json?
+  constraints     Json?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  createdBy User?        @relation("OrgAvatarProfileCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy User?        @relation("OrgAvatarProfileUpdatedBy", fields: [updatedByUserId], references: [id])
+}
+
+model OrgLeadQualification {
+  id              String       @id @default(cuid())
+  orgId           String
+  intentId        String
+  fitBand         LeadFitBand
+  priority        LeadPriority
+  reasons         Json?
+  createdByUserId String?
+  updatedByUserId String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  org       Organization @relation(fields: [orgId], references: [id])
+  intent    Intent       @relation(fields: [intentId], references: [id])
+  createdBy User?        @relation("OrgLeadQualificationCreatedBy", fields: [createdByUserId], references: [id])
+  updatedBy User?        @relation("OrgLeadQualificationUpdatedBy", fields: [updatedByUserId], references: [id])
+
+  @@unique([orgId, intentId])
+  @@index([orgId, fitBand])
+  @@index([orgId, priority])
 }

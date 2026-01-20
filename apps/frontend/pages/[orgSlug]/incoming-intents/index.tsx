@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
+import Link from 'next/link';
 import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
@@ -30,6 +31,15 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
         <p style={{ margin: 0 }}>
           This page will list incoming intents and their response status.
         </p>
+      </div>
+
+      <div style={calloutStyle}>
+        <p style={{ margin: 0, fontWeight: 600 }}>
+          Complete your provider profile to improve matching.
+        </p>
+        <Link href={`/${org.slug}/settings/org`} style={calloutLinkStyle}>
+          Go to organization settings
+        </Link>
       </div>
 
       <section style={sectionStyle}>
@@ -63,6 +73,22 @@ const cardStyle = {
 
 const sectionStyle = {
   marginTop: '2rem',
+};
+
+const calloutStyle = {
+  marginTop: '1rem',
+  padding: '1rem 1.25rem',
+  borderRadius: '12px',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  display: 'grid',
+  gap: '0.5rem',
+};
+
+const calloutLinkStyle = {
+  color: 'var(--brand)',
+  fontWeight: 600,
+  textDecoration: 'none',
 };
 
 const listStyle = {

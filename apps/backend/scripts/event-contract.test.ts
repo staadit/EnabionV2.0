@@ -54,6 +54,44 @@ const cases = [
     },
   },
   {
+    type: EVENT_TYPES.MATCH_LIST_CREATED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      matchListId: 'matchlist_test',
+      algorithmVersion: 'rule-v1',
+      topCandidates: ['org_1', 'org_2'],
+    },
+  },
+  {
+    type: EVENT_TYPES.MATCH_FEEDBACK_RECORDED,
+    payload: {
+      payloadVersion: 1,
+      intentId: 'intent_test',
+      matchListId: 'matchlist_test',
+      candidateOrgId: 'org_candidate',
+      action: 'SHORTLIST',
+      rating: 'up',
+      notes: 'Strong fit.',
+    },
+  },
+  {
+    type: EVENT_TYPES.TRUSTSCORE_RECALCULATED,
+    payload: {
+      payloadVersion: 1,
+      orgId: 'org_test',
+      trustScoreSnapshotId: 'trustscore_1',
+      scoreOverall: 55,
+      statusLabel: 'Neutral / standard',
+      scoreProfile: 60,
+      scoreResponsiveness: 80,
+      scoreBehaviour: 50,
+      reason: 'INTENT_UPDATED',
+      algorithmVersion: 'trustscore_mvp_v1',
+      explanationPublic: ['Profile 60% complete'],
+    },
+  },
+  {
     type: EVENT_TYPES.INTENT_VIEWED,
     payload: {
       payloadVersion: 1,

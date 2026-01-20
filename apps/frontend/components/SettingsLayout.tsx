@@ -7,7 +7,7 @@ import { ThemeSwitcher } from './theme/ThemeSwitcher';
 type SettingsLayoutProps = {
   user: AdminUser;
   org: AdminOrg;
-  active: 'org' | 'members' | 'preferences' | 'nda';
+  active: 'org' | 'members' | 'preferences' | 'nda' | 'avatar';
   labels: AdminLabels;
   children: ReactNode;
 };
@@ -60,6 +60,9 @@ export default function SettingsLayout({
           </NavItem>
           <NavItem href={`/${org.slug}/settings/nda`} active={active === 'nda'}>
             {labels.navNda}
+          </NavItem>
+          <NavItem href={`/${org.slug}/settings/avatar`} active={active === 'avatar'}>
+            {labels.navAvatar}
           </NavItem>
         </nav>
         <section style={panelStyle}>{children}</section>

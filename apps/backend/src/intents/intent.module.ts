@@ -4,7 +4,10 @@ import { EventModule } from '../events/event.module';
 import { NdaModule } from '../nda/nda.module';
 import { PrismaService } from '../prisma.service';
 import { AiGatewayModule } from '../ai-gateway/ai-gateway.module';
+import { TrustScoreModule } from '../trustscore/trustscore.module';
 import { IntentController } from './intent.controller';
+import { IntentMatchesController, IntentMatchesV1Controller } from './intent-matches.controller';
+import { IntentMatchingService } from './intent-matching.service';
 import { IntentRedactionController } from './intent-redaction.controller';
 import { IntentV1Controller } from './intent-v1.controller';
 import { IntentRedactionService } from './intent-redaction.service';
@@ -14,15 +17,23 @@ import { SharePublicController } from './share-public.controller';
 import { IntentService } from './intent.service';
 
 @Module({
-  imports: [AuthModule, EventModule, NdaModule, AiGatewayModule],
+  imports: [AuthModule, EventModule, NdaModule, AiGatewayModule, TrustScoreModule],
   controllers: [
     IntentController,
+    IntentMatchesController,
+    IntentMatchesV1Controller,
     IntentV1Controller,
     IntentRedactionController,
     ShareLinkController,
     SharePublicController,
   ],
-  providers: [IntentService, IntentRedactionService, ShareLinkService, PrismaService],
+  providers: [
+    IntentService,
+    IntentMatchingService,
+    IntentRedactionService,
+    ShareLinkService,
+    PrismaService,
+  ],
   exports: [IntentRedactionService, IntentService],
 })
 export class IntentModule {}

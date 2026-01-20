@@ -10,6 +10,7 @@ import { listShareLinks, revokeShareLink, type ShareLink } from '../../../lib/sh
 import { fetchNdaCurrent, fetchNdaStatus, type NdaCurrent, type NdaStatus } from '../../../lib/org-nda';
 import { formatDateTime } from '../../../lib/date-format';
 import { getTheme, resolveSystemTheme, setTheme } from '../../../lib/theme';
+import { getAvatarLabels } from '../../../lib/avatar-i18n';
 
 const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
 
@@ -55,6 +56,14 @@ type OverviewDraft = {
   risks: string;
 };
 
+type OrgQualification = {
+  fitBand: string;
+  priority: string;
+  reasons: string[];
+  status: string;
+  suggestionId?: string | null;
+};
+
 type IntentDetailProps = {
   user: OrgUser;
   org: OrgInfo;
@@ -78,6 +87,7 @@ export default function IntentDetail({
   ndaCurrent,
   ndaStatus,
 }: IntentDetailProps) {
+  const labels = getAvatarLabels(org.defaultLanguage);
   const navItems = useMemo(() => getXNavItems(org.slug, 'intents'), [org.slug]);
   const [intentState, setIntentState] = useState(intent);
   const [overviewDraft, setOverviewDraft] = useState(() => buildOverviewDraft(intent));
@@ -95,7 +105,10 @@ export default function IntentDetail({
   const [uploading, setUploading] = useState(false);
   const [aiAccessSaving, setAiAccessSaving] = useState(false);
   const [aiAccessError, setAiAccessError] = useState<string | null>(null);
+  const [orgQualification, setOrgQualification] = useState<OrgQualification | null>(null);
+  const [orgQualError, setOrgQualError] = useState<string | null>(null);
   const isViewer = user.role === 'Viewer';
+  const canDecideOrg = user.role !== 'Viewer';
 
   const hasL2 = useMemo(() => {
     const hasL2Attachment = attachmentList.some((item) => item.confidentialityLevel === 'L2');
@@ -183,6 +196,42 @@ export default function IntentDetail({
     }
   }, [intentState.id]);
 
+  useEffect(() => {
+    let active = true;
+    const loadQualification = async () => {
+      try {
+        const res = await fetch('/api/avatars/org/qualify-intent', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ intentId: intentState.id, channel: 'ui' }),
+        });
+        if (!res.ok) {
+          throw new Error('Request failed');
+        }
+        const data = await res.json();
+        const qualification = data?.qualification;
+        const suggestion = data?.suggestion;
+        if (!active) return;
+        if (qualification) {
+          setOrgQualification({
+            fitBand: String(qualification.fitBand ?? ''),
+            priority: String(qualification.priority ?? ''),
+            reasons: Array.isArray(qualification.reasons) ? qualification.reasons : [],
+            status: String(suggestion?.status ?? 'ISSUED'),
+            suggestionId: suggestion?.id ?? null,
+          });
+        }
+      } catch (err: any) {
+        if (!active) return;
+        setOrgQualError(err?.message ?? 'Unable to load qualification.');
+      }
+    };
+    void loadQualification();
+    return () => {
+      active = false;
+    };
+  }, [intentState.id]);
+
   const handleMenuToggle = (id: string) => (event: MouseEvent<HTMLButtonElement>) => {
     event.stopPropagation();
     setOpenMenuId((prev) => (prev === id ? null : id));
@@ -199,6 +248,29 @@ export default function IntentDetail({
   const handleSignOut = async () => {
     await fetch('/api/auth/logout', { method: 'POST' });
     window.location.href = '/login';
+  };
+
+  const handleOrgDecision = async (decision: 'accept' | 'reject') => {
+    if (!orgQualification?.suggestionId) return;
+    const note =
+      decision === 'reject' ? window.prompt(labels.notePrompt, '')?.trim() : undefined;
+    const res = await fetch(
+      `/api/avatars/suggestions/${orgQualification.suggestionId}/${decision}`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ note }),
+      },
+    );
+    if (!res.ok) return;
+    setOrgQualification((prev) =>
+      prev
+        ? {
+            ...prev,
+            status: decision === 'accept' ? 'ACCEPTED' : 'REJECTED',
+          }
+        : prev,
+    );
   };
 
   const handleNameEdit = () => {
@@ -1552,11 +1624,85 @@ export default function IntentDetail({
                     This status controls whether recipients can access L2 (after they accept, too).
                   </div>
                 </div>
-              </section>
+                </section>
 
-              <section className="card" style={{ marginTop: 'var(--gap)' }} aria-label="AI data level">
-                <header className="cardHeader">
-                  <h2 className="cardTitle">AI data level</h2>
+                <section className="card" style={{ marginTop: 'var(--gap)' }} aria-label="Org avatar">
+                  <header className="cardHeader">
+                    <h2 className="cardTitle">{labels.orgPanelTitle}</h2>
+                    <span className="badge">{labels.orgCardTitle}</span>
+                  </header>
+                  <div className="cardBody">
+                    {orgQualError ? (
+                      <div className="small" style={{ color: 'var(--danger)' }}>
+                        {orgQualError}
+                      </div>
+                    ) : orgQualification ? (
+                      <>
+                        <div className="kv">
+                          <div>
+                            <div className="k">{labels.fitLabel}</div>
+                            <div className="v">
+                              {labels.fitBands[orgQualification.fitBand] ??
+                                orgQualification.fitBand}
+                            </div>
+                          </div>
+                          <span className="badge">{orgQualification.fitBand}</span>
+                        </div>
+                        <div className="kv">
+                          <div>
+                            <div className="k">{labels.priorityLabel}</div>
+                            <div className="v">
+                              {labels.priorities[orgQualification.priority] ??
+                                orgQualification.priority}
+                            </div>
+                          </div>
+                          <span className="badge">{orgQualification.priority}</span>
+                        </div>
+                        {orgQualification.reasons.length ? (
+                          <div style={{ marginTop: '8px' }}>
+                            <div className="small" style={{ fontWeight: 600, marginBottom: '6px' }}>
+                              {labels.reasonsLabel}
+                            </div>
+                            <ul style={{ margin: 0, paddingLeft: '1rem' }}>
+                              {orgQualification.reasons.map((reason) => (
+                                <li key={reason} className="small">
+                                  {labels.reasonLabels[reason] ?? reason}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        ) : null}
+                        {orgQualification.status === 'ISSUED' && canDecideOrg ? (
+                          <div
+                            className="actions"
+                            style={{ justifyContent: 'flex-start', marginTop: '10px', gap: '8px' }}
+                          >
+                            <button
+                              className="btn btnSmall"
+                              type="button"
+                              onClick={() => handleOrgDecision('accept')}
+                            >
+                              {labels.acceptLabel}
+                            </button>
+                            <button
+                              className="btn btnSmall"
+                              type="button"
+                              onClick={() => handleOrgDecision('reject')}
+                            >
+                              {labels.rejectLabel}
+                            </button>
+                          </div>
+                        ) : null}
+                      </>
+                    ) : (
+                      <div className="small">{labels.orgPanelEmpty}</div>
+                    )}
+                  </div>
+                </section>
+
+                <section className="card" style={{ marginTop: 'var(--gap)' }} aria-label="AI data level">
+                  <header className="cardHeader">
+                    <h2 className="cardTitle">AI data level</h2>
                   <span className={aiAllowL2 ? 'badge badgeWarn' : 'badge'}>
                     {aiAllowL2 ? 'L2' : 'L1'}
                   </span>

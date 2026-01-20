@@ -51,6 +51,7 @@ export const EVENT_TYPES = {
   AVATAR_SUGGESTION_FEEDBACK: 'AVATAR_SUGGESTION_FEEDBACK',
   AVATAR_FEEDBACK_RECORDED: 'AVATAR_FEEDBACK_RECORDED',
   MATCH_LIST_CREATED: 'MATCH_LIST_CREATED',
+  MATCH_FEEDBACK_RECORDED: 'MATCH_FEEDBACK_RECORDED',
   PARTNER_INVITED: 'PARTNER_INVITED',
   PARTNER_RESPONSE_RECEIVED: 'PARTNER_RESPONSE_RECEIVED',
   COMMIT_DECISION_TAKEN: 'COMMIT_DECISION_TAKEN',
@@ -66,6 +67,7 @@ export const EVENT_TYPES = {
   AI_GATEWAY_RATE_LIMITED: 'AI_GATEWAY_RATE_LIMITED',
   AI_L2_USED: 'AI_L2_USED',
   TRUSTSCORE_SNAPSHOT_CREATED: 'TRUSTSCORE_SNAPSHOT_CREATED',
+  TRUSTSCORE_RECALCULATED: 'TRUSTSCORE_RECALCULATED',
   // Audit-critical coverage
   INTENT_VIEWED: 'INTENT_VIEWED',
   INTENT_SHARED_LINK_VIEWED: 'INTENT_SHARED_LINK_VIEWED',
@@ -102,9 +104,18 @@ const aiGatewayUseCaseEnum = z.enum([
   'summary_internal',
   'help_explanation',
 ]);
-const suggestionKindEnum = z.enum(['missing_info', 'risk', 'question', 'rewrite', 'summary']);
+const suggestionKindEnum = z.enum([
+  'missing_info',
+  'risk',
+  'question',
+  'rewrite',
+  'summary',
+  'lead_qualification',
+  'next_step',
+]);
 const suggestionDecisionEnum = z.enum(['ACCEPTED', 'REJECTED']);
 const feedbackSentimentEnum = z.enum(['UP', 'DOWN', 'NEUTRAL']);
+const matchFeedbackActionEnum = z.enum(['SHORTLIST', 'HIDE', 'NOT_RELEVANT']);
 const feedbackReasonCodeEnum = z.enum([
   'HELPFUL_STRUCTURING',
   'TOO_GENERIC',
@@ -193,21 +204,23 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     toLevel: z.enum(['L1', 'L2']),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_ISSUED]: basePayload.extend({
-    intentId: z.string().min(1),
+    intentId: z.string().min(1).optional(),
     avatarType: z.enum(['SYSTEM', 'ORG_X', 'INTENT_COACH']),
     suggestionId: z.string().min(1),
     suggestionKind: suggestionKindEnum,
     suggestionL1Text: z.string().min(1).optional(),
     suggestionRef: z.string().min(1).optional(),
+    fitBand: z.enum(['HIGH', 'MEDIUM', 'LOW', 'NO_FIT']).optional(),
+    priority: z.enum(['P1', 'P2', 'P3']).optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_ACCEPTED]: basePayload.extend({
     suggestionId: z.string().min(1),
-    intentId: z.string().min(1),
-    appliedFields: z.array(z.string().min(1)),
+    intentId: z.string().min(1).optional(),
+    appliedFields: z.array(z.string().min(1)).optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_REJECTED]: basePayload.extend({
     suggestionId: z.string().min(1),
-    intentId: z.string().min(1),
+    intentId: z.string().min(1).optional(),
     reasonCode: feedbackReasonCodeEnum.optional(),
   }),
   [EVENT_TYPES.AVATAR_SUGGESTION_FEEDBACK]: basePayload.extend({
@@ -233,6 +246,16 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     matchListId: z.string().min(1),
     algorithmVersion: z.string().min(1),
     topCandidates: z.array(z.string().min(1)),
+  }),
+  [EVENT_TYPES.MATCH_FEEDBACK_RECORDED]: basePayload.extend({
+    intentId: z.string().min(1),
+    matchListId: z.string().min(1),
+    candidateOrgId: z.string().min(1),
+    action: matchFeedbackActionEnum,
+    rating: z.enum(['up', 'down']).optional(),
+    candidateOrgName: z.string().min(1).optional(),
+    candidateOrgSlug: z.string().min(1).optional(),
+    notes: z.string().min(1).max(280).optional(),
   }),
   [EVENT_TYPES.PARTNER_INVITED]: basePayload.extend({
     intentId: z.string().min(1),
@@ -348,6 +371,20 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     factors: z.array(z.string().min(1)),
     computedAt: z.coerce.date(),
     algorithmVersion: z.string().min(1),
+  }),
+  [EVENT_TYPES.TRUSTSCORE_RECALCULATED]: basePayload.extend({
+    orgId: z.string().min(1),
+    trustScoreSnapshotId: z.string().min(1),
+    scoreOverall: z.number(),
+    statusLabel: z.string().min(1),
+    scoreProfile: z.number().optional(),
+    scoreResponsiveness: z.number().optional(),
+    scoreBehaviour: z.number().optional(),
+    previousScore: z.number().optional(),
+    previousStatusLabel: z.string().min(1).optional(),
+    reason: z.string().min(1).optional(),
+    algorithmVersion: z.string().min(1),
+    explanationPublic: z.array(z.string().min(1)).optional(),
   }),
   [EVENT_TYPES.INTENT_VIEWED]: basePayload.extend({
     intentId: z.string().min(1),

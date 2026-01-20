@@ -8,13 +8,25 @@ export type AdminLabels = {
   navMembers: string;
   navPreferences: string;
   navNda: string;
+  navAvatar: string;
   orgTitle: string;
   orgNameLabel: string;
   orgSlugLabel: string;
   orgSlugHint: string;
   orgInboundLabel: string;
+  orgProviderTitle: string;
+  orgProviderLanguagesLabel: string;
+  orgProviderRegionsLabel: string;
+  orgProviderTagsLabel: string;
+  orgProviderBudgetLabel: string;
+  orgProviderTeamSizeLabel: string;
+  orgProviderTagsHint: string;
+  orgProviderRegionsHint: string;
   orgSave: string;
   orgSaved: string;
+  orgTrustScoreTitle: string;
+  orgTrustScoreEmpty: string;
+  orgTrustScoreUpdatedLabel: string;
   membersTitle: string;
   membersEmail: string;
   membersRole: string;
@@ -50,13 +62,25 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Members',
     navPreferences: 'Preferences',
     navNda: 'NDA',
+    navAvatar: 'Avatar profile',
     orgTitle: 'Organization profile',
     orgNameLabel: 'Org name',
     orgSlugLabel: 'Org slug',
     orgSlugHint: '3-6 chars, lowercase letters/numbers; optional -01 suffix.',
     orgInboundLabel: 'Inbound email',
+    orgProviderTitle: 'Provider profile (Matching)',
+    orgProviderLanguagesLabel: 'Provider languages',
+    orgProviderRegionsLabel: 'Provider regions',
+    orgProviderTagsLabel: 'Provider tags',
+    orgProviderBudgetLabel: 'Budget bucket',
+    orgProviderTeamSizeLabel: 'Team size',
+    orgProviderTagsHint: 'Comma-separated, e.g. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Comma-separated, e.g. PL, DE, NL.',
     orgSave: 'Save changes',
     orgSaved: 'Saved.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore will appear after profile/pipeline activity.',
+    orgTrustScoreUpdatedLabel: 'Updated',
     membersTitle: 'Members and roles',
     membersEmail: 'Email',
     membersRole: 'Role',
@@ -90,13 +114,25 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Czlonkowie',
     navPreferences: 'Preferencje',
     navNda: 'NDA',
+    navAvatar: 'Profil Avatara',
     orgTitle: 'Profil organizacji',
     orgNameLabel: 'Nazwa organizacji',
     orgSlugLabel: 'Slug organizacji',
     orgSlugHint: '3-6 znakow, male litery/cyfry; opcjonalny sufiks -01.',
     orgInboundLabel: 'Adres inbound email',
+    orgProviderTitle: 'Profil dostawcy (Matching)',
+    orgProviderLanguagesLabel: 'Jezyki dostawcy',
+    orgProviderRegionsLabel: 'Regiony dostawcy',
+    orgProviderTagsLabel: 'Tagi dostawcy',
+    orgProviderBudgetLabel: 'Budzet',
+    orgProviderTeamSizeLabel: 'Wielkosc zespolu',
+    orgProviderTagsHint: 'Po przecinku, np. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Po przecinku, np. PL, DE, NL.',
     orgSave: 'Zapisz zmiany',
     orgSaved: 'Zapisano.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore pojawi sie po aktywnosci profilu/pipeline.',
+    orgTrustScoreUpdatedLabel: 'Aktualizacja',
     membersTitle: 'Czlonkowie i role',
     membersEmail: 'Email',
     membersRole: 'Rola',
@@ -130,13 +166,25 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Mitglieder',
     navPreferences: 'Einstellungen',
     navNda: 'NDA',
+    navAvatar: 'Avatar Profil',
     orgTitle: 'Organisationsprofil',
     orgNameLabel: 'Org-Name',
     orgSlugLabel: 'Org-Slug',
     orgSlugHint: '3-6 Zeichen, klein, Buchstaben/Zahlen; optional -01 Suffix.',
     orgInboundLabel: 'Inbound E-Mail',
+    orgProviderTitle: 'Provider Profil (Matching)',
+    orgProviderLanguagesLabel: 'Provider Sprachen',
+    orgProviderRegionsLabel: 'Provider Regionen',
+    orgProviderTagsLabel: 'Provider Tags',
+    orgProviderBudgetLabel: 'Budget',
+    orgProviderTeamSizeLabel: 'Teamgroesse',
+    orgProviderTagsHint: 'Kommagetrennt, z.B. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Kommagetrennt, z.B. PL, DE, NL.',
     orgSave: 'Aenderungen speichern',
     orgSaved: 'Gespeichert.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore erscheint nach Profil/Pipeline Aktivitaet.',
+    orgTrustScoreUpdatedLabel: 'Aktualisiert',
     membersTitle: 'Mitglieder und Rollen',
     membersEmail: 'E-Mail',
     membersRole: 'Rolle',
@@ -170,13 +218,25 @@ const LABELS: Record<AdminLanguage, AdminLabels> = {
     navMembers: 'Leden',
     navPreferences: 'Voorkeuren',
     navNda: 'NDA',
+    navAvatar: 'Avatar profiel',
     orgTitle: 'Organisatieprofiel',
     orgNameLabel: 'Organisatienaam',
     orgSlugLabel: 'Org slug',
     orgSlugHint: '3-6 tekens, lowercase letters/cijfers; optioneel -01 suffix.',
     orgInboundLabel: 'Inbound email',
+    orgProviderTitle: 'Provider profiel (Matching)',
+    orgProviderLanguagesLabel: 'Provider talen',
+    orgProviderRegionsLabel: "Provider regio's",
+    orgProviderTagsLabel: 'Provider tags',
+    orgProviderBudgetLabel: 'Budget',
+    orgProviderTeamSizeLabel: 'Teamgrootte',
+    orgProviderTagsHint: 'Komma-gescheiden, bv. ai, cybersecurity, fintech.',
+    orgProviderRegionsHint: 'Komma-gescheiden, bv. PL, DE, NL.',
     orgSave: 'Wijzigingen opslaan',
     orgSaved: 'Opgeslagen.',
+    orgTrustScoreTitle: 'TrustScore (R1.0)',
+    orgTrustScoreEmpty: 'TrustScore verschijnt na profiel/pipeline activiteit.',
+    orgTrustScoreUpdatedLabel: 'Bijgewerkt',
     membersTitle: 'Leden en rollen',
     membersEmail: 'Email',
     membersRole: 'Rol',

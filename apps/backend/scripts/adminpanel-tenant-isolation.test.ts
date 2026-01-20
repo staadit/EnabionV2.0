@@ -95,6 +95,15 @@ class MockEventService {
   }
 }
 
+class MockTrustScoreService {
+  public calls: any[] = [];
+
+  async recalculateOrgTrustScore(input: any) {
+    this.calls.push(input);
+    return { snapshot: { id: 'snapshot-1' } };
+  }
+}
+
 async function assertNotFound(fn: () => Promise<any>, message: string) {
   let threw = false;
   try {
@@ -110,7 +119,8 @@ async function assertNotFound(fn: () => Promise<any>, message: string) {
 async function run() {
   const prisma = new MockPrismaService();
   const events = new MockEventService();
-  const svc = new OrgService(prisma as any, {} as any, events as any);
+  const trustScore = new MockTrustScoreService();
+  const svc = new OrgService(prisma as any, {} as any, events as any, trustScore as any);
 
   await svc.listMembers('org-a');
   assert(
