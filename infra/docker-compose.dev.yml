@@ -42,6 +42,9 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    networks:
+      - default
+      - edge
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3000/api/health || exit 1"]
       interval: 15s
@@ -49,6 +52,24 @@ services:
       retries: 5
     ports:
       - "3000:3000"
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=enabion_edge"
+      - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+      - "traefik.http.routers.frontend-dev.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend-dev.entrypoints=websecure"
+      - "traefik.http.routers.frontend-dev.tls.certresolver=le"
+      - "traefik.http.routers.frontend-dev.service=frontend-dev-svc"
+      - "traefik.http.services.frontend-dev-svc.loadbalancer.server.port=3000"
+      - "traefik.http.routers.frontend-dev-web.rule=Host(`dev.enabion.com`)"
+      - "traefik.http.routers.frontend-dev-web.entrypoints=web"
+      - "traefik.http.routers.frontend-dev-web.middlewares=redirect-to-https"
+      - "traefik.http.routers.frontend-dev-web.service=frontend-dev-svc"
 
 volumes:
   postgres-data:
+
+networks:
+  edge:
+    external: true
+    name: enabion_edge
