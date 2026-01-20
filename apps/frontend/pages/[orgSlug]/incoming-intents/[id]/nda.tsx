@@ -13,6 +13,7 @@ type IncomingTabProps = {
   intentId: string;
   ndaCurrent: NdaCurrent | null;
   ndaStatus: NdaStatus | null;
+  counterpartyOrgId?: string | null;
 };
 
 export default function IncomingNda({
@@ -21,6 +22,7 @@ export default function IncomingNda({
   intentId,
   ndaCurrent,
   ndaStatus,
+  counterpartyOrgId,
 }: IncomingTabProps) {
   return (
     <OrgShell
@@ -40,6 +42,7 @@ export default function IncomingNda({
           current={ndaCurrent}
           status={ndaStatus ?? undefined}
           defaultLanguage={org.defaultLanguage}
+          counterpartyOrgId={counterpartyOrgId ?? undefined}
         />
       ) : (
         <p style={{ color: 'var(--danger)' }}>Unable to load NDA content.</p>
@@ -61,8 +64,12 @@ export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (c
   }
   const intentId = typeof ctx.params?.id === 'string' ? ctx.params.id : 'intent';
   const cookie = result.context!.cookie;
+  const counterpartyOrgId =
+    typeof ctx.query?.counterpartyOrgId === 'string'
+      ? ctx.query.counterpartyOrgId
+      : undefined;
   const ndaCurrent = await fetchNdaCurrent(cookie, result.context!.org.defaultLanguage);
-  const ndaStatus = await fetchNdaStatus(cookie);
+  const ndaStatus = await fetchNdaStatus(cookie, counterpartyOrgId);
   return {
     props: {
       user: result.context!.user,
@@ -70,6 +77,7 @@ export const getServerSideProps: GetServerSideProps<IncomingTabProps> = async (c
       intentId,
       ndaCurrent,
       ndaStatus,
+      counterpartyOrgId: counterpartyOrgId ?? null,
     },
   };
 };

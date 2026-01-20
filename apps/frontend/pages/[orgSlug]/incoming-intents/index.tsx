@@ -4,16 +4,19 @@ import Link from 'next/link';
 import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
-import { fetchOrgEvents, type OrgEvent } from '../../../lib/org-events';
 import { formatDateTime } from '../../../lib/date-format';
+import {
+  fetchIncomingIntents,
+  type IncomingIntentListItem,
+} from '../../../lib/intent-redaction';
 
 type IncomingIntentsProps = {
   user: OrgUser;
   org: OrgInfo;
-  events: OrgEvent[];
+  intents: IncomingIntentListItem[];
 };
 
-export default function IncomingIntents({ user, org, events }: IncomingIntentsProps) {
+export default function IncomingIntents({ user, org, intents }: IncomingIntentsProps) {
   return (
     <OrgShell
       user={user}
@@ -26,11 +29,60 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
       <Head>
         <title>{org.name} - Incoming Intents</title>
       </Head>
-      <div style={cardStyle}>
-        <p style={{ marginTop: 0, fontWeight: 600 }}>Inbox placeholder</p>
-        <p style={{ margin: 0 }}>
-          This page will list incoming intents and their response status.
-        </p>
+
+      <div style={tableCardStyle}>
+        <table style={tableStyle}>
+          <thead>
+            <tr>
+              <th style={thStyle}>Title</th>
+              <th style={thStyle}>Client</th>
+              <th style={thStyle}>Status</th>
+              <th style={thStyle}>Deadline</th>
+              <th style={thStyle}>Level</th>
+              <th style={thStyle}>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {intents.length ? (
+              intents.map((intent) => {
+                const isLocked =
+                  intent.confidentialityLevel === 'L2' &&
+                  intent.ndaGate?.canViewL2 === false;
+                const title = intent.title ?? intent.intentName ?? 'Intent';
+                return (
+                  <tr key={intent.intentId}>
+                    <td style={tdStyle}>
+                      <Link
+                        href={`/${org.slug}/incoming-intents/${intent.intentId}`}
+                        style={linkStyle}
+                      >
+                        {title}
+                      </Link>
+                    </td>
+                    <td style={tdStyle}>{intent.clientOrgName ?? '-'}</td>
+                    <td style={tdStyle}>{intent.status}</td>
+                    <td style={tdStyle}>
+                      {intent.deadlineAt ? formatDateTime(intent.deadlineAt) : '—'}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={badgeStyle}>{intent.confidentialityLevel}</span>
+                      {isLocked ? <span style={lockBadgeStyle}>Locked</span> : null}
+                    </td>
+                    <td style={tdStyle}>
+                      <span style={badgeStyle}>{intent.recipientRole}</span>
+                    </td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td style={emptyStyle} colSpan={6}>
+                  No incoming intents shared yet.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
       <div style={calloutStyle}>
@@ -41,38 +93,68 @@ export default function IncomingIntents({ user, org, events }: IncomingIntentsPr
           Go to organization settings
         </Link>
       </div>
-
-      <section style={sectionStyle}>
-        <h3 style={{ marginTop: 0 }}>Recent events</h3>
-        {events.length ? (
-          <ul style={listStyle}>
-            {events.map((event) => (
-                <li key={event.id} style={listItemStyle}>
-                  <span style={{ fontWeight: 600 }}>{event.type}</span>
-                  <span style={metaStyle}>
-                    {event.subjectId ? ` - ${event.subjectId}` : ''} {formatDateTime(event.occurredAt)}
-                  </span>
-                </li>
-              ))}
-          </ul>
-        ) : (
-          <p style={{ margin: 0, color: 'var(--muted)' }}>No events yet.</p>
-        )}
-      </section>
     </OrgShell>
   );
 }
 
-const cardStyle = {
-  padding: '1rem 1.25rem',
+const tableCardStyle = {
   borderRadius: '12px',
-  border: '1px dashed var(--border)',
-  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  background: 'var(--surface)',
+  overflow: 'hidden',
   boxShadow: 'var(--shadow)',
 };
 
-const sectionStyle = {
-  marginTop: '2rem',
+const tableStyle = {
+  width: '100%',
+  borderCollapse: 'collapse' as const,
+};
+
+const thStyle = {
+  textAlign: 'left' as const,
+  padding: '0.75rem 1rem',
+  fontSize: '0.85rem',
+  color: 'var(--muted)',
+  borderBottom: '1px solid var(--border)',
+};
+
+const tdStyle = {
+  padding: '0.75rem 1rem',
+  borderBottom: '1px solid var(--border)',
+  fontSize: '0.95rem',
+  color: 'var(--text)',
+  verticalAlign: 'top' as const,
+};
+
+const emptyStyle = {
+  padding: '1.5rem 1rem',
+  textAlign: 'center' as const,
+  color: 'var(--muted)',
+};
+
+const badgeStyle = {
+  display: 'inline-flex',
+  padding: '0.15rem 0.5rem',
+  borderRadius: '999px',
+  background: 'var(--surface-2)',
+  border: '1px solid var(--border)',
+  fontSize: '0.75rem',
+  fontWeight: 600,
+  color: 'var(--text)',
+};
+
+const lockBadgeStyle = {
+  ...badgeStyle,
+  marginLeft: '0.5rem',
+  color: 'var(--danger)',
+  borderColor: 'var(--danger-border)',
+  background: 'var(--danger-bg)',
+};
+
+const linkStyle = {
+  color: 'var(--text)',
+  fontWeight: 600,
+  textDecoration: 'none',
 };
 
 const calloutStyle = {
@@ -91,40 +173,17 @@ const calloutLinkStyle = {
   textDecoration: 'none',
 };
 
-const listStyle = {
-  listStyle: 'none',
-  padding: 0,
-  margin: 0,
-  display: 'grid',
-  gap: '0.75rem',
-};
-
-const listItemStyle = {
-  padding: '0.75rem 1rem',
-  borderRadius: '10px',
-  border: '1px solid var(--border)',
-  background: 'var(--surface)',
-  display: 'flex',
-  flexDirection: 'column' as const,
-  gap: '0.35rem',
-};
-
-const metaStyle = {
-  color: 'var(--muted)',
-  fontSize: '0.85rem',
-};
-
 export const getServerSideProps: GetServerSideProps<IncomingIntentsProps> = async (ctx) => {
   const result = await requireOrgContext(ctx);
   if (result.redirect) {
     return { redirect: result.redirect };
   }
-  const events = await fetchOrgEvents(result.context!.cookie, { limit: 8 });
+  const intents = await fetchIncomingIntents(result.context!.cookie);
   return {
     props: {
       user: result.context!.user,
       org: result.context!.org,
-      events,
+      intents,
     },
   };
 };

@@ -1,5 +1,6 @@
 import Head from 'next/head';
 import type { GetServerSideProps } from 'next';
+import { useState } from 'react';
 import OrgShell from '../../../components/OrgShell';
 import { getYNavItems } from '../../../lib/org-nav';
 import { requireOrgContext, type OrgInfo, type OrgUser } from '../../../lib/org-context';
@@ -25,7 +26,43 @@ export default function IncomingIntentDetail({
   intent,
   attachments,
 }: IncomingIntentDetailProps) {
-  const isLocked = Boolean(intent?.l2Redacted || intent?.ndaRequired);
+  const ndaGate = intent?.ndaGate;
+  const isLocked =
+    Boolean(intent?.confidentialityLevel === 'L2' && ndaGate?.canViewL2 === false) ||
+    Boolean(intent?.l2Redacted || intent?.ndaRequired);
+  const [requesting, setRequesting] = useState(false);
+  const [requestError, setRequestError] = useState<string | null>(null);
+  const [requestSentAt, setRequestSentAt] = useState<string | null>(
+    intent?.ndaRequestedAt ?? null,
+  );
+  const canRequest =
+    Boolean(intent?.senderOrgId) && Boolean(isLocked) && !requestSentAt;
+
+  const handleRequestNda = async () => {
+    if (!intent?.senderOrgId || requesting) return;
+    setRequesting(true);
+    setRequestError(null);
+    try {
+      const res = await fetch('/api/nda/mutual/request', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          counterpartyOrgId: intent.senderOrgId,
+          intentId,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => null);
+        setRequestError(data?.error ?? 'Failed to request NDA');
+        return;
+      }
+      setRequestSentAt(new Date().toISOString());
+    } catch {
+      setRequestError('Failed to request NDA');
+    } finally {
+      setRequesting(false);
+    }
+  };
 
   return (
     <OrgShell
@@ -47,33 +84,67 @@ export default function IncomingIntentDetail({
             <div style={detailGridStyle}>
               <div>
                 <div style={labelStyle}>Title</div>
-                <div style={valueStyle}>{intent.title ?? '-'}</div>
+                <div style={valueStyle}>{intent.title ?? intent.intentName ?? '-'}</div>
               </div>
               <div>
-                <div style={labelStyle}>Client</div>
-                <div style={valueStyle}>{intent.client ?? '-'}</div>
+                <div style={labelStyle}>Client org</div>
+                <div style={valueStyle}>{intent.clientOrgName ?? '-'}</div>
               </div>
               <div>
                 <div style={labelStyle}>Stage</div>
                 <div style={valueStyle}>{intent.stage}</div>
               </div>
               <div>
+                <div style={labelStyle}>Role</div>
+                <div style={valueStyle}>{intent.recipientRole ?? '-'}</div>
+              </div>
+              <div>
                 <div style={labelStyle}>Last activity</div>
                 <div style={valueStyle}>{formatDateTime(intent.lastActivityAt)}</div>
               </div>
+            </div>
+            <div style={badgeRowStyle}>
+              <span style={badgeStyle}>{intent.confidentialityLevel}</span>
+              {isLocked ? <span style={lockedBadgeStyle}>Locked</span> : null}
             </div>
             <div style={summaryStyle}>
               <div style={labelStyle}>Summary</div>
               <div style={summaryTextStyle}>{intent.goal || '-'}</div>
             </div>
+            {intent.client ? (
+              <div style={summaryStyle}>
+                <div style={labelStyle}>End client</div>
+                <div style={summaryTextStyle}>{intent.client}</div>
+              </div>
+            ) : null}
             {isLocked ? (
               <div style={lockedCardStyle}>
                 <strong>L2 details locked</strong>
                 <p style={lockedTextStyle}>
                   Mutual NDA acceptance is required to view the source text and L2 attachments.
                 </p>
+                {requestSentAt ? (
+                  <p style={lockedTextStyle}>
+                    NDA request sent: {formatDateTime(requestSentAt)}
+                  </p>
+                ) : null}
+                {requestError ? (
+                  <p style={{ margin: 0, color: 'var(--danger)' }}>{requestError}</p>
+                ) : null}
+                {canRequest ? (
+                  <button
+                    type="button"
+                    style={primaryButtonStyle}
+                    onClick={handleRequestNda}
+                    disabled={requesting}
+                  >
+                    {requesting ? 'Requesting...' : 'Request mutual NDA'}
+                  </button>
+                ) : null}
                 <a
-                  href={`/${org.slug}/incoming-intents/${intentId}/nda`}
+                  href={`/${org.slug}/incoming-intents/${intentId}/nda?counterpartyOrgId=${encodeURIComponent(
+                    intent.senderOrgId ?? '',
+                  )}`}
                   style={linkStyle}
                 >
                   Accept NDA
@@ -218,6 +289,13 @@ const sectionStyle = {
   marginTop: '2rem',
 };
 
+const badgeRowStyle = {
+  display: 'flex',
+  flexWrap: 'wrap' as const,
+  gap: '0.5rem',
+  marginTop: '1rem',
+};
+
 const sectionTitleStyle = {
   margin: '0 0 1rem',
   fontSize: '1.1rem',
@@ -262,10 +340,28 @@ const badgeStyle = {
   color: 'var(--text)',
 };
 
+const lockedBadgeStyle = {
+  ...badgeStyle,
+  color: 'var(--danger)',
+  borderColor: 'var(--danger-border)',
+  background: 'var(--danger-bg)',
+};
+
 const linkStyle = {
   color: 'var(--text)',
   fontWeight: 600,
   textDecoration: 'none',
+};
+
+const primaryButtonStyle = {
+  borderRadius: '999px',
+  border: 'none',
+  padding: '0.55rem 1.1rem',
+  background: 'var(--gradient-primary)',
+  color: 'var(--text-on-brand)',
+  fontWeight: 600,
+  cursor: 'pointer',
+  boxShadow: 'var(--shadow)',
 };
 
 const lockedStyle = {

@@ -35,6 +35,8 @@ model Organization {
   attachments Attachment[]
   ndaAcceptances NdaAcceptance[]
   shareLinks IntentShareLink[]
+  intentRecipientsSent IntentRecipient[] @relation("IntentRecipientSenderOrg")
+  intentRecipientsReceived IntentRecipient[] @relation("IntentRecipientRecipientOrg")
   matchLists MatchList[]
   matchFeedbacks MatchFeedback[]
   matchFeedbackCandidates MatchFeedback[] @relation("MatchFeedbackCandidateOrg")
@@ -72,6 +74,7 @@ model User {
   createdMatchLists MatchList[] @relation("MatchListCreatedBy")
   matchFeedbacks MatchFeedback[] @relation("MatchFeedbackActor")
   trustScoreSnapshots TrustScoreSnapshot[] @relation("TrustScoreActor")
+  requestedIntentRecipients IntentRecipient[] @relation("IntentRecipientNdaRequestedBy")
   createdAt DateTime @default(now())
 }
 
@@ -163,6 +166,17 @@ enum IntentSource {
   manual
   paste
   email
+}
+
+enum IntentRecipientRole {
+  Y
+  Z
+}
+
+enum IntentRecipientStatus {
+  SENT
+  ACCEPTED
+  REVOKED
 }
 
 enum AvatarType {
@@ -501,6 +515,7 @@ model Intent {
   orgLeadQualifications OrgLeadQualification[]
   matchLists     MatchList[]
   matchFeedbacks MatchFeedback[]
+  recipients IntentRecipient[]
 
   @@index([orgId])
   @@index([orgId, stage])
@@ -510,6 +525,29 @@ model Intent {
   @@index([orgId, stage, lastActivityAt])
   @@index([createdByUserId])
   @@unique([orgId, intentName])
+}
+
+model IntentRecipient {
+  id                   String                @id @default(cuid())
+  intentId             String
+  recipientOrgId       String
+  senderOrgId          String
+  recipientRole        IntentRecipientRole   @default(Y)
+  status               IntentRecipientStatus @default(SENT)
+  ndaRequestedAt       DateTime?
+  ndaRequestedByOrgId  String?
+  ndaRequestedByUserId String?
+  createdAt            DateTime              @default(now())
+
+  intent         Intent       @relation(fields: [intentId], references: [id])
+  recipientOrg   Organization @relation("IntentRecipientRecipientOrg", fields: [recipientOrgId], references: [id])
+  senderOrg      Organization @relation("IntentRecipientSenderOrg", fields: [senderOrgId], references: [id])
+  ndaRequestedBy User?        @relation("IntentRecipientNdaRequestedBy", fields: [ndaRequestedByUserId], references: [id])
+
+  @@unique([intentId, recipientOrgId])
+  @@index([recipientOrgId, createdAt])
+  @@index([intentId, createdAt])
+  @@index([senderOrgId, createdAt])
 }
 
 model MatchList {

@@ -12,6 +12,11 @@ const acceptSchema = z.object({
   counterpartyOrgId: z.string().optional(),
 });
 
+const requestSchema = z.object({
+  counterpartyOrgId: z.string().min(1),
+  intentId: z.string().optional(),
+});
+
 @UseGuards(AuthGuard)
 @Controller('v1/nda/mutual')
 export class NdaController {
@@ -92,6 +97,18 @@ export class NdaController {
         counterpartyOrgId: acceptance.counterpartyOrgId ?? undefined,
       },
     };
+  }
+
+  @Post('request')
+  async request(@Req() req: AuthenticatedRequest, @Body() body: unknown) {
+    const user = this.requireUser(req);
+    const parsed = this.parseBody(requestSchema, body);
+    return this.ndaService.requestMutualNda({
+      requesterOrgId: user.orgId,
+      requesterUserId: user.id,
+      counterpartyOrgId: parsed.counterpartyOrgId,
+      intentId: parsed.intentId,
+    });
   }
 
   private requireUser(req: AuthenticatedRequest) {
