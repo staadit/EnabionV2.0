@@ -44,6 +44,7 @@ export const EVENT_TYPES = {
   INTENT_PIPELINE_STAGE_CHANGED: 'INTENT_PIPELINE_STAGE_CHANGED',
   NDA_PRESENTED: 'NDA_PRESENTED',
   NDA_ACCEPTED: 'NDA_ACCEPTED',
+  NDA_REQUESTED: 'NDA_REQUESTED',
   CONFIDENTIALITY_LEVEL_CHANGED: 'CONFIDENTIALITY_LEVEL_CHANGED',
   AVATAR_SUGGESTION_ISSUED: 'AVATAR_SUGGESTION_ISSUED',
   AVATAR_SUGGESTION_ACCEPTED: 'AVATAR_SUGGESTION_ACCEPTED',
@@ -197,6 +198,14 @@ const payloadSchemas: Record<EventType, z.ZodTypeAny> = {
     counterpartyOrgId: z.string().min(1).optional(),
     ndaId: z.string().min(1).optional(),
     ndaLayer: z.literal(1).optional(),
+  }),
+  [EVENT_TYPES.NDA_REQUESTED]: basePayload.extend({
+    requestId: z.string().min(1),
+    requesterOrgId: z.string().min(1),
+    requesterUserId: z.string().min(1),
+    counterpartyOrgId: z.string().min(1),
+    counterpartyOrgName: z.string().min(1).optional(),
+    intentId: z.string().min(1).optional(),
   }),
   [EVENT_TYPES.CONFIDENTIALITY_LEVEL_CHANGED]: basePayload.extend({
     intentId: z.string().min(1),

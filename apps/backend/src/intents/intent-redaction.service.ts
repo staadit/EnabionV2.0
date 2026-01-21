@@ -18,6 +18,11 @@ type IntentRecord = {
   sourceTextRaw: string | null;
 };
 
+type NdaGate = {
+  canViewL2: boolean;
+  reason?: 'NDA_REQUIRED' | 'NOT_L2';
+};
+
 export type IntentRedactionView = {
   id: string;
   shortId: string;
@@ -25,6 +30,10 @@ export type IntentRedactionView = {
   title: string | null;
   goal: string;
   client: string | null;
+  clientOrgName?: string | null;
+  senderOrgId?: string | null;
+  recipientRole?: 'Y' | 'Z';
+  ndaRequestedAt?: string | null;
   stage: string;
   language: string;
   lastActivityAt: string;
@@ -32,6 +41,8 @@ export type IntentRedactionView = {
   hasL2: boolean;
   l2Redacted: boolean;
   ndaRequired: boolean;
+  confidentialityLevel: ConfidentialityLevel;
+  ndaGate: NdaGate;
 };
 
 export type AttachmentRedactionView = {
@@ -41,6 +52,20 @@ export type AttachmentRedactionView = {
   confidentialityLevel: ConfidentialityLevel;
   createdAt: string;
   canDownload: boolean;
+};
+
+export type IncomingIntentListItem = {
+  intentId: string;
+  intentName: string;
+  title: string | null;
+  clientOrgName: string | null;
+  status: string;
+  deadlineAt: string | null;
+  confidentialityLevel: ConfidentialityLevel;
+  ndaGate: NdaGate;
+  senderOrgId: string;
+  recipientRole: 'Y' | 'Z';
+  ndaRequestedAt: string | null;
 };
 
 @Injectable()
@@ -73,18 +98,98 @@ export class IntentRedactionService {
     };
   }
 
+  async listIncomingIntents(viewerOrgId: string): Promise<IncomingIntentListItem[]> {
+    const recipients = await this.prisma.intentRecipient.findMany({
+      where: {
+        recipientOrgId: viewerOrgId,
+        status: { not: 'REVOKED' },
+      },
+      select: {
+        intentId: true,
+        senderOrgId: true,
+        recipientRole: true,
+        ndaRequestedAt: true,
+        intent: {
+          select: {
+            id: true,
+            intentName: true,
+            title: true,
+            stage: true,
+            deadlineAt: true,
+            sourceTextLength: true,
+            lastActivityAt: true,
+            orgId: true,
+          },
+        },
+        senderOrg: {
+          select: {
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        intent: {
+          lastActivityAt: 'desc',
+        },
+      },
+    });
+
+    const intentIds = recipients.map((recipient) => recipient.intentId);
+    const l2AttachmentIntentIds = await this.loadL2AttachmentIntentIds(intentIds);
+
+    const items = await Promise.all(
+      recipients.map(async (recipient) => {
+        const intent = recipient.intent;
+        if (!intent) {
+          return null;
+        }
+        const hasL2Source = Boolean(
+          typeof intent.sourceTextLength === 'number' && intent.sourceTextLength > 0,
+        );
+        const hasL2 = hasL2Source || l2AttachmentIntentIds.has(intent.id);
+        const allowL2 = await this.resolveL2Access(intent.orgId, viewerOrgId);
+        const ndaGate = this.buildNdaGate(hasL2, allowL2);
+        return {
+          intentId: intent.id,
+          intentName: intent.intentName,
+          title: intent.title,
+          clientOrgName: recipient.senderOrg?.name ?? null,
+          status: intent.stage,
+          deadlineAt: intent.deadlineAt ? intent.deadlineAt.toISOString() : null,
+          confidentialityLevel: hasL2 ? 'L2' : 'L1',
+          ndaGate,
+          senderOrgId: recipient.senderOrgId,
+          recipientRole: recipient.recipientRole as 'Y' | 'Z',
+          ndaRequestedAt: recipient.ndaRequestedAt
+            ? recipient.ndaRequestedAt.toISOString()
+            : null,
+        } satisfies IncomingIntentListItem;
+      }),
+    );
+
+    return items.filter(Boolean) as IncomingIntentListItem[];
+  }
+
   async getIncomingView(
     intentId: string,
     viewerOrgId: string,
   ): Promise<IntentRedactionView> {
+    const recipient = await this.loadIncomingRecipient(intentId, viewerOrgId);
     const intent = await this.loadIntent(intentId);
     const allowL2 = await this.resolveL2Access(intent.orgId, viewerOrgId);
     const hasL2Attachments = await this.hasL2Attachments(intent);
-    return this.buildIntentView(intent, {
+    const view = this.buildIntentView(intent, {
       allowL2,
       hasL2: this.computeHasL2(intent, undefined, hasL2Attachments),
       viewerOrgId,
     });
+    return {
+      ...view,
+      clientOrgName: recipient.senderOrgName,
+      senderOrgId: recipient.senderOrgId,
+      recipientRole: recipient.recipientRole,
+      ndaRequestedAt: recipient.ndaRequestedAt,
+    };
   }
 
   async getIncomingPayload(
@@ -94,16 +199,23 @@ export class IntentRedactionService {
     intent: IntentRedactionView;
     attachments: AttachmentRedactionView[];
   }> {
+    const recipient = await this.loadIncomingRecipient(intentId, viewerOrgId);
     const intent = await this.loadIntent(intentId);
     const attachments = await this.loadAttachments(intent);
     const allowL2 = await this.resolveL2Access(intent.orgId, viewerOrgId);
     const hasL2 = this.computeHasL2(intent, attachments);
     return {
-      intent: this.buildIntentView(intent, {
-        allowL2,
-        hasL2,
-        viewerOrgId,
-      }),
+      intent: {
+        ...this.buildIntentView(intent, {
+          allowL2,
+          hasL2,
+          viewerOrgId,
+        }),
+        clientOrgName: recipient.senderOrgName,
+        senderOrgId: recipient.senderOrgId,
+        recipientRole: recipient.recipientRole,
+        ndaRequestedAt: recipient.ndaRequestedAt,
+      },
       attachments: this.mapAttachments(attachments, {
         allowDownloads: true,
         allowL2,
@@ -153,6 +265,37 @@ export class IntentRedactionService {
     return intent as IntentRecord;
   }
 
+  private async loadIncomingRecipient(intentId: string, viewerOrgId: string) {
+    const recipient = await this.prisma.intentRecipient.findFirst({
+      where: {
+        intentId,
+        recipientOrgId: viewerOrgId,
+        status: { not: 'REVOKED' },
+      },
+      select: {
+        senderOrgId: true,
+        recipientRole: true,
+        ndaRequestedAt: true,
+        senderOrg: {
+          select: {
+            name: true,
+          },
+        },
+      },
+    });
+    if (!recipient) {
+      throw new NotFoundException('Intent not found');
+    }
+    return {
+      senderOrgId: recipient.senderOrgId,
+      senderOrgName: recipient.senderOrg?.name ?? null,
+      recipientRole: recipient.recipientRole as 'Y' | 'Z',
+      ndaRequestedAt: recipient.ndaRequestedAt
+        ? recipient.ndaRequestedAt.toISOString()
+        : null,
+    };
+  }
+
   private async loadAttachments(intent: IntentRecord) {
     return this.prisma.attachment.findMany({
       where: { intentId: intent.id, orgId: intent.orgId },
@@ -170,6 +313,21 @@ export class IntentRedactionService {
       },
     });
     return count > 0;
+  }
+
+  private async loadL2AttachmentIntentIds(intentIds: string[]) {
+    if (!intentIds.length) {
+      return new Set<string>();
+    }
+    const rows = await this.prisma.attachment.findMany({
+      where: {
+        intentId: { in: intentIds },
+        blob: { confidentiality: 'L2' },
+      },
+      select: { intentId: true },
+      distinct: ['intentId'],
+    });
+    return new Set(rows.map((row) => row.intentId));
   }
 
   private async resolveL2Access(ownerOrgId: string, viewerOrgId: string): Promise<boolean> {
@@ -201,6 +359,8 @@ export class IntentRedactionService {
   }): IntentRedactionView {
     const isInternal = input.viewerOrgId === intent.orgId;
     const l2Redacted = input.hasL2 && !input.allowL2;
+    const confidentialityLevel: ConfidentialityLevel = input.hasL2 ? 'L2' : 'L1';
+    const ndaGate = this.buildNdaGate(input.hasL2, input.allowL2);
     return {
       id: intent.id,
       shortId: buildIntentShortId(intent.intentNumber),
@@ -215,6 +375,8 @@ export class IntentRedactionService {
       hasL2: input.hasL2,
       l2Redacted,
       ndaRequired: l2Redacted && !isInternal,
+      confidentialityLevel,
+      ndaGate,
     };
   }
 
@@ -251,5 +413,15 @@ export class IntentRedactionService {
     if (intent.client) lines.push(`Client: ${intent.client}`);
     lines.push(`Stage: ${intent.stage}`);
     return `${lines.join('\n')}\n`;
+  }
+
+  private buildNdaGate(hasL2: boolean, allowL2: boolean): NdaGate {
+    if (!hasL2) {
+      return { canViewL2: true, reason: 'NOT_L2' };
+    }
+    if (allowL2) {
+      return { canViewL2: true };
+    }
+    return { canViewL2: false, reason: 'NDA_REQUIRED' };
   }
 }

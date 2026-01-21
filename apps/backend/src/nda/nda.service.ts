@@ -2,7 +2,7 @@ import * as crypto from 'node:crypto';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { NdaChannel, NdaType } from '@prisma/client';
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { ulid } from 'ulid';
 import { EventService } from '../events/event.service';
 import { EVENT_TYPES, type Channel } from '../events/event-registry';
@@ -339,8 +339,110 @@ export class NdaService {
     return acceptance;
   }
 
+  async requestMutualNda(input: {
+    requesterOrgId: string;
+    requesterUserId: string;
+    counterpartyOrgId: string;
+    intentId?: string;
+  }): Promise<{ ok: boolean; requestId?: string; mutualAccepted: boolean }> {
+    if (!input.counterpartyOrgId) {
+      throw new BadRequestException('counterpartyOrgId is required');
+    }
+    if (input.counterpartyOrgId === input.requesterOrgId) {
+      throw new BadRequestException('counterpartyOrgId must differ from requester org');
+    }
+
+    const now = new Date();
+    let intentStage: string | null = null;
+
+    if (input.intentId) {
+      const recipient = await this.prisma.intentRecipient.findFirst({
+        where: {
+          intentId: input.intentId,
+          recipientOrgId: input.requesterOrgId,
+          status: { not: 'REVOKED' },
+        },
+        select: {
+          senderOrgId: true,
+          intent: {
+            select: {
+              stage: true,
+            },
+          },
+        },
+      });
+      if (!recipient) {
+        throw new ForbiddenException('Intent not shared with requester org');
+      }
+      if (recipient.senderOrgId !== input.counterpartyOrgId) {
+        throw new ForbiddenException('Invalid NDA counterparty');
+      }
+      intentStage = recipient.intent?.stage ?? null;
+      await this.prisma.intentRecipient.updateMany({
+        where: {
+          intentId: input.intentId,
+          recipientOrgId: input.requesterOrgId,
+        },
+        data: {
+          ndaRequestedAt: now,
+          ndaRequestedByOrgId: input.requesterOrgId,
+          ndaRequestedByUserId: input.requesterUserId,
+        },
+      });
+    }
+
+    const mutualAccepted = await this.hasMutualAcceptance({
+      ownerOrgId: input.counterpartyOrgId,
+      viewerOrgId: input.requesterOrgId,
+    });
+    if (mutualAccepted) {
+      return { ok: true, mutualAccepted: true };
+    }
+
+    const counterparty = await this.prisma.organization.findUnique({
+      where: { id: input.counterpartyOrgId },
+      select: { name: true },
+    });
+
+    const requestId = ulid();
+    const pipelineStage = (intentStage as any) || 'NEW';
+    const lifecycleStep = this.mapLifecycleStep(pipelineStage);
+
+    await this.events.emitEvent({
+      type: EVENT_TYPES.NDA_REQUESTED,
+      occurredAt: now,
+      orgId: input.counterpartyOrgId,
+      actorUserId: input.requesterUserId,
+      actorOrgId: input.requesterOrgId,
+      subjectType: 'NDA',
+      subjectId: requestId,
+      lifecycleStep,
+      pipelineStage: pipelineStage as any,
+      channel: 'ui',
+      correlationId: ulid(),
+      payload: {
+        payloadVersion: 1,
+        requestId,
+        requesterOrgId: input.requesterOrgId,
+        requesterUserId: input.requesterUserId,
+        counterpartyOrgId: input.counterpartyOrgId,
+        counterpartyOrgName: counterparty?.name ?? undefined,
+        intentId: input.intentId ?? undefined,
+      },
+    });
+
+    return { ok: true, requestId, mutualAccepted: false };
+  }
+
   computeSha256(input: string): string {
     return crypto.createHash('sha256').update(input, 'utf8').digest('hex');
+  }
+
+  private mapLifecycleStep(stage?: string | null) {
+    const value = stage?.toUpperCase();
+    if (value === 'MATCH') return 'MATCH_ALIGN';
+    if (value === 'COMMIT') return 'COMMIT_ASSURE';
+    return 'CLARIFY';
   }
 
   private async readContentFile(fileName: string, required: boolean): Promise<string> {

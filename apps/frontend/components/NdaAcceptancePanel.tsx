@@ -6,6 +6,7 @@ type NdaAcceptancePanelProps = {
   current: NdaCurrent;
   status?: NdaStatus | null;
   defaultLanguage?: string;
+  counterpartyOrgId?: string;
 };
 
 const LANGUAGE_OPTIONS = ['EN', 'PL', 'DE', 'NL'];
@@ -14,6 +15,7 @@ export default function NdaAcceptancePanel({
   current,
   status,
   defaultLanguage,
+  counterpartyOrgId,
 }: NdaAcceptancePanelProps) {
   const [language, setLanguage] = useState(defaultLanguage || 'EN');
   const [typedName, setTypedName] = useState('');
@@ -37,6 +39,7 @@ export default function NdaAcceptancePanel({
           typedName,
           typedRole,
           language,
+          counterpartyOrgId,
         }),
       });
       if (!res.ok) {

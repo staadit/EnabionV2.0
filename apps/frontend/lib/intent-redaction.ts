@@ -5,6 +5,10 @@ export type IntentRedactionView = {
   title: string | null;
   goal: string;
   client: string | null;
+  clientOrgName?: string | null;
+  senderOrgId?: string | null;
+  recipientRole?: 'Y' | 'Z';
+  ndaRequestedAt?: string | null;
   stage: string;
   language: string;
   lastActivityAt: string;
@@ -12,6 +16,8 @@ export type IntentRedactionView = {
   hasL2: boolean;
   l2Redacted: boolean;
   ndaRequired: boolean;
+  confidentialityLevel: string;
+  ndaGate: { canViewL2: boolean; reason?: string };
 };
 
 export type AttachmentRedactionView = {
@@ -31,6 +37,20 @@ export type ShareIntentPayload = {
 export type ExportIntentPayload = {
   intent: IntentRedactionView;
   markdown: string;
+};
+
+export type IncomingIntentListItem = {
+  intentId: string;
+  intentName: string;
+  title: string | null;
+  clientOrgName: string | null;
+  status: string;
+  deadlineAt: string | null;
+  confidentialityLevel: string;
+  ndaGate: { canViewL2: boolean; reason?: string };
+  senderOrgId: string;
+  recipientRole: 'Y' | 'Z';
+  ndaRequestedAt: string | null;
 };
 
 const BACKEND_BASE = process.env.BACKEND_URL || 'http://backend:4000';
@@ -67,6 +87,22 @@ export async function fetchIncomingIntent(
     return await readJson<ShareIntentPayload>(res);
   } catch {
     return null;
+  }
+}
+
+export async function fetchIncomingIntents(
+  cookie: string | undefined,
+): Promise<IncomingIntentListItem[]> {
+  const url = `${BACKEND_BASE}/v1/incoming-intents`;
+  try {
+    const res = await fetch(url, { headers: { cookie: cookie ?? '' } });
+    if (!res.ok) return [];
+    const data = await readJson<any>(res);
+    if (Array.isArray(data)) return data as IncomingIntentListItem[];
+    if (Array.isArray(data?.items)) return data.items as IncomingIntentListItem[];
+    return [];
+  } catch {
+    return [];
   }
 }
 

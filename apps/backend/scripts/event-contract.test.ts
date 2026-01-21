@@ -43,6 +43,18 @@ const cases = [
     },
   },
   {
+    type: EVENT_TYPES.NDA_REQUESTED,
+    payload: {
+      payloadVersion: 1,
+      requestId: 'nda_req_1',
+      requesterOrgId: 'org_y',
+      requesterUserId: 'user_y',
+      counterpartyOrgId: 'org_x',
+      counterpartyOrgName: 'Org X',
+      intentId: 'intent_test',
+    },
+  },
+  {
     type: EVENT_TYPES.EMAIL_RECEIVED,
     payload: {
       payloadVersion: 1,
